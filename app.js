@@ -82,17 +82,19 @@
     return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.72));
   }
 
-  function fotoSecici(girdi, onizleme, yazi) {
+  // girdi: kamera girdisi; galeri: (isteğe bağlı) galeriden seçme girdisi
+  function fotoSecici(girdi, onizleme, yazi, galeri) {
     let blob = null;
-    girdi.addEventListener("change", async () => {
-      const f = girdi.files?.[0]; if (!f) return;
+    const girdiler = [girdi, galeri].filter(Boolean);
+    for (const g of girdiler) g.addEventListener("change", async () => {
+      const f = g.files?.[0]; if (!f) return;
       try {
         blob = await kucult(f);
         onizleme.src = URL.createObjectURL(blob); onizleme.hidden = false;
         if (yazi) yazi.textContent = "📷 Fotoğrafı değiştir";
       } catch (e) { mesaj(e.message); }
     });
-    return { al: () => blob, sifirla: () => { blob = null; girdi.value = ""; onizleme.hidden = true; if (yazi) yazi.textContent = "📷 Fotoğraf çek"; } };
+    return { al: () => blob, sifirla: () => { blob = null; for (const g of girdiler) g.value = ""; onizleme.hidden = true; if (yazi) yazi.textContent = "📷 Fotoğraf çek"; } };
   }
 
   // Sesle yazma: tarayıcı destekliyorsa Türkçe dinler, metni kutuya ekler.
@@ -619,7 +621,7 @@
 
   // Yeni kayıt formu
   const yeniForm = $("#yeni-form");
-  const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"));
+  const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"), $("#yeni-galeri"));
   mikrofonBagla($("#mikrofon"), yeniForm.querySelector("textarea"), $("#mikrofon-ipucu"));
 
   $("#yeni-ac").addEventListener("click", () => { yeniForm.reset(); yeniFoto.sifirla(); goster("yeni"); });

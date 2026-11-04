@@ -182,6 +182,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
   display: block; text-align: center; padding: 18px; margin: 0;
   border: 2px dashed var(--cizgi); border-radius: 12px; background: var(--yesil-acik); cursor: pointer;
 }
+/* Galeri düğmesi kameradan ayrı görünsün: dolu mavi */
+.galeri-dugme { margin-top: 10px; padding: 14px; border: 0; background: #1565c0; color: #fff; font-weight: 700; }
 
 .ses-satir { display: grid; grid-template-columns: 1fr 52px; gap: 8px; align-items: start; }
 .mikrofon { margin-top: 6px; height: 52px; border-radius: 12px; border: 1px solid var(--cizgi); background: var(--kart); font-size: 22px; }
