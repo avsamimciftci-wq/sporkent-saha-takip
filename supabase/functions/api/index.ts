@@ -177,6 +177,12 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "durum":
       return { rol, durum: u.durum, ad: u.ad };
 
+    // Geçici: simgedeki bildirim sayısı neden silinmiyor, telefondan gelen rapor
+    case "tani": {
+      await db.from("bildirim_gunlugu").insert({ baslik: `TANI: ${u.ad} (${rol})`, hatalar: g.rapor ?? null });
+      return { tamam: true };
+    }
+
     case "liste": {
       const { data, error } = await db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (error) throw error;

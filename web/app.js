@@ -352,10 +352,29 @@
     if (!("serviceWorker" in navigator)) return;
     try {
       const kayit = await navigator.serviceWorker.ready;
-      for (const b of await kayit.getNotifications()) b.close();
+      const once = await kayit.getNotifications();
+      for (const b of once) b.close();
       // Android sayıyı bildirimlerden alır; kapatmayı bildirimi gösteren servis çalışanı da yapsın
       (navigator.serviceWorker.controller || kayit.active)?.postMessage({ tip: "temizle" });
-    } catch {}
+      taniGonder(kayit, once);
+    } catch (e) { taniGonder(null, [], String(e)); }
+  }
+
+  // Geçici tanı: kaç bildirim bulundu, kapatıldıktan sonra kaç kaldı
+  let sonTani = 0;
+  async function taniGonder(kayit, once, hata) {
+    if (Date.now() - sonTani < 20000) return;
+    sonTani = Date.now();
+    await new Promise((r) => setTimeout(r, 1500));
+    let sonra = null;
+    try { sonra = kayit ? (await kayit.getNotifications()).length : null; } catch (e) { hata = String(e); }
+    const rapor = {
+      once: once.length, etiketler: once.map((b) => b.tag).slice(0, 10), sonra, hata: hata || null,
+      surum: await caches.keys().catch(() => []), denetci: !!navigator.serviceWorker.controller,
+      izin: window.Notification?.permission, rozetApi: typeof navigator.clearAppBadge,
+      kurulu: window.matchMedia("(display-mode: standalone)").matches, ua: navigator.userAgent,
+    };
+    api("tani", { rapor }).catch(() => {});
   }
   const iosTarayicida = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches && !navigator.standalone;
 
