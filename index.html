@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sporkent Takip</title>
+  <meta name="theme-color" content="#1f4e45">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sporkent Takip">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="ust">
+    <div>
+      <div class="ust-kurum">Sporkent İşletme Kooperatifi</div>
+      <div class="ust-baslik">Saha Takip</div>
+    </div>
+    <button id="cikis" class="ust-dugme" hidden>Çıkış</button>
+  </header>
+
+  <div id="demo-uyari" class="demo" hidden>
+    Deneme modu: kayıtlar yalnızca bu cihazda tutulur.
+  </div>
+
+  <!-- Giriş -->
+  <main id="ekran-giris" class="ekran" hidden>
+    <form id="giris-form" class="kart">
+      <h1>Giriş</h1>
+      <label>Adınız
+        <input name="ad" autocomplete="name" required maxlength="80" placeholder="Örn. Ahmet Yılmaz">
+      </label>
+      <label>Giriş kodu
+        <input name="kod" required autocomplete="off" autocapitalize="none" spellcheck="false">
+      </label>
+      <button class="ana-dugme" type="submit">Giriş yap</button>
+      <p id="giris-hata" class="hata" hidden></p>
+    </form>
+  </main>
+
+  <!-- Liste -->
+  <main id="ekran-liste" class="ekran" hidden>
+    <div id="ozet" class="ozet"></div>
+    <div id="bildirim-kutu" class="bilgi" hidden>
+      <span id="bildirim-metin">Bildirimleri açın, yeni kayıt ve “yapıldı” haberleri telefonunuza gelsin.</span>
+      <button id="bildirim-ac" class="kucuk-dugme">Bildirimleri aç</button>
+    </div>
+    <nav class="sekmeler" id="sekmeler">
+      <button data-filtre="acik" class="secili">Açık</button>
+      <button data-filtre="devam">Devam eden</button>
+      <button data-filtre="tamam">Yapıldı</button>
+      <button data-filtre="hepsi">Tümü</button>
+    </nav>
+    <div id="liste" class="liste"></div>
+    <button id="yeni-ac" class="yuzen">+ Yeni kayıt</button>
+  </main>
+
+  <!-- Yeni kayıt -->
+  <main id="ekran-yeni" class="ekran" hidden>
+    <form id="yeni-form" class="kart">
+      <h1>Yeni kayıt</h1>
+
+      <div class="foto-alan">
+        <img id="yeni-foto-onizleme" alt="" hidden>
+        <label class="foto-dugme">
+          <input id="yeni-foto" type="file" accept="image/*" capture="environment" hidden>
+          <span id="yeni-foto-yazi">📷 Fotoğraf çek</span>
+        </label>
+      </div>
+
+      <label>Bölge
+        <select name="bolge" required>
+          <option value="">Seçin</option>
+          <option>Sahil ve plaj</option>
+          <option>Sosyal tesisler ve havuz çevresi</option>
+          <option>Ana yollar ve ortak yeşil alanlar</option>
+          <option>Villa yolları ve ortak peyzaj</option>
+          <option>Spor alanları ve amfi tiyatro</option>
+          <option>Teknik altyapı ve hizmet alanları</option>
+        </select>
+      </label>
+
+      <label>Yer
+        <input name="yer" required maxlength="200" placeholder="Örn. 3 numaralı duş">
+      </label>
+
+      <label>Sorun
+        <div class="ses-satir">
+          <textarea name="sorun" required rows="4" maxlength="2000" placeholder="Yazın ya da mikrofona basıp konuşun"></textarea>
+          <button type="button" class="mikrofon" id="mikrofon" title="Sesle yaz">🎤</button>
+        </div>
+        <small id="mikrofon-ipucu" class="ipucu">Mikrofon çalışmazsa klavyedeki mikrofon tuşuyla da konuşarak yazabilirsiniz.</small>
+      </label>
+
+      <fieldset class="oncelik">
+        <legend>Öncelik</legend>
+        <label><input type="radio" name="oncelik" value="acil"> <span class="rozet acil">Acil</span> <small>Elektrik, su baskını, güvenlik</small></label>
+        <label><input type="radio" name="oncelik" value="oncelikli"> <span class="rozet oncelikli">Öncelikli</span> <small>Duş, tuvalet, pompa, tesisat</small></label>
+        <label><input type="radio" name="oncelik" value="normal" checked> <span class="rozet normal">Normal</span> <small>Boya, budama, küçük işler</small></label>
+      </fieldset>
+
+      <div class="dugmeler">
+        <button type="button" class="ikincil" data-geri>Vazgeç</button>
+        <button class="ana-dugme" type="submit">Gönder</button>
+      </div>
+      <p class="hata" hidden></p>
+    </form>
+  </main>
+
+  <!-- Kayıt ayrıntısı -->
+  <main id="ekran-detay" class="ekran" hidden>
+    <div id="detay" class="kart"></div>
+  </main>
+
+  <div id="mesaj" class="mesaj" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
