@@ -203,8 +203,8 @@
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const geciken = kayitlar.filter(gecikti).length;
     $("#ozet").innerHTML = `
-      <button data-filtre="tamam" class="ozet-yapilan ${filtre === "tamam" ? "secili" : ""}"><b>${yapilan}</b><span>Yapılanlar</span></button>
-      <button data-filtre="acik" class="ozet-yapilmayan ${filtre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Yapılmayanlar</span></button>`;
+      <button data-filtre="acik" class="ozet-yapilmayan ${filtre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Henüz yapılmayanlar</span></button>
+      <button data-filtre="tamam" class="ozet-yapilan ${filtre === "tamam" ? "secili" : ""}"><b>${yapilan}</b><span>Yapılanlar</span></button>`;
     const uyari = $("#gecikme-uyari");
     uyari.hidden = !geciken;
     uyari.textContent = `⚠ ${geciken} iş süresi içinde yapılmadı`;
@@ -235,7 +235,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
         </span>
-      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Yapılmayan iş yok. 👍"}</p>`;
+      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
   }
 
   const fotoKutu = (url, yazi, bos) => `<figure>${url
