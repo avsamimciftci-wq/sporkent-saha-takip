@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v4";
+const SURUM = "sk-v5";
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -35,13 +35,24 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let v = {};
   try { v = e.data.json(); } catch { v = { baslik: "Sporkent", govde: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(v.baslik || "Sporkent", {
-    body: v.govde || "",
-    icon: "icons/icon-192.png",
-    badge: "icons/icon-192.png",
-    image: v.resim || undefined,
-    data: { kayitId: v.kayitId },
-  }));
+  e.waitUntil((async () => {
+    // Sesli, titreşimli ve dokunulana kadar ekranda kalan bildirim
+    await self.registration.showNotification(v.baslik || "Sporkent", {
+      body: v.govde || "",
+      icon: "icons/icon-192.png",
+      badge: "icons/icon-192.png",
+      image: v.resim || undefined,
+      tag: v.kayitId ? "kayit-" + v.kayitId : undefined,
+      renotify: !!v.kayitId,
+      requireInteraction: true,
+      silent: false,
+      vibrate: [300, 100, 300, 100, 300],
+      data: { kayitId: v.kayitId },
+    });
+    // Uygulama açıksa haber ver: iş penceresi kendiliğinden açılsın
+    const pencereler = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const p of pencereler) p.postMessage({ tip: "bildirim", kayitId: v.kayitId });
+  })());
 });
 
 self.addEventListener("notificationclick", (e) => {
