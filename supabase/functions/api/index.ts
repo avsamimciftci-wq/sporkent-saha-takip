@@ -55,6 +55,17 @@ async function rolBul(kod: unknown): Promise<Rol | null> {
   return null;
 }
 
+// Yeni işlerin yapılma süresi (gün): yöneticinin ayarı, yoksa 3
+async function varsayilanSure(): Promise<number> {
+  const { data } = await db.from("ayarlar").select("deger").eq("ad", "varsayilan_sure").maybeSingle();
+  const n = Number(data?.deger);
+  return Number.isInteger(n) && n >= 1 && n <= 60 ? n : 3;
+}
+
+// Türkiye saatiyle (UTC+3, yaz saati yok) gün + n gün → "YYYY-MM-DD"
+const sonGun = (baslangic: string | Date, gun: number) =>
+  new Date(new Date(baslangic).getTime() + 3 * 3600e3 + gun * 864e5).toISOString().slice(0, 10);
+
 const anahtarUret = () => crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
 
 async function fotoUrlleri(kayitlar: any[]) {
@@ -192,6 +203,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         yer: temiz(g.yer, 200),
         sorun: temiz(g.sorun),
         foto_once: temiz(g.foto, 200) || null,
+        son_tarih: sonGun(new Date(), await varsayilanSure()),
       };
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
@@ -217,6 +229,28 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: url } = await db.storage.from(BUCKET).createSignedUrl(data.foto_sonra, 60 * 60 * 24 * 7);
       await bildir("hepsi", `Yapıldı • ${data.yer}`.slice(0, 80), (data.sonuc || data.sorun || "").slice(0, 180),
         { kayitId: data.id, resim: url?.signedUrl });
+      return { tamam: true };
+    }
+
+    case "sure_degistir": {
+      yonetici();
+      const gun = Number(g.gun);
+      if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
+      const { data: k } = await db.from("kayitlar").select("id, created_at, durum").eq("id", g.id).maybeSingle();
+      if (!k) throw new Hata("Kayıt bulunamadı.");
+      if (k.durum === "tamam") throw new Hata("Bu iş zaten yapıldı.");
+      const son_tarih = sonGun(k.created_at, gun);
+      const { error } = await db.from("kayitlar").update({ son_tarih }).eq("id", k.id);
+      if (error) throw error;
+      return { son_tarih };
+    }
+
+    case "varsayilan_sure": {
+      yonetici();
+      const gun = Number(g.gun);
+      if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
+      const { error } = await db.from("ayarlar").upsert({ ad: "varsayilan_sure", deger: String(gun) });
+      if (error) throw error;
       return { tamam: true };
     }
 
@@ -285,7 +319,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "kodlar": {
       yonetici();
-      return { kodlar: await kodlar() };
+      return { kodlar: await kodlar(), varsayilan_sure: await varsayilanSure() };
     }
 
     case "kod_degistir": {
