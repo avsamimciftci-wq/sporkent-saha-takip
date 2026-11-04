@@ -1,4 +1,4 @@
-// Sporkent Müdür Takip: tek API ucu.
+// Sporkent İşletme Kooperatifi SAHA TAKİP: tek API ucu.
 // Giriş kodu yalnızca gruba katılırken kullanılır; yönetici (YK başkanı) onaylayınca telefon
 // kendi gizli anahtarıyla çalışır. Tarayıcıya hiçbir tablo açık değildir.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -31,7 +31,7 @@ class Hata extends Error {
 type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
-const MAKS_UYE = 30; // başkan dahil onaylı üye sınırı
+const MAKS_UYE = 50; // başkan dahil onaylı üye sınırı
 const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi",
 };
@@ -302,7 +302,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (durum === "cikarildi") {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
       } else {
-        await bildir({ cihaz: hedef }, "Gruba kabul edildiniz", "Sporkent Saha Takip'i kullanmaya başlayabilirsiniz.");
+        await bildir({ cihaz: hedef }, "Gruba kabul edildiniz", "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasını kullanmaya başlayabilirsiniz.");
       }
       return { tamam: true };
     }
