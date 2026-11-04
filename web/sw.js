@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v3";
+const SURUM = "sk-v4";
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -39,6 +39,7 @@ self.addEventListener("push", (e) => {
     body: v.govde || "",
     icon: "icons/icon-192.png",
     badge: "icons/icon-192.png",
+    image: v.resim || undefined,
     data: { kayitId: v.kayitId },
   }));
 });

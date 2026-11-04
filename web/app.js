@@ -50,33 +50,30 @@
 
   // Deneme modu: aynı işlemleri bu cihazda taklit eder.
   // Gerçek kodlar yalnızca sunucudadır; bunlar sadece denemeye özeldir.
-  const DEMO_UYE = "deneme", DEMO_MUDUR = "deneme-mudur";
+  const DEMO_UYE = "deneme", DEMO_MUDUR = "deneme-mudur", DEMO_SEF = "deneme-sef", DEMO_YONETIM = "deneme-yonetim";
   function demoApi(g) {
     const kod = String(g.kod || "").trim().toLowerCase();
-    const rol = kod === DEMO_MUDUR ? "mudur" : kod === DEMO_UYE ? "uye" : null;
+    const rol = { [DEMO_MUDUR]: "mudur", [DEMO_SEF]: "sef", [DEMO_YONETIM]: "yonetim", [DEMO_UYE]: "uye" }[kod];
     if (!rol) throw new Error("Kod hatalı.");
     const liste = sakla.al("sk_demo_kayitlar", []);
     const kaydet = () => sakla.koy("sk_demo_kayitlar", liste);
     const bul = () => { const k = liste.find((x) => x.id === g.id); if (!k) throw new Error("Kayıt bulunamadı."); return k; };
-    const mudurMu = () => { if (rol !== "mudur") throw new Error("Bu işlem yalnızca müdür içindir."); };
     const url = (p) => (p ? sakla.al("sk_demo_foto_" + p) : null);
     switch (g.eylem) {
       case "giris": return { rol, vapid: null };
-      case "liste": return { kayitlar: liste.slice().reverse().map((k) => ({ ...k, foto_once_url: url(k.foto_once), foto_sonra_url: url(k.foto_sonra) })) };
+      case "liste": return { kayitlar: liste.slice().reverse()
+        .filter((k) => rol !== "uye" || k.durum === "tamam" || k.cihaz === g.cihaz)
+        .map((k) => ({ ...k, foto_once_url: url(k.foto_once), foto_sonra_url: url(k.foto_sonra) })) };
       case "yeni": {
         const id = (liste.at(-1)?.id || 0) + 1;
         const k = { id, no: new Date().getFullYear() + "-" + String(id).padStart(3, "0"), created_at: new Date().toISOString(),
-          bildiren: g.bildiren, cihaz: g.cihaz, bolge: g.bolge, yer: g.yer, sorun: g.sorun, oncelik: g.oncelik,
-          durum: "acik", foto_once: g.foto || null };
+          bildiren: g.bildiren, cihaz: g.cihaz, yer: g.yer, sorun: g.sorun, durum: "acik", foto_once: g.foto || null };
         liste.push(k); kaydet(); return { kayit: k };
       }
-      case "baslat": { mudurMu(); const k = bul(); Object.assign(k, { durum: "devam", sorumlu: g.sorumlu, son_tarih: g.son_tarih || null, mudahale_at: new Date().toISOString() }); kaydet(); return { kayit: k }; }
-      case "gecikme": { mudurMu(); const k = bul(); Object.assign(k, { gecikme_nedeni: g.neden, son_tarih: g.son_tarih || null }); kaydet(); return { kayit: k }; }
       case "kapat": {
-        mudurMu();
-        if (!g.foto) throw new Error("İş bitti fotoğrafı olmadan kayıt kapatılamaz.");
-        if (!String(g.sonuc || "").trim()) throw new Error("Yapılan işlemi yazın.");
-        const k = bul(); Object.assign(k, { durum: "tamam", sonuc: g.sonuc, foto_sonra: g.foto, kapanis_at: new Date().toISOString() }); kaydet(); return { kayit: k };
+        if (!KAPATABILIR.includes(rol)) throw new Error("Bu işlemi yalnızca müdür veya şef yapabilir.");
+        if (!g.foto) throw new Error("Yapılan işin fotoğrafını çekin.");
+        const k = bul(); Object.assign(k, { durum: "tamam", sonuc: g.sonuc || null, foto_sonra: g.foto, kapatan: g.ad, kapanis_at: new Date().toISOString() }); kaydet(); return { kayit: k };
       }
       case "abone_ol": return { tamam: true };
     }
@@ -86,11 +83,13 @@
   // ---------- Yardımcılar ----------
   const kac = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const tarihSaat = (t) => t ? new Date(t).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
-  const tarih = (t) => t ? new Date(t + "T00:00:00").toLocaleDateString("tr-TR") : "—";
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
-  const DURUM = { acik: "Açık", devam: "Devam ediyor", tamam: "Yapıldı" };
-  const DURUM_ROZET = { acik: "oncelikli", devam: "devam", tamam: "tamam" };
-  const gecikti = (k) => k.durum !== "tamam" && k.son_tarih && k.son_tarih < bugun();
+  const DURUM = { acik: "Açık", devam: "Açık", tamam: "Yapıldı" };
+  const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
+  const ROL_ADI = { mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
+  const KAPATABILIR = ["mudur", "sef"];
+  const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
+  const hepsiniGorur = () => oturum?.rol && oturum.rol !== "uye";
 
   let mesajZamani;
   function mesaj(metin) {
@@ -164,22 +163,22 @@
   }
 
   function listeCiz() {
-    const acik = kayitlar.filter((k) => k.durum === "acik").length;
-    const devam = kayitlar.filter((k) => k.durum === "devam").length;
-    const geciken = kayitlar.filter(gecikti).length;
+    const acik = kayitlar.filter((k) => k.durum !== "tamam").length;
+    const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const bugunKapanan = kayitlar.filter((k) => k.kapanis_at && k.kapanis_at.slice(0, 10) === bugun()).length;
     $("#ozet").innerHTML = `
-      <div><b>${acik}</b><span>Açık</span></div>
-      <div><b>${devam}</b><span>Devam</span></div>
-      <div class="${geciken ? "kirmizi" : ""}"><b>${geciken}</b><span>Geciken</span></div>
-      <div><b>${bugunKapanan}</b><span>Bugün biten</span></div>`;
+      <div><b>${acik}</b><span>${hepsiniGorur() ? "Açık sorun" : "Bildirdiğim açık"}</span></div>
+      <div><b>${bugunKapanan}</b><span>Bugün yapılan</span></div>
+      <div><b>${yapilan}</b><span>Toplam yapılan</span></div>`;
+    $("#gorunurluk").textContent = hepsiniGorur()
+      ? `${ROL_ADI[oturum.rol]} olarak tüm sorunları görüyorsunuz.`
+      : "Bildirdiğiniz sorunları yalnızca siz, müdür, şef ve yönetim kurulu görür. Yapılan işleri herkes görür.";
 
-    const sira = { acil: 0, oncelikli: 1, normal: 2 };
     const gorunen = kayitlar
-      .filter((k) => filtre === "hepsi" || k.durum === filtre)
-      .sort((a, b) => filtre === "tamam" || filtre === "hepsi"
-        ? (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at)
-        : (sira[a.oncelik] - sira[b.oncelik]) || a.created_at.localeCompare(b.created_at));
+      .filter((k) => filtre === "hepsi" || (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
+      .sort((a, b) => filtre === "acik"
+        ? a.created_at.localeCompare(b.created_at)
+        : (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at));
 
     $("#liste").innerHTML = gorunen.length ? gorunen.map((k) => `
       <button class="satir" data-id="${k.id}">
@@ -188,7 +187,6 @@
           <span class="satir-ust">
             <span>${kac(k.no)}</span>
             <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
-            ${gecikti(k) ? `<span class="rozet gecikti">Gecikti</span>` : ""}
           </span>
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
@@ -196,11 +194,15 @@
       </button>`).join("") : `<p class="bos">Bu bölümde kayıt yok.</p>`;
   }
 
+  const fotoKutu = (url, yazi, bos) => `<figure>${url
+    ? `<a href="${kac(url)}" target="_blank" rel="noopener"><img src="${kac(url)}" alt="${yazi}"></a>`
+    : `<div class="foto-bos">${bos}</div>`}<figcaption>${yazi}</figcaption></figure>`;
+
   function detayGoster(id) {
     const k = kayitlar.find((x) => x.id === id);
     if (!k) return;
-    location.hash = "kayit-" + id;
-    const mudur = oturum?.rol === "mudur";
+    if (location.hash !== "#kayit-" + id) history.replaceState(null, "", "#kayit-" + id);
+    const kapat = kapatabilir() && k.durum !== "tamam";
     $("#detay").innerHTML = `
       <div class="detay-ust">
         <button class="geri" data-geri>← Liste</button>
@@ -209,99 +211,54 @@
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
       <div class="fotolar">
-        <figure>${k.foto_once_url ? `<a href="${kac(k.foto_once_url)}" target="_blank" rel="noopener"><img src="${kac(k.foto_once_url)}" alt="Önce"></a>` : `<div class="bos-foto" style="aspect-ratio:1;border-radius:10px;background:var(--yesil-acik);display:grid;place-items:center">Fotoğraf yok</div>`}<figcaption>Önce</figcaption></figure>
-        <figure>${k.foto_sonra_url ? `<a href="${kac(k.foto_sonra_url)}" target="_blank" rel="noopener"><img src="${kac(k.foto_sonra_url)}" alt="Sonra"></a>` : `<div style="aspect-ratio:1;border-radius:10px;background:var(--yesil-acik);display:grid;place-items:center;color:var(--soluk)">Henüz yok</div>`}<figcaption>Yapıldı</figcaption></figure>
+        ${fotoKutu(k.foto_once_url, "Sorun", "Fotoğraf yok")}
+        ${fotoKutu(k.foto_sonra_url, "Yapıldı", "Henüz yapılmadı")}
       </div>
       <dl class="alanlar">
         <dt>Kayıt no</dt><dd>${kac(k.no)}</dd>
-        <dt>Durum</dt><dd>${DURUM[k.durum]}${gecikti(k) ? ` <span class="rozet gecikti">Gecikti</span>` : ""}</dd>
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
-        <dt>Sorumlu</dt><dd>${kac(k.sorumlu || "—")}</dd>
-        <dt>Son tarih</dt><dd>${tarih(k.son_tarih)}</dd>
-        <dt>Müdahale</dt><dd>${tarihSaat(k.mudahale_at)}</dd>
-        ${k.gecikme_nedeni ? `<dt>Gecikme nedeni</dt><dd>${kac(k.gecikme_nedeni)}</dd>` : ""}
-        <dt>Sonuç</dt><dd>${kac(k.sonuc || "—")}</dd>
-        <dt>Kapanış</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
+        ${k.durum === "tamam" ? `
+        <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
+        <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
+        ${k.sonuc ? `<dt>Not</dt><dd>${kac(k.sonuc)}</dd>` : ""}` : ""}
       </dl>
-      ${mudur && k.durum !== "tamam" ? mudurIslemleri(k) : ""}`;
-    goster("detay");
-    if (mudur && k.durum !== "tamam") mudurIslemBagla(k);
-  }
-
-  function mudurIslemleri(k) {
-    return `
-      ${k.durum === "acik" ? `
-      <form class="islem" id="baslat-form">
-        <h2>İş emri ver</h2>
-        <label>Sorumlu personel <input name="sorumlu" maxlength="120" required placeholder="Örn. Teknik ekip – Mehmet"></label>
-        <label>Son tarih <input name="son_tarih" type="date" value="${bugun()}"></label>
-        <button class="ana-dugme" type="submit">İşi başlat</button>
-      </form>` : `
-      <form class="islem" id="gecikme-form">
-        <h2>Gecikme bildir</h2>
-        <label>Neden <input name="neden" maxlength="500" value="${kac(k.gecikme_nedeni || "")}" placeholder="Örn. Parça bekleniyor"></label>
-        <label>Yeni son tarih <input name="son_tarih" type="date" value="${kac(k.son_tarih || "")}"></label>
-        <button class="ikincil" type="submit" style="width:100%">Kaydet</button>
-      </form>`}
+      ${kapat ? `
       <form class="islem" id="kapat-form">
-        <h2>Yapıldı olarak kapat</h2>
+        <h2>Sorunu giderdiniz mi?</h2>
         <div class="foto-alan">
           <img id="sonra-onizleme" alt="" hidden>
-          <label class="foto-dugme"><input id="sonra-foto" type="file" accept="image/*" capture="environment" hidden><span id="sonra-yazi">📷 İş bitti fotoğrafı çek</span></label>
+          <label class="foto-dugme"><input id="sonra-foto" type="file" accept="image/*" capture="environment" hidden><span id="sonra-yazi">📷 Yapılan işin fotoğrafını çek</span></label>
         </div>
-        <label>Yapılan işlem
+        <label>Not (isteğe bağlı)
           <div class="ses-satir">
-            <textarea name="sonuc" rows="3" required maxlength="2000" placeholder="Örn. Batarya değiştirildi, su akıyor"></textarea>
+            <textarea name="sonuc" rows="2" maxlength="2000" placeholder="Örn. Batarya değiştirildi"></textarea>
             <button type="button" class="mikrofon" id="sonra-mikrofon">🎤</button>
           </div>
-          <small class="ipucu" id="sonra-ipucu">Kontrol edip çalıştığını gördükten sonra kapatın.</small>
+          <small class="ipucu" id="sonra-ipucu"></small>
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
-      </form>`;
+      </form>` : ""}`;
+    goster("detay");
+    if (kapat) kapatBagla(k);
   }
 
-  function mudurIslemBagla(k) {
-    const islemYap = async (form, eylem, veri) => {
-      const d = form.querySelector("button[type=submit]");
-      d.disabled = true;
-      try {
-        await api(eylem, { id: k.id, ...veri });
-        await yenile();
-        detayGoster(k.id);
-        return true;
-      } catch (e) { mesaj(e.message); return false; }
-      finally { d.disabled = false; }
-    };
-
-    const baslat = $("#baslat-form");
-    baslat?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const f = new FormData(baslat);
-      islemYap(baslat, "baslat", { sorumlu: f.get("sorumlu"), son_tarih: f.get("son_tarih") }).then((ok) => ok && mesaj("İş emri verildi."));
-    });
-
-    const gec = $("#gecikme-form");
-    gec?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const f = new FormData(gec);
-      islemYap(gec, "gecikme", { neden: f.get("neden"), son_tarih: f.get("son_tarih") }).then((ok) => ok && mesaj("Kaydedildi."));
-    });
-
-    const kapat = $("#kapat-form");
+  function kapatBagla(k) {
+    const form = $("#kapat-form");
     const foto = fotoSecici($("#sonra-foto"), $("#sonra-onizleme"), $("#sonra-yazi"));
-    mikrofonBagla($("#sonra-mikrofon"), kapat.querySelector("textarea"), $("#sonra-ipucu"));
-    kapat.addEventListener("submit", async (e) => {
+    mikrofonBagla($("#sonra-mikrofon"), form.querySelector("textarea"), $("#sonra-ipucu"));
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!foto.al()) return mesaj("Önce iş bitti fotoğrafını çekin.");
-      const d = kapat.querySelector("button[type=submit]");
+      if (!foto.al()) return mesaj("Önce yapılan işin fotoğrafını çekin.");
+      const d = form.querySelector("button[type=submit]");
       d.disabled = true; d.textContent = "Gönderiliyor…";
       try {
         const yol = await fotoYukle(foto.al());
-        const ok = await islemYap(kapat, "kapat", { foto: yol, sonuc: new FormData(kapat).get("sonuc") });
-        if (ok) mesaj("Kayıt kapatıldı. Bildiren kişiye haber gitti.");
-      } catch (err) { mesaj(err.message); }
-      finally { d.disabled = false; d.textContent = "✔ Yapıldı"; }
+        await api("kapat", { id: k.id, foto: yol, sonuc: new FormData(form).get("sonuc"), ad: oturum.ad });
+        await yenile();
+        detayGoster(k.id);
+        mesaj("Yapıldı olarak gönderildi. Gruptaki herkes görecek.");
+      } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "✔ Yapıldı"; }
     });
   }
 
@@ -375,7 +332,7 @@
       oturum.rol = r.rol; oturum.vapid = r.vapid;
       sakla.koy("sk_oturum", oturum);
       await basla();
-      mesaj(r.rol === "mudur" ? "Müdür olarak giriş yapıldı." : "Hoş geldiniz.");
+      mesaj(r.rol === "uye" ? "Hoş geldiniz." : `${ROL_ADI[r.rol]} olarak giriş yapıldı.`);
     } catch (err) {
       oturum = null; hata.textContent = err.message; hata.hidden = false;
     } finally { d.disabled = false; }
@@ -426,6 +383,14 @@
     } catch (err) {
       hata.textContent = err.message; hata.hidden = false;
     } finally { d.disabled = false; d.textContent = "Gönder"; }
+  });
+
+  // Bildirime dokununca ilgili kayıt açılsın (uygulama zaten açıkken de)
+  window.addEventListener("hashchange", async () => {
+    const m = location.hash.match(/^#kayit-(\d+)$/);
+    if (!m || !oturum) return;
+    if (!kayitlar.some((k) => k.id === Number(m[1]))) await yenile();
+    detayGoster(Number(m[1]));
   });
 
   // Uygulamaya dönüldüğünde listeyi tazele
