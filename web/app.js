@@ -349,7 +349,12 @@
 
   async function basla() {
     $("#demo-uyari").hidden = !DEMO;
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) {
+      // Yeni sürüm yüklenince sayfayı bir kez yenile, eski ekran kalmasın.
+      const ilkKontrol = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if (ilkKontrol) location.reload(); });
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((k) => k.update()).catch(() => {});
+    }
     if (!oturum) return goster("giris");
     $("#yeni-ac").textContent = "+ Yeni kayıt";
     goster("liste");

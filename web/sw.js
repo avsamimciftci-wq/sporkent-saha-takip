@@ -1,9 +1,12 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v2";
+const SURUM = "sk-v3";
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(SURUM).then((c) => c.addAll(KABUK)).then(() => self.skipWaiting()));
+  // GitHub Pages dosyaları 10 dk tarayıcı önbelleğinde tutar; "reload" ile her zaman sunucudan alınır.
+  e.waitUntil(caches.open(SURUM)
+    .then((c) => c.addAll(KABUK.map((u) => new Request(u, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -19,7 +22,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" })
       .then((r) => {
         const kopya = r.clone();
         caches.open(SURUM).then((c) => c.put(e.request, kopya));
