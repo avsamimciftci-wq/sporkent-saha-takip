@@ -203,7 +203,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
-      await bildir(["mudur", "sef"], `Yeni sorun ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
+      await bildir(["baskan", "mudur", "sef"], `Yeni sorun ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
       const { cihaz: _c, ...donen } = data;
       return { kayit: { ...donen, benim: true } };
     }
