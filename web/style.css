@@ -59,10 +59,11 @@ body {
   width: 54px; height: 54px; flex: none; border-radius: 50%;
   background: #fff; object-fit: contain; padding: 3px;
   box-shadow: 0 0 0 2px rgba(255,255,255,.35);
-  /* Basılı tutunca tarayıcının resim menüsü açılmasın */
-  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
-  -webkit-user-drag: none; touch-action: none;
+  -webkit-user-drag: none; pointer-events: none;
 }
+/* Bant basılı tutulunca Chrome kelime aramasını, metin seçimini ve resim menüsünü açmasın */
+.ust, .ust * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.ust { touch-action: none; }
 .perde { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
 .soru { width: 100%; max-width: 420px; }
 .ust-kurum { font-size: 15px; opacity: .85; letter-spacing: .02em; }
