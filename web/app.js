@@ -327,22 +327,6 @@
     if (Notification.permission === "granted") bildirimAc(true);
   }
 
-  async function bildirimDene() {
-    const d = $("#bildirim-dene");
-    d.disabled = true;
-    try {
-      if (!bildirimDestek() || Notification.permission !== "granted") {
-        await bildirimAc(false);
-        if (Notification.permission !== "granted") return;
-      } else await bildirimAc(true);
-      const r = await api("bildirim_dene");
-      mesaj(r.basarili
-        ? "Deneme bildirimi gönderildi. Birkaç saniye içinde gelmezse telefon ayarlarından Chrome bildirimlerini açın."
-        : "Bu telefon bildirime kayıtlı görünmüyor. Bildirim iznini kontrol edin.");
-    } catch (e) { mesaj(e.message); }
-    finally { d.disabled = false; }
-  }
-
   function base64Bayt(s) {
     const p = "=".repeat((4 - (s.length % 4)) % 4);
     const b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
@@ -419,8 +403,6 @@
   });
 
   $("#bildirim-ac").addEventListener("click", () => bildirimAc(false));
-  $("#bildirim-dene").addEventListener("click", bildirimDene);
-
   $("#ozet").addEventListener("click", (e) => {
     const k = e.target.closest("[data-filtre]"); if (!k) return;
     $(`#sekmeler [data-filtre="${k.dataset.filtre}"]`).click();
