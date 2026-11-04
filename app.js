@@ -3,7 +3,6 @@
   "use strict";
 
   const AYAR = window.SPORKENT || {};
-  const DEMO = !AYAR.supabaseUrl || !AYAR.anonKey;
   const $ = (s, kok = document) => kok.querySelector(s);
 
   // ---------- Yerel saklama (gizli pencerede atılabilir, hep try/catch) ----------
@@ -16,14 +15,18 @@
   let cihaz = sakla.al("sk_cihaz");
   if (!cihaz) { cihaz = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); sakla.koy("sk_cihaz", cihaz); }
 
-  let oturum = sakla.al("sk_oturum"); // { ad, kod, rol, vapid }
+  // { ad, rol, durum, anahtar, vapid } — giriş kodu saklanmaz, onaydan sonra telefon kendi anahtarıyla çalışır
+  let oturum = sakla.al("sk_oturum");
   let kayitlar = [];
   let filtre = "hepsi";
 
   // ---------- Sunucu ----------
+  class SunucuHatasi extends Error {
+    constructor(j) { super(j.hata || "Bağlantı hatası, tekrar deneyin."); this.bekliyor = !!j.bekliyor; this.cikis = !!j.cikis; }
+  }
+
   async function api(eylem, veri = {}) {
-    const govde = { eylem, kod: oturum?.kod, cihaz, ...veri };
-    if (DEMO) return demoApi(govde);
+    const govde = { eylem, cihaz, anahtar: oturum?.anahtar, ...veri };
     const r = await fetch(`${AYAR.supabaseUrl}/functions/v1/api`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: AYAR.anonKey, Authorization: `Bearer ${AYAR.anonKey}` },
@@ -31,53 +34,20 @@
     });
     let j = {};
     try { j = await r.json(); } catch {}
-    if (!r.ok) throw new Error(j.hata || "Bağlantı hatası, tekrar deneyin.");
+    if (!r.ok) {
+      const h = new SunucuHatasi(j);
+      if (h.cikis && eylem !== "giris") { cikisYap(); mesaj(h.message); }
+      else if (h.bekliyor && oturum) { oturum.durum = "bekliyor"; sakla.koy("sk_oturum", oturum); bekleEkrani(); }
+      throw h;
+    }
     return j;
   }
 
   async function fotoYukle(blob) {
-    if (DEMO) {
-      const yol = "demo/" + Date.now() + Math.random().toString(36).slice(2);
-      const veri = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
-      sakla.koy("sk_demo_foto_" + yol, veri);
-      return yol;
-    }
     const { yol, adres } = await api("yukleme_adresi");
     const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": "image/jpeg", "x-upsert": "false" }, body: blob });
     if (!r.ok) throw new Error("Fotoğraf yüklenemedi, tekrar deneyin.");
     return yol;
-  }
-
-  // Deneme modu: aynı işlemleri bu cihazda taklit eder.
-  // Gerçek kodlar yalnızca sunucudadır; bunlar sadece denemeye özeldir.
-  const DEMO_UYE = "deneme", DEMO_MUDUR = "deneme-mudur", DEMO_SEF = "deneme-sef", DEMO_YONETIM = "deneme-yonetim";
-  function demoApi(g) {
-    const kod = String(g.kod || "").trim().toLowerCase();
-    const rol = { [DEMO_MUDUR]: "mudur", [DEMO_SEF]: "sef", [DEMO_YONETIM]: "yonetim", [DEMO_UYE]: "uye" }[kod];
-    if (!rol) throw new Error("Kod hatalı.");
-    const liste = sakla.al("sk_demo_kayitlar", []);
-    const kaydet = () => sakla.koy("sk_demo_kayitlar", liste);
-    const bul = () => { const k = liste.find((x) => x.id === g.id); if (!k) throw new Error("Kayıt bulunamadı."); return k; };
-    const url = (p) => (p ? sakla.al("sk_demo_foto_" + p) : null);
-    switch (g.eylem) {
-      case "giris": return { rol, vapid: null };
-      case "liste": return { kayitlar: liste.slice().reverse()
-        .filter((k) => rol !== "uye" || k.durum === "tamam" || k.cihaz === g.cihaz)
-        .map((k) => ({ ...k, foto_once_url: url(k.foto_once), foto_sonra_url: url(k.foto_sonra) })) };
-      case "yeni": {
-        const id = (liste.at(-1)?.id || 0) + 1;
-        const k = { id, no: new Date().getFullYear() + "-" + String(id).padStart(3, "0"), created_at: new Date().toISOString(),
-          bildiren: g.bildiren, cihaz: g.cihaz, yer: g.yer, sorun: g.sorun, durum: "acik", foto_once: g.foto || null };
-        liste.push(k); kaydet(); return { kayit: k };
-      }
-      case "kapat": {
-        if (!KAPATABILIR.includes(rol)) throw new Error("Bu işlemi yalnızca müdür veya şef yapabilir.");
-        if (!g.foto) throw new Error("Yapılan işin fotoğrafını çekin.");
-        const k = bul(); Object.assign(k, { durum: "tamam", sonuc: g.sonuc || null, foto_sonra: g.foto, kapatan: g.ad, kapanis_at: new Date().toISOString() }); kaydet(); return { kayit: k };
-      }
-      case "abone_ol": return { tamam: true };
-    }
-    throw new Error("Bilinmeyen işlem.");
   }
 
   // ---------- Yardımcılar ----------
@@ -86,10 +56,12 @@
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const DURUM = { acik: "Açık", devam: "Açık", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
-  const ROL_ADI = { mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
+  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
   const KAPATABILIR = ["mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const hepsiniGorur = () => oturum?.rol && oturum.rol !== "uye";
+  const yonetici = () => oturum?.rol === "baskan";
+  const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
   let mesajZamani;
   function mesaj(metin) {
@@ -151,14 +123,22 @@
     window.scrollTo(0, 0);
   }
 
+  let bekleyenSayisi = 0;
   async function yenile() {
+    if (!onayli()) return;
     try {
-      kayitlar = (await api("liste")).kayitlar || [];
+      const r = await api("liste");
+      kayitlar = r.kayitlar || [];
+      // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
+      if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
+      if (yonetici()) {
+        if ((r.bekleyen || 0) > bekleyenSayisi) { sesCal(); mesaj(`Onay bekleyen ${r.bekleyen} kişi var.`); }
+        bekleyenSayisi = r.bekleyen || 0;
+      }
       listeCiz();
       yenileriAc();
     } catch (e) {
-      if (/Kod hatalı/.test(e.message)) return cikisYap();
-      mesaj(e.message);
+      if (!e.cikis && !e.bekliyor) mesaj(e.message);
     }
   }
 
@@ -217,6 +197,10 @@
     $("#gorunurluk").textContent = hepsiniGorur()
       ? `${ROL_ADI[oturum.rol]} olarak tüm sorunları görüyorsunuz.`
       : "Bildirdiğiniz sorunları yalnızca siz, müdür, şef ve yönetim kurulu görür. Yapılan işleri herkes görür.";
+    const yd = $("#yonetim-ac");
+    yd.hidden = !yonetici();
+    yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
+    yd.classList.toggle("uyari", bekleyenSayisi > 0);
 
     const gorunen = kayitlar
       .filter((k) => filtre === "hepsi" || (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
@@ -315,7 +299,7 @@
 
   function bildirimKutusu() {
     const kutu = $("#bildirim-kutu");
-    if (DEMO || !oturum?.vapid) { kutu.hidden = true; return; }
+    if (!oturum?.vapid) { kutu.hidden = true; return; }
     if (iosTarayicida()) {
       $("#bildirim-metin").textContent = "iPhone'da bildirim için: Paylaş ⬆︎ → “Ana Ekrana Ekle”, sonra uygulamayı ana ekrandan açın.";
       $("#bildirim-ac").hidden = true; kutu.hidden = false; return;
@@ -346,27 +330,70 @@
     } catch (e) { if (!sessiz) mesaj("Bildirim açılamadı: " + e.message); }
   }
 
-  // ---------- Giriş / çıkış ----------
+  // ---------- Giriş / onay bekleme / çıkış ----------
   function cikisYap() {
     oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen");
-    kayitlar = []; goster("giris");
+    kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); goster("giris");
   }
 
+  // Kodu girdikten sonra yönetici onaylayana kadar bu ekran görünür; onaylanınca kendiliğinden açılır.
+  let bekleZamani = null;
+  function bekleEkrani() {
+    goster("bekle");
+    $("#bekle-ad").textContent = oturum.ad;
+    $("#bekle-rol").textContent = ROL_ADI[oturum.rol] || "";
+    bildirimKutusu();
+    clearInterval(bekleZamani);
+    bekleZamani = setInterval(durumKontrol, 10000);
+  }
+
+  async function durumKontrol() {
+    if (!oturum?.anahtar) return clearInterval(bekleZamani);
+    try {
+      const r = await api("durum");
+      if (r.durum === "onayli") {
+        clearInterval(bekleZamani);
+        Object.assign(oturum, { durum: "onayli", rol: r.rol });
+        sakla.koy("sk_oturum", oturum);
+        await basla();
+        mesaj("Gruba kabul edildiniz.");
+      }
+    } catch {}
+  }
+
+  async function girisYap(ad, kod) {
+    const r = await api("giris", { ad, kod });
+    oturum = { ad, rol: r.rol, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
+    sakla.koy("sk_oturum", oturum);
+    return r;
+  }
+
+  let swHazir = false;
   async function basla() {
-    $("#demo-uyari").hidden = !DEMO;
-    if ("serviceWorker" in navigator) {
+    if (!swHazir && "serviceWorker" in navigator) {
+      swHazir = true;
       // Yeni sürüm yüklenince sayfayı bir kez yenile, eski ekran kalmasın.
       const ilkKontrol = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener("controllerchange", () => { if (ilkKontrol) location.reload(); });
       navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((k) => k.update()).catch(() => {});
-      // Uygulama açıkken bildirim gelirse listeyi hemen tazele (pencere ve ses yenileriAc'tan)
-      navigator.serviceWorker.addEventListener("message", (e) => { if (e.data?.tip === "bildirim" && oturum) yenile(); });
+      // Uygulama açıkken bildirim gelirse hemen tazele (pencere ve ses yenileriAc'tan)
+      navigator.serviceWorker.addEventListener("message", (e) => {
+        if (e.data?.tip !== "bildirim" || !oturum) return;
+        if (!onayli()) durumKontrol(); else if (e.data.sayfa === "uyeler") yonetimAc(); else yenile();
+      });
     }
     if (!oturum) return goster("giris");
-    $("#yeni-ac").textContent = "+ Yeni kayıt";
+    // Eski sürümden kalan oturum (kodla çalışıyordu): bir kez kodla katılım isteği gönder
+    if (!oturum.anahtar) {
+      if (!oturum.kod) return cikisYap();
+      try { await girisYap(oturum.ad, oturum.kod); } catch { return cikisYap(); }
+    }
+    if (oturum.durum !== "onayli") return bekleEkrani();
+    clearInterval(bekleZamani);
     goster("liste");
     bildirimKutusu();
     await yenile();
+    if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     const m = location.hash.match(/^#kayit-(\d+)$/);
     if (m) detayGoster(Number(m[1]));
   }
@@ -377,16 +404,98 @@
     const hata = $("#giris-hata"); hata.hidden = true;
     const d = e.target.querySelector("button"); d.disabled = true;
     try {
-      oturum = { ad: String(f.get("ad")).trim(), kod: String(f.get("kod")).trim() };
-      const r = await api("giris");
-      oturum.rol = r.rol; oturum.vapid = r.vapid;
-      sakla.koy("sk_oturum", oturum);
+      const r = await girisYap(String(f.get("ad")).trim(), String(f.get("kod")).trim());
       await basla();
-      mesaj(r.rol === "uye" ? "Hoş geldiniz." : `${ROL_ADI[r.rol]} olarak giriş yapıldı.`);
+      if (r.durum === "onayli") mesaj(r.rol === "uye" ? "Hoş geldiniz." : `${ROL_ADI[r.rol]} olarak giriş yapıldı.`);
     } catch (err) {
       oturum = null; hata.textContent = err.message; hata.hidden = false;
     } finally { d.disabled = false; }
   });
+
+  // ---------- Yönetici paneli (YK başkanı) ----------
+  const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "uye"];
+  const sonGorulme = (t) => t ? "Son görülme: " + tarihSaat(t) : "";
+
+  async function yonetimAc() {
+    if (!yonetici()) return;
+    if (location.hash !== "#uyeler") history.replaceState(null, "", "#uyeler");
+    goster("yonetim");
+    $("#yonetim").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try {
+      const [{ uyeler }, { kodlar }] = await Promise.all([api("uye_listesi"), api("kodlar")]);
+      yonetimCiz(uyeler, kodlar);
+    } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+
+  function uyeSatiri(u, dugmeler) {
+    return `<div class="uye">
+      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small></div>
+      <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
+    </div>`;
+  }
+
+  function yonetimCiz(uyeler, kodlar) {
+    const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
+    const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
+      .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
+    const cikan = uyeler.filter((u) => u.durum === "cikarildi");
+    bekleyenSayisi = bekleyen.length;
+    const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
+    $("#yonetim").innerHTML = `
+      <div class="detay-ust"><button class="geri" data-geri>← Liste</button></div>
+      <h1>Üyeler ve ayarlar</h1>
+
+      <h2>Onay bekleyenler (${bekleyen.length})</h2>
+      ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"))).join("")
+        : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
+
+      <h2>Gruptakiler (${gruptakiler.length})</h2>
+      ${gruptakiler.map((u) => uyeSatiri(u, d("uye_cikar", u.cihaz, "Çıkar", "tehlike"))).join("")}
+
+      ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
+      <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
+      ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
+
+      <h2>Giriş kodları</h2>
+      <p class="ipucu">Kodu değiştirmek gruptakileri çıkarmaz; yalnızca yeni katılacaklar yeni kodu kullanır.</p>
+      ${ROL_SIRASI.map((r) => `<div class="uye">
+        <div><b>${kac(ROL_ADI[r])}</b><br><code>${kac(kodlar[r] || "—")}</code></div>
+        <div class="uye-dugmeler">${d("kod_degistir", r, "Değiştir")}</div>
+      </div>`).join("")}
+
+      <h2>Tüm kayıtları sil</h2>
+      <p class="ipucu">Bütün sorunlar ve fotoğraflar kalıcı olarak silinir, numaralar 001'den başlar. Üyeler silinmez. Geri alınamaz.</p>
+      <button class="ikincil tehlike" style="width:100%" data-eylem="hepsini_sil">Tüm kayıtları sil</button>`;
+  }
+
+  $("#yonetim").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-eylem]"); if (!b) return;
+    const { eylem, hedef } = b.dataset;
+    let veri = { hedef };
+    const ad = b.closest(".uye")?.querySelector("b")?.textContent || "";
+    if (eylem === "uye_cikar" && !confirm(`${ad} gruptan çıkarılsın mı? Bu telefon bir daha giremez (geri alabilirsiniz).`)) return;
+    if (eylem === "uye_sil" && !confirm(`${ad} listeden silinsin mi?`)) return;
+    if (eylem === "kod_degistir") {
+      const yeni = prompt(`${ROL_ADI[hedef]} için yeni kod (en az 6 karakter, boşluksuz):`);
+      if (!yeni) return;
+      veri = { rol: hedef, yeni: yeni.trim() };
+    }
+    if (eylem === "hepsini_sil") {
+      const onay = prompt("Bütün kayıtlar ve fotoğraflar silinecek. Onaylamak için büyük harflerle SİL yazın:");
+      if (onay === null) return;
+      veri = { onay: onay.trim().toLocaleUpperCase("tr-TR") };
+    }
+    b.disabled = true;
+    try {
+      await api(eylem, veri);
+      mesaj({ uye_onayla: "Onaylandı, kişiye haber gitti.", uye_cikar: "Gruptan çıkarıldı.", uye_geri_al: "Gruba geri alındı.",
+        uye_sil: "Silindi.", kod_degistir: "Kod değiştirildi.", hepsini_sil: "Tüm kayıtlar silindi." }[eylem]);
+      if (eylem === "hepsini_sil") { kayitlar = []; sakla.sil("sk_gorulen"); }
+      await yonetimAc();
+    } catch (err) { mesaj(err.message); b.disabled = false; }
+  });
+
+  $("#yonetim-ac").addEventListener("click", yonetimAc);
 
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
@@ -421,6 +530,7 @@
   });
 
   $("#bildirim-ac").addEventListener("click", () => bildirimAc(false));
+  $("#bekle-bildirim").addEventListener("click", () => bildirimAc(false));
   $("#ozet").addEventListener("click", (e) => {
     const k = e.target.closest("[data-filtre]"); if (!k) return;
     $(`#sekmeler [data-filtre="${k.dataset.filtre}"]`).click();
@@ -460,15 +570,20 @@
 
   // Bildirime dokununca ilgili kayıt açılsın (uygulama zaten açıkken de)
   window.addEventListener("hashchange", async () => {
+    if (!onayli()) return;
+    if (location.hash === "#uyeler") return yonetimAc();
     const m = location.hash.match(/^#kayit-(\d+)$/);
-    if (!m || !oturum) return;
+    if (!m) return;
     if (!kayitlar.some((k) => k.id === Number(m[1]))) await yenile();
     detayGoster(Number(m[1]));
   });
 
   // Uygulamaya dönüldüğünde ve açıkken 20 sn'de bir tazele (bildirim gecikse de yeni iş görünür)
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && oturum) yenile(); });
-  setInterval(() => { if (!document.hidden && oturum) yenile(); }, 20000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !oturum) return;
+    if (onayli()) yenile(); else durumKontrol();
+  });
+  setInterval(() => { if (!document.hidden && onayli()) yenile(); }, 20000);
 
   basla();
 })();

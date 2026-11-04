@@ -23,10 +23,6 @@
     </div>
   </header>
 
-  <div id="demo-uyari" class="demo" hidden>
-    Deneme modu: kayıtlar yalnızca bu cihazda tutulur.
-  </div>
-
   <!-- Giriş -->
   <main id="ekran-giris" class="ekran" hidden>
     <form id="giris-form" class="kart">
@@ -42,10 +38,27 @@
     </form>
   </main>
 
+  <!-- Yönetici onayı bekleniyor -->
+  <main id="ekran-bekle" class="ekran" hidden>
+    <div class="kart" style="text-align:center">
+      <div style="font-size:44px">⏳</div>
+      <h1>Onay bekleniyor</h1>
+      <p><b id="bekle-ad"></b> · <span id="bekle-rol"></span></p>
+      <p class="ipucu" style="font-size:15px">Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.</p>
+      <button id="bekle-bildirim" class="ikincil" style="width:100%">🔔 Onaylanınca bildirim gelsin</button>
+    </div>
+  </main>
+
+  <!-- Yönetici: üyeler ve ayarlar -->
+  <main id="ekran-yonetim" class="ekran" hidden>
+    <div id="yonetim" class="kart"></div>
+  </main>
+
   <!-- Liste -->
   <main id="ekran-liste" class="ekran" hidden>
     <div id="ozet" class="ozet"></div>
     <p id="gorunurluk" class="ipucu" style="margin:-4px 0 12px"></p>
+    <button id="yonetim-ac" class="ikincil yonetim-dugme" hidden>👥 Üyeler ve ayarlar</button>
     <div id="bildirim-kutu" class="bilgi" hidden>
       <span id="bildirim-metin">Bildirimleri açın, yeni kayıt ve “yapıldı” haberleri telefonunuza gelsin.</span>
       <button id="bildirim-ac" class="kucuk-dugme">Bildirimleri aç</button>
@@ -55,7 +68,8 @@
       <button data-filtre="acik">Açık</button>
       <button data-filtre="tamam">Yapılanlar</button>
     </nav>
-    <div id="liste" class="liste"></div>    <button id="yeni-ac" class="yuzen">+ Yeni kayıt</button>
+    <div id="liste" class="liste"></div>
+    <button id="yeni-ac" class="yuzen">+ Yeni kayıt</button>
   </main>
 
   <!-- Yeni kayıt -->

@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v9";
+const SURUM = "sk-v10";
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -47,17 +47,18 @@ self.addEventListener("push", (e) => {
       requireInteraction: true,
       silent: false,
       vibrate: [300, 100, 300, 100, 300],
-      data: { kayitId: v.kayitId },
+      data: { kayitId: v.kayitId, sayfa: v.sayfa },
     });
     // Uygulama açıksa haber ver: iş penceresi kendiliğinden açılsın
     const pencereler = await clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const p of pencereler) p.postMessage({ tip: "bildirim", kayitId: v.kayitId });
+    for (const p of pencereler) p.postMessage({ tip: "bildirim", kayitId: v.kayitId, sayfa: v.sayfa });
   })());
 });
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const hedef = "./" + (e.notification.data?.kayitId ? "#kayit-" + e.notification.data.kayitId : "");
+  const v = e.notification.data || {};
+  const hedef = "./" + (v.sayfa ? "#" + v.sayfa : v.kayitId ? "#kayit-" + v.kayitId : "");
   e.waitUntil((async () => {
     const pencereler = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const p of pencereler) {
