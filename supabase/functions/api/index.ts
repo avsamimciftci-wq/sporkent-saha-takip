@@ -27,12 +27,10 @@ class Hata extends Error {
 }
 
 // baskan: YK başkanı ve yönetici (onay, üye çıkarma, kodlar, tümden silme)
-// mudur ve sef işi kapatır; baskan ve yonetim her kaydı görür;
-// uye yalnızca kendi kayıtlarını ve yapılan işleri görür.
+// baskan, mudur ve sef işi "yapıldı" olarak kapatır; onaylı her üye bütün kayıtları görür.
 type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "uye"];
-const HEPSINI_GORUR: Rol[] = ["baskan", "mudur", "sef", "yonetim"];
-const KAPATABILIR: Rol[] = ["mudur", "sef"];
+const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi",
 };
@@ -168,13 +166,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { rol, durum: u.durum, ad: u.ad };
 
     case "liste": {
-      let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
-      if (!HEPSINI_GORUR.includes(rol)) {
-        // Grup üyesi: yapılan işler + kendi açtığı kayıtlar
-        const cihaz = u.cihaz.replace(/[^a-zA-Z0-9-]/g, "");
-        q = q.or(`durum.eq.tamam,cihaz.eq.${cihaz}`);
-      }
-      const { data, error } = await q;
+      const { data, error } = await db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (error) throw error;
       const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz }));
       let bekleyen: number | undefined;
@@ -203,13 +195,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
-      await bildir(["baskan", "mudur", "sef"], `Yeni sorun ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
+      // Yeni sorun bütün gruba duyurulur
+      await bildir("hepsi", `Yeni sorun ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
       const { cihaz: _c, ...donen } = data;
       return { kayit: { ...donen, benim: true } };
     }
 
     case "kapat": {
-      if (!KAPATABILIR.includes(rol)) throw new Hata("Bu işlemi yalnızca müdür veya şef yapabilir.", 403);
+      if (!KAPATABILIR.includes(rol)) throw new Hata("Bu işlemi yalnızca yönetici, müdür veya şef yapabilir.", 403);
       if (!g.foto) throw new Hata("Yapılan işin fotoğrafını çekin.");
       const { data, error } = await db.from("kayitlar").update({
         durum: "tamam",

@@ -57,9 +57,8 @@
   const DURUM = { acik: "Açık", devam: "Açık", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
   const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
-  const KAPATABILIR = ["mudur", "sef"];
+  const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
-  const hepsiniGorur = () => oturum?.rol && oturum.rol !== "uye";
   const yonetici = () => oturum?.rol === "baskan";
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
@@ -143,14 +142,12 @@
   }
 
   // ---------- Yeni iş gelince: sesli uyarı + pencere kendiliğinden açılır ----------
-  // Başkan/müdür/şef için yeni açık sorunlar, herkes için yeni "yapıldı" işler.
+  // Herkes için: yeni açılan sorunlar ve yeni "yapıldı" işler.
   const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a");
-  const ilgili = (k) => k.durum === "tamam" || kapatabilir() || yonetici();
 
   function yenileriAc() {
     const gorulen = sakla.al("sk_gorulen");
-    const adaylar = kayitlar.filter(ilgili);
-    const yeniler = gorulen ? adaylar.filter((k) => !gorulen.includes(anahtar(k))) : [];
+    const yeniler = gorulen ? kayitlar.filter((k) => !gorulen.includes(anahtar(k))) : [];
     sakla.koy("sk_gorulen", kayitlar.map(anahtar).slice(0, 500));
     if (!yeniler.length) return;
     sesCal();
@@ -191,12 +188,12 @@
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const bugunKapanan = kayitlar.filter((k) => k.kapanis_at && k.kapanis_at.slice(0, 10) === bugun()).length;
     $("#ozet").innerHTML = `
-      <div data-filtre="acik"><b>${acik}</b><span>${hepsiniGorur() ? "Açık sorun" : "Bildirdiğim açık"}</span></div>
+      <div data-filtre="acik"><b>${acik}</b><span>Açık sorun</span></div>
       <div data-filtre="tamam"><b>${bugunKapanan}</b><span>Bugün yapılan</span></div>
       <div data-filtre="tamam"><b>${yapilan}</b><span>Toplam yapılan</span></div>`;
-    $("#gorunurluk").textContent = hepsiniGorur()
-      ? `${ROL_ADI[oturum.rol]} olarak tüm sorunları görüyorsunuz.`
-      : "Bildirdiğiniz sorunları yalnızca siz, müdür, şef ve yönetim kurulu görür. Yapılan işleri herkes görür.";
+    $("#gorunurluk").textContent = kapatabilir()
+      ? `${ROL_ADI[oturum.rol]}: sorunları fotoğrafla "Yapıldı" olarak kapatabilirsiniz.`
+      : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
     const yd = $("#yonetim-ac");
     yd.hidden = !yonetici();
     yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
