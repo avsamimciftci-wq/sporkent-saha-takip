@@ -156,7 +156,7 @@
     const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
     const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Adınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Giriş kodu<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
     const liste = (ek = "") => `${bant}
-      <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>1</b><br>Yapılanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Yapılmayanlar</div></div>
+      <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Henüz yapılmayanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>1</b><br>Yapılanlar</div></div>
       <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-acik">Açık</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
       <div class="e-satir"><div class="e-foto" style="background:#e3f4ea">💡</div><div><span class="rozet r-tamam">Yapıldı</span><br><b>Sahil lambası</b><br>Yanmıyordu</div></div>
       <div class="e-yuzen">+ Yeni kayıt</div>${ek}`;
