@@ -264,9 +264,25 @@
           <small class="ipucu" id="sonra-ipucu"></small>
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
-      </form>` : ""}`;
+      </form>` : ""}
+      ${yonetici() ? `
+      <div class="islem">
+        <button type="button" class="ikincil tehlike" id="kayit-sil" style="width:100%">🗑 Bu kaydı sil</button>
+        <small class="ipucu">Yalnızca yönetici görür. Uygun olmayan kaydı fotoğraflarıyla birlikte herkesten kaldırır.</small>
+      </div>` : ""}`;
     goster("detay");
     if (kapat) kapatBagla(k);
+    $("#kayit-sil")?.addEventListener("click", async (e) => {
+      if (!confirm(`${k.no} numaralı "${k.yer}" kaydı herkesten silinsin mi? Geri alınamaz.`)) return;
+      e.target.disabled = true;
+      try {
+        await api("kayit_sil", { id: k.id });
+        kayitlar = kayitlar.filter((x) => x.id !== k.id);
+        history.replaceState(null, "", location.pathname);
+        goster("liste"); listeCiz();
+        mesaj("Kayıt silindi.");
+      } catch (err) { mesaj(err.message); e.target.disabled = false; }
+    });
   }
 
   function kapatBagla(k) {
@@ -292,6 +308,16 @@
 
   // ---------- Bildirimler ----------
   const bildirimDestek = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+  // Uygulama açılınca bildirim çubuğundaki Sporkent bildirimlerini ve simgedeki sayıyı temizle
+  async function bildirimleriTemizle() {
+    try { await navigator.clearAppBadge?.(); } catch {}
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      const kayit = await navigator.serviceWorker.ready;
+      for (const b of await kayit.getNotifications()) b.close();
+    } catch {}
+  }
   const iosTarayicida = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches && !navigator.standalone;
 
   function bildirimKutusu() {
@@ -376,7 +402,10 @@
       // Uygulama açıkken bildirim gelirse hemen tazele (pencere ve ses yenileriAc'tan)
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.tip !== "bildirim" || !oturum) return;
-        if (!onayli()) durumKontrol(); else if (e.data.sayfa === "uyeler") yonetimAc(); else yenile();
+        if (!onayli()) return durumKontrol();
+        // Uygulama önündeyken gelen bildirim zaten ekranda açılıyor; çubukta ve simgede birikmesin
+        if (!document.hidden) bildirimleriTemizle();
+        if (e.data.sayfa === "uyeler") yonetimAc(); else yenile();
       });
     }
     if (!oturum) return goster("giris");
@@ -387,6 +416,7 @@
     }
     if (oturum.durum !== "onayli") return bekleEkrani();
     clearInterval(bekleZamani);
+    bildirimleriTemizle();
     goster("liste");
     bildirimKutusu();
     await yenile();
@@ -411,6 +441,7 @@
 
   // ---------- Yönetici paneli (YK başkanı) ----------
   const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "uye"];
+  const MAKS_UYE = 30; // sunucudaki sınırla aynı
   const sonGorulme = (t) => t ? "Son görülme: " + tarihSaat(t) : "";
 
   async function yonetimAc() {
@@ -446,7 +477,7 @@
       ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"))).join("")
         : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
 
-      <h2>Gruptakiler (${gruptakiler.length})</h2>
+      <h2>Gruptakiler (${gruptakiler.length} / ${MAKS_UYE})</h2>
       ${gruptakiler.map((u) => uyeSatiri(u, d("uye_cikar", u.cihaz, "Çıkar", "tehlike"))).join("")}
 
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
@@ -578,7 +609,7 @@
   // Uygulamaya dönüldüğünde ve açıkken 20 sn'de bir tazele (bildirim gecikse de yeni iş görünür)
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !oturum) return;
-    if (onayli()) yenile(); else durumKontrol();
+    if (onayli()) { bildirimleriTemizle(); yenile(); } else durumKontrol();
   });
   setInterval(() => { if (!document.hidden && onayli()) yenile(); }, 20000);
 
