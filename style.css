@@ -54,6 +54,12 @@ body {
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
   background: #1f4e45; color: #fff;
 }
+.ust-sol { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ust-logo {
+  width: 54px; height: 54px; flex: none; border-radius: 50%;
+  background: #fff; object-fit: contain; padding: 3px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.35);
+}
 .ust-kurum { font-size: 12px; opacity: .8; letter-spacing: .02em; }
 .ust-baslik { font-size: 19px; font-weight: 700; }
 .ust-dugme {
@@ -155,7 +161,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 .oncelik small { color: var(--soluk); font-size: 13px; }
 
 .detay-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.geri { background: none; border: 0; color: var(--yesil); font: inherit; font-weight: 600; padding: 4px 0; }
+.geri { background: none; border: 0; color: var(--yesil); font: inherit; font-size: 21px; font-weight: 800; padding: 4px 0; cursor: pointer; }
+.detay-ust .rozet { font-size: 15px; padding: 3px 10px; }
 .alanlar { display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; font-size: 15px; margin: 10px 0; }
 .alanlar dt { color: var(--soluk); }
 .alanlar dd { margin: 0; overflow-wrap: anywhere; }
