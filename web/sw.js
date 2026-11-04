@@ -1,5 +1,6 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v21";
+const SURUM = "sk-v22";
+const DURUM = "sk-durum"; // sürümden bağımsız küçük kayıt: temizlenmemiş bildirim var mı
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -12,7 +13,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((adlar) => Promise.all(adlar.filter((a) => a !== SURUM).map((a) => caches.delete(a))))
+      .then((adlar) => Promise.all(adlar.filter((a) => a !== SURUM && a !== DURUM).map((a) => caches.delete(a))))
       .then(() => self.clients.claim())
   );
 });
@@ -49,6 +50,7 @@ self.addEventListener("push", (e) => {
       vibrate: [300, 100, 300, 100, 300],
       data: { kayitId: v.kayitId, sayfa: v.sayfa },
     });
+    await bekleyenVar(true);
     // iPhone ve bilgisayar simgedeki sayıyı kendiliğinden koymaz; bekleyen bildirim kadar yaz
     await sayiyiYaz();
     // Uygulama açıksa haber ver: iş penceresi kendiliğinden açılsın
@@ -65,10 +67,27 @@ async function sayiyiYaz() {
   } catch {}
 }
 
+// Bildirim geldi mi, uygulama açılıp temizlendi mi (kayıt yoksa "geldi" sayılır)
+async function bekleyenVar(deger) {
+  const c = await caches.open(DURUM);
+  if (deger !== undefined) return c.put("bekleyen", new Response(deger ? "1" : "0"));
+  const r = await c.match("bekleyen");
+  return !r || (await r.text()) === "1";
+}
+
 // Uygulama açılınca çubuktaki bildirimleri kapat, simgedeki sayıyı sil
 async function temizle() {
   try { for (const b of await self.registration.getNotifications()) b.close(); } catch {}
   try { await self.navigator.clearAppBadge?.(); } catch {}
+  // Samsung simgedeki sayıyı bildirimler kapansa da bazen tutuyor; sessiz bir bildirim
+  // gösterip hemen kapatmak sayıyı yeniden hesaplatıp sıfırlıyor. Yalnızca bildirim geldiyse.
+  try {
+    if (!(await bekleyenVar())) return false;
+    await self.registration.showNotification("Sporkent", { tag: "sk-temizlik", silent: true, body: "" });
+    for (const b of await self.registration.getNotifications({ tag: "sk-temizlik" })) b.close();
+    await bekleyenVar(false);
+    return true;
+  } catch { return false; }
 }
 
 self.addEventListener("message", (e) => {
