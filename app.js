@@ -143,9 +143,9 @@
   }
 
   // ---------- Yeni iş gelince: sesli uyarı + pencere kendiliğinden açılır ----------
-  // Müdür/şef için yeni açık sorunlar, herkes için yeni "yapıldı" işler.
+  // Başkan/müdür/şef için yeni açık sorunlar, herkes için yeni "yapıldı" işler.
   const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a");
-  const ilgili = (k) => k.durum === "tamam" || kapatabilir();
+  const ilgili = (k) => k.durum === "tamam" || kapatabilir() || yonetici();
 
   function yenileriAc() {
     const gorulen = sakla.al("sk_gorulen");
