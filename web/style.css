@@ -64,6 +64,13 @@ body {
 /* Bant basılı tutulunca Chrome kelime aramasını, metin seçimini ve resim menüsünü açmasın */
 .ust, .ust * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .ust { touch-action: none; }
+.yonetim-dugme { width: 100%; margin-bottom: 12px; }
+.yonetim-dugme.uyari { background: var(--oncelikli-zemin); color: var(--oncelikli); }
+.uye { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--cizgi); }
+.uye small { color: var(--soluk); }
+.uye code { font-size: 15px; }
+.uye-dugmeler { display: flex; gap: 6px; flex: none; }
+.tehlike { background: var(--acil-zemin) !important; color: var(--acil) !important; }
 .perde { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
 .soru { width: 100%; max-width: 420px; }
 .ust-kurum { font-size: 15px; opacity: .85; letter-spacing: .02em; }
