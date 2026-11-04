@@ -148,7 +148,6 @@
   // ---------- Ekranlar ----------
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
-    $("#cikis").hidden = ad === "giris";
     window.scrollTo(0, 0);
   }
 
@@ -389,7 +388,14 @@
     } finally { d.disabled = false; }
   });
 
-  $("#cikis").addEventListener("click", () => { if (confirm("Çıkış yapılsın mı?")) cikisYap(); });
+  // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse logoya 3 saniye basılı tutunca sorulur.
+  let logoZamani;
+  const logo = $(".ust-logo");
+  logo.addEventListener("pointerdown", () => {
+    logoZamani = setTimeout(() => { if (oturum && confirm("Çıkış yapılsın mı?")) cikisYap(); }, 3000);
+  });
+  for (const ol of ["pointerup", "pointerleave", "pointercancel"]) logo.addEventListener(ol, () => clearTimeout(logoZamani));
+  logo.addEventListener("contextmenu", (e) => e.preventDefault());
 
   $("#sekmeler").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-filtre]"); if (!b) return;

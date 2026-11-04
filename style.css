@@ -60,7 +60,7 @@ body {
   background: #fff; object-fit: contain; padding: 3px;
   box-shadow: 0 0 0 2px rgba(255,255,255,.35);
 }
-.ust-kurum { font-size: 12px; opacity: .8; letter-spacing: .02em; }
+.ust-kurum { font-size: 15px; opacity: .85; letter-spacing: .02em; }
 .ust-baslik { font-size: 19px; font-weight: 700; }
 .ust-dugme {
   background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5);

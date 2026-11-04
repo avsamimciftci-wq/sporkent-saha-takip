@@ -1,6 +1,6 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v6";
-const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/icon-192.png"];
+const SURUM = "sk-v7";
+const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
 self.addEventListener("install", (e) => {
   // GitHub Pages dosyaları 10 dk tarayıcı önbelleğinde tutar; "reload" ile her zaman sunucudan alınır.
@@ -39,8 +39,8 @@ self.addEventListener("push", (e) => {
     // Sesli, titreşimli ve dokunulana kadar ekranda kalan bildirim
     await self.registration.showNotification(v.baslik || "Sporkent", {
       body: v.govde || "",
-      icon: "icons/icon-192.png",
-      badge: "icons/icon-192.png",
+      icon: "icons/logo-192.png",
+      badge: "icons/logo-192.png",
       image: v.resim || undefined,
       tag: v.kayitId ? "kayit-" + v.kayitId : undefined,
       renotify: !!v.kayitId,
