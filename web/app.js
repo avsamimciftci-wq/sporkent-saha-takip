@@ -276,6 +276,7 @@
         <div class="foto-alan">
           <img id="sonra-onizleme" alt="" hidden>
           <label class="foto-dugme"><input id="sonra-foto" type="file" accept="image/*" capture="environment" hidden><span id="sonra-yazi">📷 Yapılan işin fotoğrafını çek</span></label>
+          <label class="foto-dugme galeri-dugme"><input id="sonra-galeri" type="file" accept="image/*" hidden><span>🖼️ Galeriden Fotoğraf Yükle</span></label>
         </div>
         <label>Not (isteğe bağlı)
           <div class="ses-satir">
@@ -326,7 +327,7 @@
 
   function kapatBagla(k) {
     const form = $("#kapat-form");
-    const foto = fotoSecici($("#sonra-foto"), $("#sonra-onizleme"), $("#sonra-yazi"));
+    const foto = fotoSecici($("#sonra-foto"), $("#sonra-onizleme"), $("#sonra-yazi"), $("#sonra-galeri"));
     mikrofonBagla($("#sonra-mikrofon"), form.querySelector("textarea"), $("#sonra-ipucu"));
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
