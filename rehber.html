@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sporkent Takip Rehberi</title>
+  <meta name="theme-color" content="#1f4e45">
+  <link rel="icon" href="icons/logo-192.png">
+  <style>
+    :root {
+      --yesil: #1f4e45; --yesil-acik: #e8f0ec; --zemin: #f4f6f4; --kart: #fff;
+      --yazi: #1b2421; --soluk: #5d6b66; --cizgi: #d7e0dc; --turuncu: #e8772e;
+      --kirmizi: #b42318;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --yesil-acik: #1d2e2a; --zemin: #111816; --kart: #1a2320; --yazi: #e8eeeb; --soluk: #9fb0aa; --cizgi: #2e3c37;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--zemin); color: var(--yazi); font: 18px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    [hidden] { display: none !important; }
+
+    .ust { background: #1f4e45; color: #fff; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; display: flex; gap: 12px; align-items: center; }
+    .ust img { width: 54px; height: 54px; border-radius: 50%; background: #fff; padding: 3px; }
+    .ust b { display: block; font-size: 20px; }
+    .ust span { font-size: 15px; opacity: .85; }
+
+    main { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; }
+
+    .secim { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .secim button { font: inherit; font-weight: 700; padding: 12px; border-radius: 12px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); cursor: pointer; }
+    .secim button.secili { border-color: #1f4e45; background: #1f4e45; color: #fff; }
+    .secim-baslik { font-size: 15px; color: var(--soluk); margin: 0 0 6px; }
+
+    .ilerleme { display: flex; gap: 4px; margin-bottom: 12px; }
+    .ilerleme i { flex: 1; height: 6px; border-radius: 3px; background: var(--cizgi); }
+    .ilerleme i.dolu { background: #1f4e45; }
+
+    .adim-no { color: var(--turuncu); font-weight: 800; font-size: 15px; letter-spacing: .04em; }
+    h1 { font-size: 26px; line-height: 1.2; margin: 2px 0 6px; }
+    .aciklama { font-size: 19px; margin: 0 0 14px; min-height: 3em; }
+    .aciklama b { color: #1f4e45; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .aciklama b { color: #7fd6a2; } }
+
+    /* ---------- Telefon ---------- */
+    .telefon {
+      position: relative; width: 250px; height: 500px; margin: 0 auto 16px;
+      border-radius: 36px; background: #111; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .ekran {
+      position: relative; width: 100%; height: 100%; border-radius: 26px; overflow: hidden;
+      background: #f4f6f4; color: #1b2421; font-size: 12px; line-height: 1.35;
+    }
+    .ekran .kare { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; background: #f4f6f4; }
+    .ekran .kare.aktif { opacity: 1; }
+    .ekran .durum-cubugu { height: 20px; background: rgba(0,0,0,.06); }
+
+    .parmak {
+      position: absolute; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%;
+      background: rgba(232,119,46,.35); border: 3px solid var(--turuncu); z-index: 5;
+      transition: left .7s ease, top .7s ease, opacity .3s; pointer-events: none;
+    }
+    .parmak::after { content: "👆"; position: absolute; left: 10px; top: 14px; font-size: 30px; }
+    .parmak.bas { animation: bas .6s ease; }
+    .parmak.uzun { animation: uzun 3s ease; }
+    @keyframes bas { 0% { transform: scale(1); } 40% { transform: scale(.7); background: rgba(232,119,46,.7); } 100% { transform: scale(1); } }
+    @keyframes uzun { 0% { transform: scale(1); } 10%, 90% { transform: scale(.75); background: rgba(232,119,46,.75); } 100% { transform: scale(1); } }
+
+    /* Ekran içi parçalar */
+    .e-bant { background: #1f4e45; color: #fff; padding: 8px; display: flex; gap: 6px; align-items: center; font-weight: 700; }
+    .e-bant img { width: 22px; height: 22px; border-radius: 50%; background: #fff; }
+    .e-kart { background: #fff; border-radius: 10px; margin: 8px; padding: 10px; border: 1px solid #d7e0dc; }
+    .e-alan { border: 1px solid #c9d4cf; border-radius: 6px; padding: 6px; margin: 4px 0 8px; background: #fff; min-height: 24px; }
+    .e-dugme { background: #1f4e45; color: #fff; border-radius: 8px; padding: 8px; text-align: center; font-weight: 700; }
+    .e-dugme.acik { background: #e8f0ec; color: #1b2421; }
+    .e-yuzen { position: absolute; right: 10px; bottom: 14px; background: #1f4e45; color: #fff; border-radius: 20px; padding: 8px 12px; font-weight: 700; }
+    .e-satir { display: flex; gap: 8px; background: #fff; border: 1px solid #d7e0dc; border-radius: 8px; margin: 6px 8px; padding: 6px; align-items: center; }
+    .e-foto { width: 38px; height: 38px; border-radius: 6px; flex: none; display: grid; place-items: center; font-size: 20px; }
+    .rozet { font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; }
+    .r-acik { background: #fef0db; color: #b54708; } .r-tamam { background: #e3f4ea; color: #217a47; }
+    .e-tarayici { background: #fff; padding: 6px 8px; display: flex; gap: 6px; align-items: center; border-bottom: 1px solid #ddd; }
+    .e-adres { flex: 1; background: #eef1f0; border-radius: 14px; padding: 4px 8px; font-size: 10px; color: #444; white-space: nowrap; overflow: hidden; }
+    .e-menu { position: absolute; right: 6px; top: 50px; background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); width: 160px; overflow: hidden; }
+    .e-menu div { padding: 8px 10px; border-bottom: 1px solid #eee; }
+    .e-menu .vurgu, .e-sayfa .vurgu { background: #fff3e6; font-weight: 700; outline: 2px solid var(--turuncu); outline-offset: -2px; }
+    .e-perde { position: absolute; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; }
+    .e-pencere { background: #fff; border-radius: 12px; padding: 14px; width: 85%; }
+    .e-pencere .dugmeler { display: flex; justify-content: flex-end; gap: 14px; margin-top: 12px; font-weight: 700; color: #1a73e8; }
+    .e-sayfa { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 14px 14px 0 0; padding: 8px 0; box-shadow: 0 -4px 16px rgba(0,0,0,.2); }
+    .e-sayfa div { padding: 9px 14px; border-bottom: 1px solid #eee; }
+    .e-ana { background: linear-gradient(160deg, #3a4a6b, #22283a); height: 100%; padding: 30px 14px; display: grid; grid-template-columns: repeat(4, 1fr); align-content: start; gap: 16px 8px; color: #fff; font-size: 9px; text-align: center; }
+    .e-ana .ikon { width: 42px; height: 42px; border-radius: 12px; margin: 0 auto 4px; display: grid; place-items: center; font-size: 20px; }
+    .e-ana .sk { background: #fff url(icons/logo-192.png) center/cover; }
+    .e-bildirim { position: absolute; left: 8px; right: 8px; top: 26px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.3); display: flex; gap: 8px; animation: in .6s ease; }
+    @keyframes in { from { transform: translateY(-80px); opacity: 0; } }
+    .e-safari { position: absolute; left: 0; right: 0; bottom: 0; background: #f7f7f7; border-top: 1px solid #ddd; display: flex; justify-content: space-around; padding: 8px 0 12px; font-size: 18px; color: #1a73e8; }
+    .yaziyor::after { content: "|"; animation: yanip .8s infinite; }
+    @keyframes yanip { 50% { opacity: 0; } }
+
+    /* Alt düğmeler */
+    .gezinti { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+    .gezinti button { font: inherit; font-weight: 800; font-size: 20px; padding: 16px; border-radius: 14px; border: 0; cursor: pointer; }
+    .geri { background: var(--yesil-acik); color: var(--yazi); }
+    .ileri { background: #1f4e45; color: #fff; }
+    .gezinti button:disabled { opacity: .4; }
+    .tekrar { display: block; margin: 10px auto 0; background: none; border: 0; color: var(--soluk); font: inherit; font-size: 16px; text-decoration: underline; cursor: pointer; }
+
+    .not { background: #fff4ce; color: #5c4400; border-radius: 12px; padding: 10px 12px; font-size: 16px; margin: 0 0 14px; }
+    .uygulamaya { display: block; text-align: center; background: var(--turuncu); color: #fff; text-decoration: none; font-weight: 800; font-size: 20px; padding: 16px; border-radius: 14px; margin-top: 12px; }
+    @media (prefers-reduced-motion: reduce) { .parmak, .ekran .kare { transition: none; } .parmak.bas, .parmak.uzun { animation: none; } }
+  </style>
+</head>
+<body>
+  <header class="ust">
+    <img src="logo.png" alt="">
+    <div><b>Nasıl kullanılır?</b><span>Sporkent Saha Takip · adım adım</span></div>
+  </header>
+
+  <main>
+    <p class="secim-baslik">Telefonunuz hangisi?</p>
+    <div class="secim" id="secim">
+      <button data-tel="android" class="secili">🤖 Android<br><small>Samsung, Xiaomi, Oppo…</small></button>
+      <button data-tel="iphone">🍎 iPhone</button>
+    </div>
+
+    <div class="ilerleme" id="ilerleme"></div>
+    <div class="adim-no" id="adim-no"></div>
+    <h1 id="baslik"></h1>
+    <p class="aciklama" id="aciklama"></p>
+    <p class="not" id="not" hidden></p>
+
+    <div class="telefon"><div class="ekran" id="ekran"><div class="parmak" id="parmak"></div></div></div>
+
+    <div class="gezinti">
+      <button class="geri" id="geri">← Geri</button>
+      <button class="ileri" id="ileri">İleri →</button>
+    </div>
+    <button class="tekrar" id="tekrar">↻ Bu adımı tekrar oynat</button>
+    <a class="uygulamaya" id="uygulamaya" href="./" hidden>Uygulamayı aç</a>
+  </main>
+
+  <script>
+  (() => {
+    const BAGLANTI = "avsamimciftci-wq.github.io/sporkent-saha-takip";
+    const bant = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt="">Saha Takip</div>`;
+    const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
+    const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Adınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Giriş kodu<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
+    const liste = (ek = "") => `${bant}
+      <div style="display:flex;gap:4px;margin:8px"><div class="e-kart" style="margin:0;flex:1;text-align:center;padding:6px"><b>1</b><br>Açık</div><div class="e-kart" style="margin:0;flex:1;text-align:center;padding:6px"><b>2</b><br>Yapılan</div></div>
+      <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-acik">Açık</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
+      <div class="e-satir"><div class="e-foto" style="background:#e3f4ea">💡</div><div><span class="rozet r-tamam">Yapıldı</span><br><b>Sahil lambası</b><br>Yanmıyordu</div></div>
+      <div class="e-yuzen">+ Yeni kayıt</div>${ek}`;
+    const izin = (metin) => `<div class="e-perde"><div class="e-pencere"><b>${metin}</b><div class="dugmeler"><span style="color:#888">Engelle</span><span>İzin ver</span></div></div></div>`;
+
+    // Her adım: başlık, açıklama, kareler (ekran + parmağın dokunduğu yer, % olarak)
+    const ADIMLAR = {
+      ortak_bas: [
+        { baslik: "Bağlantıya dokunun", aciklama: "Size WhatsApp'tan gelen <b>mavi bağlantıya</b> bir kez dokunun. Uygulama telefonunuzun internet tarayıcısında açılır.",
+          kareler: [
+            { ekran: `<div class="durum-cubugu"></div><div style="background:#075e54;color:#fff;padding:8px;font-weight:700">Sporkent Grubu</div><div style="background:#e5ddd5;height:100%;padding:10px"><div style="background:#fff;border-radius:8px;padding:8px;width:85%">Saha takip uygulamamız:<br><u style="color:#1a73e8">${BAGLANTI}</u></div></div>`, parmak: [50, 58] },
+          ] },
+      ],
+      android_yukle: [
+        { baslik: "Ana ekrana ekleyin", aciklama: "Sağ üstteki <b>üç noktaya (⋮)</b> dokunun. Açılan listede <b>“Ana ekrana ekle”</b> yazısına dokunun. Sonra <b>“Ekle”</b> ya da <b>“Yükle”</b> deyin.",
+          not: "Bu işi yalnızca bir kez yaparsınız. Sonra uygulamayı her zaman ana ekrandaki Sporkent simgesinden açarsınız.",
+          kareler: [
+            { ekran: `${tarayiciAndroid}${giris("", "")}`, parmak: [90, 7] },
+            { ekran: `${tarayiciAndroid}${giris("", "")}<div class="e-menu"><div>Yeni sekme</div><div>Yer işaretleri</div><div>Paylaş…</div><div class="vurgu">📲 Ana ekrana ekle</div><div>Ayarlar</div></div>`, parmak: [75, 35] },
+            { ekran: `${tarayiciAndroid}${giris("", "")}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>Sporkent Takip</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 60] },
+          ] },
+      ],
+      iphone_yukle: [
+        { baslik: "Ana ekrana ekleyin", aciklama: "Bağlantıyı <b>Safari</b>'de açın. Alttaki <b>paylaş düğmesine (kare içinde yukarı ok ⬆︎)</b> dokunun. Listeyi biraz kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.",
+          not: "iPhone'da bildirimler yalnızca uygulamayı ana ekrana ekleyip oradan açarsanız gelir. Bu adımı atlamayın.",
+          kareler: [
+            { ekran: `<div class="durum-cubugu"></div>${giris("", "")}<div class="e-safari"><span>‹</span><span>›</span><span>⬆︎</span><span>📖</span><span>⧉</span></div>`, parmak: [50, 94] },
+            { ekran: `<div class="durum-cubugu"></div>${giris("", "")}<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`, parmak: [45, 82] },
+            { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/logo-192.png) center/cover;border:1px solid #ddd"></span><div>Sporkent Takip</div></div>`, parmak: [88, 9] },
+          ] },
+      ],
+      ortak_son: [
+        { baslik: "Simgeden açın", aciklama: "Artık telefonunuzun ana ekranında <b>Sporkent logosu</b> var. Uygulamayı her zaman <b>bu simgeye dokunarak</b> açın.",
+          kareler: [
+            { ekran: `<div class="e-ana"><div><div class="ikon" style="background:#4caf50">📞</div>Telefon</div><div><div class="ikon" style="background:#25d366">💬</div>WhatsApp</div><div><div class="ikon" style="background:#fff">🌐</div>Chrome</div><div><div class="ikon sk"></div>Sporkent Takip</div></div>`, parmak: [86, 13] },
+          ] },
+        { baslik: "Adınızı ve kodu yazın", aciklama: "<b>Adınızı soyadınızla</b> yazın. Size verilen <b>giriş kodunu</b> yazın. Sonra <b>“Giriş yap”</b> düğmesine dokunun.",
+          not: "Giriş kodunu yönetim size ayrıca verir. Kodu başkasıyla paylaşmayın.",
+          kareler: [
+            { ekran: giris("Ahmet Yıl", "", 1), parmak: [50, 31] },
+            { ekran: giris("Ahmet Yılmaz", "••••••", 2), parmak: [50, 44] },
+            { ekran: giris("Ahmet Yılmaz", "••••••••••••"), parmak: [50, 54] },
+          ] },
+        { baslik: "Onay bekleyin", aciklama: "İlk girişte <b>“Onay bekleniyor”</b> yazar. Yönetim Kurulu Başkanı sizi onaylayınca ekran <b>kendiliğinden açılır</b>. Bir şey yapmanıza gerek yok.",
+          kareler: [
+            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ahmet Yılmaz · Grup üyesi<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
+            { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#fff url(icons/logo-192.png) center/cover"></div><div><b>Gruba kabul edildiniz</b><br>Kullanmaya başlayabilirsiniz.</div></div>`, parmak: [50, 120] },
+          ] },
+        { baslik: "Bildirimleri açın", aciklama: "Listenin üstündeki <b>“Bildirimleri aç”</b> düğmesine dokunun. Telefon sorunca <b>“İzin ver”</b> deyin. Böylece yapılan işlerin haberi telefonunuza gelir.",
+          kareler: [
+            { ekran: `${bant}<div class="e-kart" style="display:flex;gap:6px;align-items:center;background:#e8f0ec">Bildirimleri açın<div class="e-dugme" style="padding:5px 8px">Bildirimleri aç</div></div>`, parmak: [72, 21] },
+            { ekran: `${bant}${izin("Sporkent Takip bildirim göndermek istiyor")}`, parmak: [80, 54] },
+          ] },
+        { baslik: "Sorun bildirin", aciklama: "Sağ alttaki <b>“+ Yeni kayıt”</b>a dokunun. <b>📷 Fotoğraf çek</b>in. <b>Yeri</b> yazın (örn. 3 numaralı duş). <b>Sorunu</b> yazın ya da <b>🎤 mikrofona</b> basıp konuşun. En son <b>“Gönder”</b>e dokunun.",
+          kareler: [
+            { ekran: liste(), parmak: [80, 93] },
+            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div class="e-dugme acik" style="margin:8px 0;padding:16px">📷 Fotoğraf çek</div>Yer<div class="e-alan"></div>Sorun<div class="e-alan" style="min-height:40px"></div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 26] },
+            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div style="margin:8px 0;height:50px;border-radius:8px;background:linear-gradient(135deg,#9bb,#577)"></div>Yer<div class="e-alan">3 numaralı duş</div>Sorun<div class="e-alan yaziyor" style="min-height:40px">Su akmıyor</div><div style="text-align:right;margin:-6px 0 6px">🎤</div><div class="e-dugme">Gönder</div></div>`, parmak: [88, 66] },
+            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div style="margin:8px 0;height:50px;border-radius:8px;background:linear-gradient(135deg,#9bb,#577)"></div>Yer<div class="e-alan">3 numaralı duş</div>Sorun<div class="e-alan" style="min-height:40px">Su akmıyor</div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 80] },
+          ] },
+        { baslik: "Yapılan işi görün", aciklama: "Müdür işi bitirince telefonunuza <b>sesli bildirim</b> gelir. Uygulamada <b>önce ve sonra fotoğrafı</b> yan yana görünür. Bildirdiğiniz sorunları yalnızca siz ve yönetim görür; <b>yapılan işleri herkes</b> görür.",
+          kareler: [
+            { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#bfe3cb">✅</div><div><b>Yapıldı • 3 numaralı duş</b><br>Batarya değiştirildi</div></div>`, parmak: [50, 10] },
+            { ekran: `${bant}<div class="e-kart"><b style="color:#1f4e45;font-size:14px">← Liste</b><span class="rozet r-tamam" style="float:right">Yapıldı</span><br><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="display:flex;gap:6px;margin:8px 0"><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#caa,#866)"></div><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#9db,#486)"></div></div><span style="color:#5d6b66">Sorun</span><span style="color:#5d6b66;float:right">Yapıldı</span></div>`, parmak: [50, 120] },
+          ] },
+        { baslik: "Müdür ve şef için: Yapıldı", aciklama: "Gelen soruna dokunun. İşi bitirince <b>📷 yapılan işin fotoğrafını</b> çekin ve <b>“✔ Yapıldı”</b>ya dokunun. Haber bütün gruba gider.",
+          not: "Bu adım sadece müdür ve şef içindir. Diğerleri bu düğmeyi görmez.",
+          kareler: [
+            { ekran: `${bant}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div class="e-dugme acik" style="margin:6px 0;padding:12px">📷 Yapılan işin fotoğrafını çek</div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 67] },
+            { ekran: `${bant}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div style="height:42px;border-radius:6px;background:linear-gradient(135deg,#9db,#486);margin:6px 0"></div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 78] },
+          ] },
+        { baslik: "Hepsi bu kadar!", aciklama: "Uygulamayı kapatmanıza gerek yok, <b>çıkış yapmayın</b>. Bir dahaki sefere ana ekrandaki Sporkent simgesine dokunmanız yeter.",
+          not: "Çok nadiren çıkış gerekirse: üstteki yeşil banda parmağınızla 3 saniye basılı tutun.",
+          kareler: [
+            { ekran: liste(), parmak: [50, 8], uzun: true },
+            { ekran: `${liste()}<div class="e-perde"><div class="e-pencere"><b>Çıkış yapılsın mı?</b><div class="dugmeler"><span>Vazgeç</span><span style="color:#b42318">Çıkış yap</span></div></div></div>`, parmak: [72, 54] },
+          ] },
+      ],
+    };
+
+    let tel = /iphone|ipad|ipod/i.test(navigator.userAgent) ? "iphone" : "android";
+    let adimlar = [], sira = 0, zamanlayicilar = [];
+    const $ = (s) => document.querySelector(s);
+    const ekran = $("#ekran"), parmak = $("#parmak");
+
+    function kur() {
+      adimlar = [...ADIMLAR.ortak_bas, ...ADIMLAR[tel + "_yukle"], ...ADIMLAR.ortak_son];
+      for (const b of document.querySelectorAll("#secim button")) b.classList.toggle("secili", b.dataset.tel === tel);
+      $("#ilerleme").innerHTML = adimlar.map(() => "<i></i>").join("");
+      goster();
+    }
+
+    function goster() {
+      zamanlayicilar.forEach(clearTimeout); zamanlayicilar = [];
+      const a = adimlar[sira];
+      $("#adim-no").textContent = `ADIM ${sira + 1} / ${adimlar.length}`;
+      $("#baslik").textContent = a.baslik;
+      $("#aciklama").innerHTML = a.aciklama;
+      $("#not").hidden = !a.not; $("#not").textContent = a.not ? "💡 " + a.not : "";
+      document.querySelectorAll("#ilerleme i").forEach((i, n) => i.classList.toggle("dolu", n <= sira));
+      $("#geri").disabled = sira === 0;
+      $("#ileri").textContent = sira === adimlar.length - 1 ? "Baştan ↺" : "İleri →";
+      $("#uygulamaya").hidden = sira !== adimlar.length - 1;
+
+      ekran.querySelectorAll(".kare").forEach((k) => k.remove());
+      const kareler = a.kareler.map((k) => {
+        const d = document.createElement("div"); d.className = "kare"; d.innerHTML = k.ekran;
+        ekran.insertBefore(d, parmak); return d;
+      });
+      oynat(a, kareler);
+    }
+
+    // Kareleri sırayla gösterir: parmak hedefe gider, dokunur, sonraki kare açılır; sonunda başa döner.
+    function oynat(a, kareler) {
+      const azalt = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let t = 0;
+      const sonra = (ms, f) => zamanlayicilar.push(setTimeout(f, (t += ms)));
+      parmak.style.opacity = 0; parmak.style.left = "50%"; parmak.style.top = "110%";
+      a.kareler.forEach((k, n) => {
+        sonra(n === 0 ? 300 : 500, () => {
+          kareler.forEach((d, m) => d.classList.toggle("aktif", m === n));
+          if (k.parmak[1] > 100) { parmak.style.opacity = 0; return; }
+          parmak.style.opacity = 1; parmak.style.left = k.parmak[0] + "%"; parmak.style.top = k.parmak[1] + "%";
+        });
+        if (k.parmak[1] > 100) { sonra(2200, () => {}); return; }
+        sonra(azalt ? 300 : 1000, () => {
+          parmak.classList.remove("bas", "uzun"); void parmak.offsetWidth;
+          parmak.classList.add(k.uzun ? "uzun" : "bas");
+        });
+        sonra(k.uzun ? 3100 : 1100, () => {});
+      });
+      sonra(1500, () => oynat(a, kareler));
+    }
+
+    $("#ileri").addEventListener("click", () => { sira = sira === adimlar.length - 1 ? 0 : sira + 1; goster(); scrollTo({ top: 0, behavior: "smooth" }); });
+    $("#geri").addEventListener("click", () => { if (sira > 0) { sira--; goster(); scrollTo({ top: 0, behavior: "smooth" }); } });
+    $("#tekrar").addEventListener("click", goster);
+    $("#secim").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tel]"); if (!b) return;
+      tel = b.dataset.tel; sira = Math.min(sira, 1); kur();
+    });
+    kur();
+  })();
+  </script>
+</body>
+</html>
