@@ -351,10 +351,30 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   }
 }
 
+// Her sabah zamanlayıcı (pg_cron) çağırır: süresi geçen işleri yönetime bildirir.
+const CRON_ANAHTARI = Deno.env.get("CRON_ANAHTARI") ?? "";
+
+async function gunlukGecikme() {
+  const bugun = sonGun(new Date(), 0);
+  const { data, error } = await db.from("kayitlar").select("id, no, yer, son_tarih")
+    .neq("durum", "tamam").lt("son_tarih", bugun).order("son_tarih");
+  if (error) throw error;
+  if (!data?.length) return { geciken: 0 };
+  const gun = (t: string) => Math.round((Date.parse(bugun) - Date.parse(t)) / 864e5);
+  const ozet = data.slice(0, 4).map((k: any) => `${k.yer} (${gun(k.son_tarih)} gün)`).join(", ")
+    + (data.length > 4 ? ` ve ${data.length - 4} iş daha` : "");
+  const sonuc = await bildir(["baskan", "mudur", "sef", "yonetim"], `⚠ ${data.length} iş süresinde yapılmadı`, ozet, { kayitId: data[0].id });
+  return { geciken: data.length, ...sonuc };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
     const g = await req.json();
+    if (g.eylem === "gunluk_gecikme") {
+      if (!CRON_ANAHTARI || g.cron !== CRON_ANAHTARI) throw new Hata("Yetkisiz.", 401);
+      return yanit(await gunlukGecikme());
+    }
     if (g.eylem === "giris") return yanit(await giris(g));
     const u = await kimlik(g);
     return yanit(await islem(String(g.eylem), u, g));
