@@ -88,8 +88,8 @@
   const tarihSaat = (t) => t ? new Date(t).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
   const tarih = (t) => t ? new Date(t + "T00:00:00").toLocaleDateString("tr-TR") : "—";
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
-  const ONCELIK = { acil: "Acil", oncelikli: "Öncelikli", normal: "Normal" };
   const DURUM = { acik: "Açık", devam: "Devam ediyor", tamam: "Yapıldı" };
+  const DURUM_ROZET = { acik: "oncelikli", devam: "devam", tamam: "tamam" };
   const gecikti = (k) => k.durum !== "tamam" && k.son_tarih && k.son_tarih < bugun();
 
   let mesajZamani;
@@ -187,8 +187,7 @@
         <span>
           <span class="satir-ust">
             <span>${kac(k.no)}</span>
-            <span class="rozet ${k.durum === "tamam" ? "tamam" : k.oncelik}">${k.durum === "tamam" ? "Yapıldı" : ONCELIK[k.oncelik]}</span>
-            ${k.durum === "devam" ? `<span class="rozet devam">Devam</span>` : ""}
+            <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
             ${gecikti(k) ? `<span class="rozet gecikti">Gecikti</span>` : ""}
           </span>
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
@@ -205,7 +204,7 @@
     $("#detay").innerHTML = `
       <div class="detay-ust">
         <button class="geri" data-geri>← Liste</button>
-        <span class="rozet ${k.durum === "tamam" ? "tamam" : k.oncelik}">${k.durum === "tamam" ? "Yapıldı" : ONCELIK[k.oncelik]}</span>
+        <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
       </div>
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
@@ -216,7 +215,6 @@
       <dl class="alanlar">
         <dt>Kayıt no</dt><dd>${kac(k.no)}</dd>
         <dt>Durum</dt><dd>${DURUM[k.durum]}${gecikti(k) ? ` <span class="rozet gecikti">Gecikti</span>` : ""}</dd>
-        <dt>Bölge</dt><dd>${kac(k.bolge)}</dd>
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
         <dt>Sorumlu</dt><dd>${kac(k.sorumlu || "—")}</dd>
@@ -413,7 +411,7 @@
       const f = new FormData(yeniForm);
       const foto = yeniFoto.al() ? await fotoYukle(yeniFoto.al()) : null;
       const r = await api("yeni", {
-        bildiren: oturum.ad, bolge: f.get("bolge"), yer: f.get("yer"), sorun: f.get("sorun"), oncelik: f.get("oncelik"), foto,
+        bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
       });
       mesaj(`Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       filtre = "acik";
