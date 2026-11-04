@@ -31,6 +31,7 @@ class Hata extends Error {
 type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
+const MAKS_UYE = 30; // başkan dahil onaylı üye sınırı
 const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi",
 };
@@ -219,6 +220,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
+    case "kayit_sil": {
+      // Yönetici uygun görmediği kaydı fotoğraflarıyla birlikte herkesten kaldırır
+      yonetici();
+      const { data: k } = await db.from("kayitlar").select("id, foto_once, foto_sonra").eq("id", g.id).maybeSingle();
+      if (!k) throw new Hata("Kayıt bulunamadı.");
+      const fotolar = [k.foto_once, k.foto_sonra].filter(Boolean);
+      if (fotolar.length) await db.storage.from(BUCKET).remove(fotolar);
+      const { error } = await db.from("kayitlar").delete().eq("id", k.id);
+      if (error) throw error;
+      return { tamam: true };
+    }
+
     case "abone_ol": {
       const a = g.abonelik;
       if (!a?.endpoint) throw new Hata("Geçersiz abonelik.");
@@ -243,6 +256,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const hedef = temiz(g.hedef, 80);
       if (hedef === u.cihaz) throw new Hata("Kendi telefonunuzu değiştiremezsiniz.");
       const durum = eylem === "uye_cikar" ? "cikarildi" : "onayli";
+      if (durum === "onayli") {
+        const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
+        if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi). Yeni üye için önce birini çıkarın.`);
+      }
       const { data, error } = await db.from("uyeler")
         .update({ durum, onay_at: durum === "onayli" ? new Date().toISOString() : null })
         .eq("cihaz", hedef).select("ad").maybeSingle();
