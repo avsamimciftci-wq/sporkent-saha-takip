@@ -18,7 +18,7 @@
 
   let oturum = sakla.al("sk_oturum"); // { ad, kod, rol, vapid }
   let kayitlar = [];
-  let filtre = "acik";
+  let filtre = "hepsi";
 
   // ---------- Sunucu ----------
   async function api(eylem, veri = {}) {
@@ -156,29 +156,75 @@
     try {
       kayitlar = (await api("liste")).kayitlar || [];
       listeCiz();
+      yenileriAc();
     } catch (e) {
       if (/Kod hatalı/.test(e.message)) return cikisYap();
       mesaj(e.message);
     }
   }
 
+  // ---------- Yeni iş gelince: sesli uyarı + pencere kendiliğinden açılır ----------
+  // Müdür/şef için yeni açık sorunlar, herkes için yeni "yapıldı" işler.
+  const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a");
+  const ilgili = (k) => k.durum === "tamam" || kapatabilir();
+
+  function yenileriAc() {
+    const gorulen = sakla.al("sk_gorulen");
+    const adaylar = kayitlar.filter(ilgili);
+    const yeniler = gorulen ? adaylar.filter((k) => !gorulen.includes(anahtar(k))) : [];
+    sakla.koy("sk_gorulen", kayitlar.map(anahtar).slice(0, 500));
+    if (!yeniler.length) return;
+    sesCal();
+    const en = yeniler.sort((a, b) => (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at))[0];
+    const baslik = en.durum === "tamam" ? `Yapıldı: ${en.yer}` : `Yeni sorun: ${en.yer}`;
+    // Yeni kayıt formu doluyken yazılanı kaybettirme, sadece haber ver
+    if (!$("#ekran-yeni").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden)) return mesaj(baslik);
+    detayGoster(en.id);
+    mesaj(yeniler.length > 1 ? `${baslik} (+${yeniler.length - 1} yeni)` : baslik);
+  }
+
+  let sesBaglam = null;
+  function sesAc() {
+    try {
+      sesBaglam = sesBaglam || new (window.AudioContext || window.webkitAudioContext)();
+      if (sesBaglam.state === "suspended") sesBaglam.resume();
+    } catch {}
+  }
+  function sesCal() {
+    try { navigator.vibrate?.([200, 100, 200]); } catch {}
+    if (!sesBaglam) return;
+    const t = sesBaglam.currentTime;
+    for (const [frek, bas] of [[880, 0], [1175, 0.18], [880, 0.5], [1175, 0.68]]) {
+      const o = sesBaglam.createOscillator(), g = sesBaglam.createGain();
+      o.frequency.value = frek; o.type = "sine";
+      g.gain.setValueAtTime(0.0001, t + bas);
+      g.gain.exponentialRampToValueAtTime(0.4, t + bas + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + bas + 0.16);
+      o.connect(g).connect(sesBaglam.destination);
+      o.start(t + bas); o.stop(t + bas + 0.17);
+    }
+  }
+  // Telefonlar sesi ancak bir dokunuştan sonra izin verir
+  document.addEventListener("pointerdown", sesAc);
+
   function listeCiz() {
     const acik = kayitlar.filter((k) => k.durum !== "tamam").length;
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const bugunKapanan = kayitlar.filter((k) => k.kapanis_at && k.kapanis_at.slice(0, 10) === bugun()).length;
     $("#ozet").innerHTML = `
-      <div><b>${acik}</b><span>${hepsiniGorur() ? "Açık sorun" : "Bildirdiğim açık"}</span></div>
-      <div><b>${bugunKapanan}</b><span>Bugün yapılan</span></div>
-      <div><b>${yapilan}</b><span>Toplam yapılan</span></div>`;
+      <div data-filtre="acik"><b>${acik}</b><span>${hepsiniGorur() ? "Açık sorun" : "Bildirdiğim açık"}</span></div>
+      <div data-filtre="tamam"><b>${bugunKapanan}</b><span>Bugün yapılan</span></div>
+      <div data-filtre="tamam"><b>${yapilan}</b><span>Toplam yapılan</span></div>`;
     $("#gorunurluk").textContent = hepsiniGorur()
       ? `${ROL_ADI[oturum.rol]} olarak tüm sorunları görüyorsunuz.`
       : "Bildirdiğiniz sorunları yalnızca siz, müdür, şef ve yönetim kurulu görür. Yapılan işleri herkes görür.";
 
     const gorunen = kayitlar
       .filter((k) => filtre === "hepsi" || (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
-      .sort((a, b) => filtre === "acik"
-        ? a.created_at.localeCompare(b.created_at)
-        : (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at));
+      // Açıklar önce (eskiden yeniye), sonra yapılanlar (en yeni üstte)
+      .sort((a, b) => (a.durum === "tamam") - (b.durum === "tamam") || (a.durum === "tamam"
+        ? b.kapanis_at.localeCompare(a.kapanis_at)
+        : a.created_at.localeCompare(b.created_at)));
 
     $("#liste").innerHTML = gorunen.length ? gorunen.map((k) => `
       <button class="satir" data-id="${k.id}">
@@ -255,6 +301,8 @@
       try {
         const yol = await fotoYukle(foto.al());
         await api("kapat", { id: k.id, foto: yol, sonuc: new FormData(form).get("sonuc"), ad: oturum.ad });
+        sakla.koy("sk_gorulen", [k.id + ":t", ...(sakla.al("sk_gorulen") || [])]);
+        form.remove();
         await yenile();
         detayGoster(k.id);
         mesaj("Yapıldı olarak gönderildi. Gruptaki herkes görecek.");
@@ -274,8 +322,25 @@
       $("#bildirim-ac").hidden = true; kutu.hidden = false; return;
     }
     if (!bildirimDestek()) { kutu.hidden = true; return; }
-    kutu.hidden = Notification.permission === "granted" && sakla.al("sk_abone") === oturum.rol;
-    if (Notification.permission === "granted" && sakla.al("sk_abone") !== oturum.rol) bildirimAc(true);
+    kutu.hidden = Notification.permission === "granted";
+    // İzin varsa her açılışta sunucuya yeniden kaydol: kayıt silinmişse kendiliğinden düzelir
+    if (Notification.permission === "granted") bildirimAc(true);
+  }
+
+  async function bildirimDene() {
+    const d = $("#bildirim-dene");
+    d.disabled = true;
+    try {
+      if (!bildirimDestek() || Notification.permission !== "granted") {
+        await bildirimAc(false);
+        if (Notification.permission !== "granted") return;
+      } else await bildirimAc(true);
+      const r = await api("bildirim_dene");
+      mesaj(r.basarili
+        ? "Deneme bildirimi gönderildi. Birkaç saniye içinde gelmezse telefon ayarlarından Chrome bildirimlerini açın."
+        : "Bu telefon bildirime kayıtlı görünmüyor. Bildirim iznini kontrol edin.");
+    } catch (e) { mesaj(e.message); }
+    finally { d.disabled = false; }
   }
 
   function base64Bayt(s) {
@@ -300,7 +365,7 @@
 
   // ---------- Giriş / çıkış ----------
   function cikisYap() {
-    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone");
+    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen");
     kayitlar = []; goster("giris");
   }
 
@@ -311,6 +376,8 @@
       const ilkKontrol = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener("controllerchange", () => { if (ilkKontrol) location.reload(); });
       navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((k) => k.update()).catch(() => {});
+      // Uygulama açıkken bildirim gelirse listeyi hemen tazele (pencere ve ses yenileriAc'tan)
+      navigator.serviceWorker.addEventListener("message", (e) => { if (e.data?.tip === "bildirim" && oturum) yenile(); });
     }
     if (!oturum) return goster("giris");
     $("#yeni-ac").textContent = "+ Yeni kayıt";
@@ -352,6 +419,12 @@
   });
 
   $("#bildirim-ac").addEventListener("click", () => bildirimAc(false));
+  $("#bildirim-dene").addEventListener("click", bildirimDene);
+
+  $("#ozet").addEventListener("click", (e) => {
+    const k = e.target.closest("[data-filtre]"); if (!k) return;
+    $(`#sekmeler [data-filtre="${k.dataset.filtre}"]`).click();
+  });
 
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-geri]")) { history.replaceState(null, "", location.pathname); goster("liste"); listeCiz(); }
@@ -376,8 +449,8 @@
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
       });
       mesaj(`Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
-      filtre = "acik";
-      for (const x of document.querySelectorAll("#sekmeler button")) x.classList.toggle("secili", x.dataset.filtre === "acik");
+      // Kendi açtığımız kayıt için pencere açılmasın
+      sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
       goster("liste");
       await yenile();
     } catch (err) {
@@ -393,8 +466,9 @@
     detayGoster(Number(m[1]));
   });
 
-  // Uygulamaya dönüldüğünde listeyi tazele
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && oturum && !$("#ekran-liste").hidden) yenile(); });
+  // Uygulamaya dönüldüğünde ve açıkken 20 sn'de bir tazele (bildirim gecikse de yeni iş görünür)
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && oturum) yenile(); });
+  setInterval(() => { if (!document.hidden && oturum) yenile(); }, 20000);
 
   basla();
 })();

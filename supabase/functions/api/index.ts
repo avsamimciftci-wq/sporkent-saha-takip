@@ -57,24 +57,33 @@ async function fotoUrlleri(kayitlar: any[]) {
   }));
 }
 
-async function bildir(roller: Rol[] | "hepsi", baslik: string, govde: string, kayitId?: number, resim?: string | null) {
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
-  let q = db.from("abonelikler").select("endpoint, abonelik");
-  if (roller !== "hepsi") q = q.in("rol", roller);
+type Hedef = Rol[] | "hepsi" | { cihaz: string };
+
+async function bildir(hedef: Hedef, baslik: string, govde: string, kayitId?: number, resim?: string | null) {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return { hedef: 0, basarili: 0 };
+  let q = db.from("abonelikler").select("endpoint, abonelik, rol");
+  if (Array.isArray(hedef)) q = q.in("rol", hedef);
+  else if (hedef !== "hepsi") q = q.eq("cihaz", hedef.cihaz);
   const { data } = await q;
   const mesaj = JSON.stringify({ baslik, govde, kayitId, resim: resim ?? undefined });
+  const hatalar: unknown[] = [];
+  let basarili = 0;
   await Promise.all((data ?? []).map(async (a: any) => {
     try {
-      await webpush.sendNotification(a.abonelik, mesaj, { TTL: 60 * 60 * 24 });
+      // urgency: high → Android telefonu uykudayken de hemen uyandırır
+      await webpush.sendNotification(a.abonelik, mesaj, { TTL: 60 * 60 * 24, urgency: "high" });
+      basarili++;
     } catch (e: any) {
-      // Süresi dolmuş abonelikleri temizle
+      hatalar.push({ rol: a.rol, kod: e?.statusCode ?? null, mesaj: String(e?.body ?? e?.message ?? e).slice(0, 300) });
+      // Yalnızca servis "bu abonelik artık yok" derse sil; telefon her açılışta yeniden kaydolur
       if (e?.statusCode === 404 || e?.statusCode === 410) {
         await db.from("abonelikler").delete().eq("endpoint", a.endpoint);
-      } else {
-        console.error("push hatası", e?.statusCode, e?.body ?? e?.message);
       }
     }
   }));
+  const sonuc = { hedef: (data ?? []).length, basarili };
+  await db.from("bildirim_gunlugu").insert({ baslik, ...sonuc, hatalar: hatalar.length ? hatalar : null });
+  return sonuc;
 }
 
 async function islem(eylem: string, rol: Rol, g: any) {
@@ -139,6 +148,13 @@ async function islem(eylem: string, rol: Rol, g: any) {
       await bildir("hepsi", `Yapıldı • ${data.yer}`.slice(0, 80),
         (data.sonuc || data.sorun || "").slice(0, 180), data.id, url?.signedUrl);
       return { kayit: data };
+    }
+
+    case "bildirim_dene": {
+      const cihaz = temiz(g.cihaz, 80);
+      if (!cihaz) throw new Hata("Cihaz bilgisi yok.");
+      const sonuc = await bildir({ cihaz }, "Sporkent deneme", "Bildirimler bu telefonda çalışıyor.");
+      return sonuc;
     }
 
     case "abone_ol": {
