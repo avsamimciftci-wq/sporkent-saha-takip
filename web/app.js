@@ -389,13 +389,25 @@
   });
 
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse logoya 3 saniye basılı tutunca sorulur.
-  let logoZamani;
+  // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
+  // bu yüzden dokunma olayları ayrı dinleniyor ve onay penceresi sayfanın içinde gösteriliyor.
+  let logoZamani = null;
   const logo = $(".ust-logo");
-  logo.addEventListener("pointerdown", () => {
-    logoZamani = setTimeout(() => { if (oturum && confirm("Çıkış yapılsın mı?")) cikisYap(); }, 3000);
-  });
-  for (const ol of ["pointerup", "pointerleave", "pointercancel"]) logo.addEventListener(ol, () => clearTimeout(logoZamani));
+  const basla3sn = () => {
+    clearTimeout(logoZamani);
+    if (!oturum) return;
+    logoZamani = setTimeout(() => { logoZamani = null; navigator.vibrate?.(80); $("#cikis-sor").hidden = false; }, 3000);
+  };
+  const birak = () => { clearTimeout(logoZamani); logoZamani = null; };
+  logo.addEventListener("touchstart", basla3sn, { passive: true });
+  logo.addEventListener("touchend", birak);
+  logo.addEventListener("touchcancel", birak);
+  logo.addEventListener("mousedown", basla3sn);
+  logo.addEventListener("mouseup", birak);
+  logo.addEventListener("mouseleave", birak);
   logo.addEventListener("contextmenu", (e) => e.preventDefault());
+  $("#cikis-evet").addEventListener("click", () => { $("#cikis-sor").hidden = true; cikisYap(); });
+  $("#cikis-hayir").addEventListener("click", () => { $("#cikis-sor").hidden = true; });
 
   $("#sekmeler").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-filtre]"); if (!b) return;
