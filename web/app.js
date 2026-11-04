@@ -353,6 +353,8 @@
     try {
       const kayit = await navigator.serviceWorker.ready;
       for (const b of await kayit.getNotifications()) b.close();
+      // Android sayıyı bildirimlerden alır; kapatmayı bildirimi gösteren servis çalışanı da yapsın
+      (navigator.serviceWorker.controller || kayit.active)?.postMessage({ tip: "temizle" });
     } catch {}
   }
   const iosTarayicida = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches && !navigator.standalone;
@@ -657,6 +659,10 @@
     if (document.hidden || !oturum) return;
     if (onayli()) { bildirimleriTemizle(); yenile(); } else durumKontrol();
   });
+  // Simgeden açılınca her zaman visibilitychange gelmeyebiliyor
+  for (const olay of ["pageshow", "focus"]) {
+    window.addEventListener(olay, () => { if (!document.hidden && onayli()) bildirimleriTemizle(); });
+  }
   setInterval(() => { if (!document.hidden && onayli()) yenile(); }, 20000);
 
   basla();
