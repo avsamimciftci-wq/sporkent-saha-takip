@@ -18,7 +18,7 @@
   // { ad, rol, durum, anahtar, vapid } — giriş kodu saklanmaz, onaydan sonra telefon kendi anahtarıyla çalışır
   let oturum = sakla.al("sk_oturum");
   let kayitlar = [];
-  let filtre = "hepsi";
+  let filtre = "acik";
 
   // ---------- Sunucu ----------
   class SunucuHatasi extends Error {
@@ -183,14 +183,31 @@
   // Telefonlar sesi ancak bir dokunuştan sonra izin verir
   document.addEventListener("pointerdown", sesAc);
 
+  // ---------- Yapılma süresi ----------
+  // son_tarih "YYYY-MM-DD"; o gün bitene kadar süre var, ertesi gün gecikmiş sayılır.
+  const gunFarki = (t) => Math.round((Date.parse(t + "T00:00:00") - Date.parse(bugun() + "T00:00:00")) / 864e5);
+  const gecikti = (k) => k.durum !== "tamam" && k.son_tarih && gunFarki(k.son_tarih) < 0;
+  // Kaydın açıldığı gün (İstanbul) ile son gün arasındaki gün sayısı
+  const acilisGunu = (k) => new Date(Date.parse(k.created_at) + 3 * 3600e3).toISOString().slice(0, 10);
+  const sureGun = (k) => k.son_tarih ? Math.round((Date.parse(k.son_tarih) - Date.parse(acilisGunu(k))) / 864e5) : null;
+  function sureYazisi(k) {
+    if (k.durum === "tamam" || !k.son_tarih) return "";
+    const f = gunFarki(k.son_tarih);
+    if (f < 0) return `<span class="sure gecikmis">⚠ ${-f} gün gecikti</span>`;
+    if (f === 0) return `<span class="sure son-gun">⏰ Bugün son gün</span>`;
+    return `<span class="sure">⏰ ${f} gün kaldı</span>`;
+  }
+
   function listeCiz() {
     const acik = kayitlar.filter((k) => k.durum !== "tamam").length;
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
-    const bugunKapanan = kayitlar.filter((k) => k.kapanis_at && k.kapanis_at.slice(0, 10) === bugun()).length;
+    const geciken = kayitlar.filter(gecikti).length;
     $("#ozet").innerHTML = `
-      <div data-filtre="acik"><b>${acik}</b><span>Açık sorun</span></div>
-      <div data-filtre="tamam"><b>${bugunKapanan}</b><span>Bugün yapılan</span></div>
-      <div data-filtre="tamam"><b>${yapilan}</b><span>Toplam yapılan</span></div>`;
+      <button data-filtre="tamam" class="ozet-yapilan ${filtre === "tamam" ? "secili" : ""}"><b>${yapilan}</b><span>Yapılanlar</span></button>
+      <button data-filtre="acik" class="ozet-yapilmayan ${filtre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Yapılmayanlar</span></button>`;
+    const uyari = $("#gecikme-uyari");
+    uyari.hidden = !geciken;
+    uyari.textContent = `⚠ ${geciken} iş süresi içinde yapılmadı`;
     $("#gorunurluk").textContent = kapatabilir()
       ? `${ROL_ADI[oturum.rol]}: sorunları fotoğrafla "Yapıldı" olarak kapatabilirsiniz.`
       : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
@@ -200,24 +217,25 @@
     yd.classList.toggle("uyari", bekleyenSayisi > 0);
 
     const gorunen = kayitlar
-      .filter((k) => filtre === "hepsi" || (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
-      // Açıklar önce (eskiden yeniye), sonra yapılanlar (en yeni üstte)
-      .sort((a, b) => (a.durum === "tamam") - (b.durum === "tamam") || (a.durum === "tamam"
+      .filter((k) => (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
+      // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
+      .sort((a, b) => filtre === "tamam"
         ? b.kapanis_at.localeCompare(a.kapanis_at)
-        : a.created_at.localeCompare(b.created_at)));
+        : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at));
 
     $("#liste").innerHTML = gorunen.length ? gorunen.map((k) => `
-      <button class="satir" data-id="${k.id}">
+      <button class="satir ${gecikti(k) ? "gecikti" : ""}" data-id="${k.id}">
         ${(k.foto_sonra_url || k.foto_once_url) ? `<img src="${kac(k.foto_sonra_url || k.foto_once_url)}" alt="" loading="lazy">` : `<span class="bos-foto">📝</span>`}
         <span>
           <span class="satir-ust">
             <span>${kac(k.no)}</span>
             <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
+            ${sureYazisi(k)}
           </span>
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
         </span>
-      </button>`).join("") : `<p class="bos">Bu bölümde kayıt yok.</p>`;
+      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Yapılmayan iş yok. 👍"}</p>`;
   }
 
   const fotoKutu = (url, yazi, bos) => `<figure>${url
@@ -244,6 +262,7 @@
         <dt>Kayıt no</dt><dd>${kac(k.no)}</dd>
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
+        ${k.son_tarih ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
         <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
@@ -265,6 +284,14 @@
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
       </form>` : ""}
+      ${yonetici() && k.durum !== "tamam" ? `
+      <div class="islem">
+        <h2>Yapılma süresi</h2>
+        <div class="sure-sec">
+          ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}" class="${sureGun(k) === g ? "secili" : ""}">${g} gün</button>`).join("")}
+        </div>
+        <small class="ipucu">Kaydın açıldığı günden itibaren sayılır. Süre dolunca iş listede yanıp söner.</small>
+      </div>` : ""}
       ${yonetici() ? `
       <div class="islem">
         <button type="button" class="ikincil tehlike" id="kayit-sil" style="width:100%">🗑 Bu kaydı sil</button>
@@ -272,6 +299,16 @@
       </div>` : ""}`;
     goster("detay");
     if (kapat) kapatBagla(k);
+    $(".sure-sec")?.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-gun]"); if (!b) return;
+      b.disabled = true;
+      try {
+        const r = await api("sure_degistir", { id: k.id, gun: Number(b.dataset.gun) });
+        k.son_tarih = r.son_tarih;
+        listeCiz(); detayGoster(k.id);
+        mesaj(`Yapılma süresi ${b.dataset.gun} gün olarak ayarlandı.`);
+      } catch (err) { mesaj(err.message); b.disabled = false; }
+    });
     $("#kayit-sil")?.addEventListener("click", async (e) => {
       if (!confirm(`${k.no} numaralı "${k.yer}" kaydı herkesten silinsin mi? Geri alınamaz.`)) return;
       e.target.disabled = true;
@@ -450,8 +487,8 @@
     goster("yonetim");
     $("#yonetim").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     try {
-      const [{ uyeler }, { kodlar }] = await Promise.all([api("uye_listesi"), api("kodlar")]);
-      yonetimCiz(uyeler, kodlar);
+      const [{ uyeler }, { kodlar, varsayilan_sure }] = await Promise.all([api("uye_listesi"), api("kodlar")]);
+      yonetimCiz(uyeler, kodlar, varsayilan_sure);
     } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
@@ -462,7 +499,7 @@
     </div>`;
   }
 
-  function yonetimCiz(uyeler, kodlar) {
+  function yonetimCiz(uyeler, kodlar, varsSure) {
     const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
     const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
       .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
@@ -484,6 +521,12 @@
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
 
+      <h2>Yeni işlerin yapılma süresi</h2>
+      <div class="uye">
+        <div><b>${varsSure} gün</b><br><small>Her yeni kayda kendiliğinden verilir. Kayıt içinden tek tek değiştirebilirsiniz.</small></div>
+        <div class="uye-dugmeler">${d("varsayilan_sure", "", "Değiştir")}</div>
+      </div>
+
       <h2>Giriş kodları</h2>
       <p class="ipucu">Kodu değiştirmek gruptakileri çıkarmaz; yalnızca yeni katılacaklar yeni kodu kullanır.</p>
       ${ROL_SIRASI.map((r) => `<div class="uye">
@@ -503,6 +546,11 @@
     const ad = b.closest(".uye")?.querySelector("b")?.textContent || "";
     if (eylem === "uye_cikar" && !confirm(`${ad} gruptan çıkarılsın mı? Bu telefon bir daha giremez (geri alabilirsiniz).`)) return;
     if (eylem === "uye_sil" && !confirm(`${ad} listeden silinsin mi?`)) return;
+    if (eylem === "varsayilan_sure") {
+      const gun = prompt("Yeni işler kaç günde yapılsın? (1 ile 60 arası)");
+      if (!gun) return;
+      veri = { gun: Number(gun) };
+    }
     if (eylem === "kod_degistir") {
       const yeni = prompt(`${ROL_ADI[hedef]} için yeni kod (en az 6 karakter, boşluksuz):`);
       if (!yeni) return;
@@ -517,7 +565,8 @@
     try {
       await api(eylem, veri);
       mesaj({ uye_onayla: "Onaylandı, kişiye haber gitti.", uye_cikar: "Gruptan çıkarıldı.", uye_geri_al: "Gruba geri alındı.",
-        uye_sil: "Silindi.", kod_degistir: "Kod değiştirildi.", hepsini_sil: "Tüm kayıtlar silindi." }[eylem]);
+        uye_sil: "Silindi.", kod_degistir: "Kod değiştirildi.", hepsini_sil: "Tüm kayıtlar silindi.",
+        varsayilan_sure: "Yeni işlerin süresi değiştirildi." }[eylem]);
       if (eylem === "hepsini_sil") { kayitlar = []; sakla.sil("sk_gorulen"); }
       await yonetimAc();
     } catch (err) { mesaj(err.message); b.disabled = false; }
@@ -546,12 +595,6 @@
   $("#cikis-evet").addEventListener("click", () => { $("#cikis-sor").hidden = true; cikisYap(); });
   $("#cikis-hayir").addEventListener("click", () => { $("#cikis-sor").hidden = true; });
 
-  $("#sekmeler").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-filtre]"); if (!b) return;
-    filtre = b.dataset.filtre;
-    for (const x of document.querySelectorAll("#sekmeler button")) x.classList.toggle("secili", x === b);
-    listeCiz();
-  });
 
   $("#liste").addEventListener("click", (e) => {
     const s = e.target.closest(".satir"); if (s) detayGoster(Number(s.dataset.id));
@@ -559,10 +602,13 @@
 
   $("#bildirim-ac").addEventListener("click", () => bildirimAc(false));
   $("#bekle-bildirim").addEventListener("click", () => bildirimAc(false));
+  // Yapılanlar / Yapılmayanlar düğmeleri listeyi süzer
   $("#ozet").addEventListener("click", (e) => {
     const k = e.target.closest("[data-filtre]"); if (!k) return;
-    $(`#sekmeler [data-filtre="${k.dataset.filtre}"]`).click();
+    filtre = k.dataset.filtre;
+    listeCiz();
   });
+  $("#gecikme-uyari").addEventListener("click", () => { filtre = "acik"; listeCiz(); });
 
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-geri]")) { history.replaceState(null, "", location.pathname); goster("liste"); listeCiz(); }
