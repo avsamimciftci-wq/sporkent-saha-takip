@@ -478,7 +478,7 @@
 
   // ---------- Yönetici paneli (YK başkanı) ----------
   const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "uye"];
-  const MAKS_UYE = 30; // sunucudaki sınırla aynı
+  const MAKS_UYE = 50; // sunucudaki sınırla aynı
   const sonGorulme = (t) => t ? "Son görülme: " + tarihSaat(t) : "";
 
   async function yonetimAc() {
