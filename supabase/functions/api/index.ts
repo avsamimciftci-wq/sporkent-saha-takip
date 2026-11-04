@@ -70,8 +70,6 @@ async function bildir(hedef: { rol?: string; cihaz?: string }, baslik: string, g
   }));
 }
 
-const ONCELIK_ADI: Record<string, string> = { acil: "ACİL", oncelikli: "Öncelikli", normal: "Normal" };
-
 async function islem(eylem: string, rol: "mudur" | "uye", g: any) {
   switch (eylem) {
     case "giris":
@@ -96,16 +94,16 @@ async function islem(eylem: string, rol: "mudur" | "uye", g: any) {
       const kayit = {
         bildiren: temiz(g.bildiren, 80) || "İsimsiz",
         cihaz: temiz(g.cihaz, 80),
-        bolge: temiz(g.bolge, 80),
+        bolge: temiz(g.bolge, 80) || null,
         yer: temiz(g.yer, 200),
         sorun: temiz(g.sorun),
         oncelik,
         foto_once: temiz(g.foto, 200) || null,
       };
-      if (!kayit.bolge || !kayit.yer || !kayit.sorun) throw new Hata("Bölge, yer ve sorun zorunlu.");
+      if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
-      await bildir({ rol: "mudur" }, `${ONCELIK_ADI[oncelik]} • Yeni kayıt ${data.no}`,
+      await bildir({ rol: "mudur" }, `Yeni kayıt ${data.no}`,
         `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), data.id);
       return { kayit: data };
     }
