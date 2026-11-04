@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v8";
+const SURUM = "sk-v9";
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
 self.addEventListener("install", (e) => {

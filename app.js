@@ -388,11 +388,11 @@
     } finally { d.disabled = false; }
   });
 
-  // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse logoya 3 saniye basılı tutunca sorulur.
+  // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
   // bu yüzden dokunma olayları ayrı dinleniyor ve onay penceresi sayfanın içinde gösteriliyor.
   let logoZamani = null;
-  const logo = $(".ust-logo");
+  const logo = $(".ust");
   const basla3sn = () => {
     clearTimeout(logoZamani);
     if (!oturum) return;
