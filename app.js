@@ -56,7 +56,7 @@
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const DURUM = { acik: "Henüz yapılmayan", devam: "Henüz yapılmayan", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
-  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
+  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Grup üyesi" };
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
@@ -509,7 +509,7 @@
   });
 
   // ---------- Yönetici paneli (YK başkanı) ----------
-  const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "uye"];
+  const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
   const MAKS_UYE = 50; // sunucudaki sınırla aynı
   const sonGorulme = (t) => t ? "Son görülme: " + tarihSaat(t) : "";
 
