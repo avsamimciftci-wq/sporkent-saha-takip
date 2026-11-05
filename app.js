@@ -201,7 +201,8 @@
     return `<span class="sure">⏰ ${f} gün kaldı</span>`;
   }
 
-  // Yönetici için: müdür ve şef kaydı ne zaman gördü
+  // Yönetici ve yönetim kurulu için: müdür ve şef kaydı ne zaman gördü
+  const gorulmeGorur = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const GOREN_ROLLER = [["mudur", "Müdür"], ["sef", "Şef"]];
   const gorenler = (k, rol) => (k.gorenler || []).filter((g) => g.rol === rol);
   const gorulmeSatiri = (k) => GOREN_ROLLER
@@ -253,7 +254,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
-          ${yonetici() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
+          ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
   }
@@ -283,7 +284,7 @@
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
         ${k.yanit ? `<dt>Cevap</dt><dd>💬 ${kac(k.yanit)}<br><small>${kac(k.yanit_veren || "")} · ${tarihSaat(k.yanit_at)}</small></dd>` : ""}
-        ${yonetici() ? gorulmeAlanlari(k) : ""}
+        ${gorulmeGorur() ? gorulmeAlanlari(k) : ""}
         ${k.son_tarih ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
