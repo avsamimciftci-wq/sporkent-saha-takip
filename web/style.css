@@ -185,10 +185,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 /* Galeri düğmesi kameradan ayrı görünsün: soluk mavi */
 .galeri-dugme { margin-top: 10px; padding: 14px; border: 2px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: 700; }
 
-.ses-satir { display: grid; grid-template-columns: 1fr 52px; gap: 8px; align-items: start; }
-.mikrofon { margin-top: 6px; height: 52px; border-radius: 12px; border: 1px solid var(--cizgi); background: var(--kart); font-size: 22px; }
-.mikrofon.dinliyor { background: var(--acil); border-color: var(--acil); animation: nabiz 1s infinite; }
-@keyframes nabiz { 50% { opacity: .6; } }
 
 .oncelik { border: 0; padding: 0; margin: 0 0 14px; }
 .oncelik legend { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
@@ -230,3 +226,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
   :root:not([data-theme="light"]) .satir-cevap, :root:not([data-theme="light"]) .cevap-cumle b { color: #9ccbff; }
   :root:not([data-theme="light"]) .gorulmedi { color: #ff8a80; }
 }
+
+/* Yönetici devri */
+.devret { margin-top: 12px; padding: 14px; border: 1px solid var(--cizgi); border-radius: 12px; }
+.devret select { width: 100%; margin: 6px 0 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--cizgi); background: var(--kart); color: var(--yazi); font-size: 16px; }

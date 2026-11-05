@@ -164,6 +164,14 @@ async function tumFotograflariSil() {
   }
 }
 
+// Yönetici (YK başkanı) gruptan çıkarılamaz; önce yöneticilik devredilmeli
+async function yoneticiyeDokunma(cihaz: string) {
+  const { data } = await db.from("uyeler").select("rol, durum").eq("cihaz", cihaz).maybeSingle();
+  if (data?.rol === "baskan" && data.durum === "onayli") {
+    throw new Hata("Yönetici gruptan çıkarılamaz. Gerekirse önce \"Yönetici Değiştir\" ile devredin.", 403);
+  }
+}
+
 async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; durum: string }, g: any) {
   const rol = u.rol;
   const yonetici = () => { if (rol !== "baskan") throw new Hata("Bu işlemi yalnızca yönetici (YK başkanı) yapabilir.", 403); };
@@ -326,6 +334,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const hedef = temiz(g.hedef, 80);
       if (hedef === u.cihaz) throw new Hata("Kendi telefonunuzu değiştiremezsiniz.");
       const durum = eylem === "uye_cikar" ? "cikarildi" : "onayli";
+      if (durum === "cikarildi") await yoneticiyeDokunma(hedef);
       if (durum === "onayli") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi). Yeni üye için önce birini çıkarın.`);
@@ -348,9 +357,35 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       yonetici();
       const hedef = temiz(g.hedef, 80);
       if (hedef === u.cihaz) throw new Hata("Kendi telefonunuzu silemezsiniz.");
+      await yoneticiyeDokunma(hedef);
       await db.from("abonelikler").delete().eq("cihaz", hedef);
       await db.from("uyeler").delete().eq("cihaz", hedef);
       return { tamam: true };
+    }
+
+    case "yonetici_degistir": {
+      // Yöneticilik devri: seçilen üye YK başkanı olur, bütün eski yönetici telefonları seçilen göreve iner.
+      // Eski yönetici kodla geri giremesin diye yönetici kodu yenilenir; yeni yönetici ayarlarda görür.
+      yonetici();
+      const hedef = temiz(g.hedef, 80);
+      const eskiRol = g.eski_rol === "uye" ? "uye" : "yonetim";
+      const { data: yeni } = await db.from("uyeler").select("cihaz, ad, rol, durum").eq("cihaz", hedef).maybeSingle();
+      if (!yeni || yeni.durum !== "onayli") throw new Hata("Yeni yönetici gruptaki onaylı biri olmalı.");
+      if (yeni.rol === "baskan") throw new Hata("Bu kişi zaten yönetici.");
+      const { data: eskiler } = await db.from("uyeler").select("cihaz").eq("rol", "baskan");
+      const eskiCihazlar = (eskiler ?? []).map((x: any) => x.cihaz);
+      // Önce yeni yönetici atanır; bir adım yarıda kalsa bile grup yöneticisiz kalmaz
+      const { error: e1 } = await db.from("uyeler").update({ rol: "baskan" }).eq("cihaz", hedef);
+      if (e1) throw e1;
+      await db.from("abonelikler").update({ rol: "baskan" }).eq("cihaz", hedef);
+      const { error: e2 } = await db.from("uyeler").update({ rol: eskiRol }).in("cihaz", eskiCihazlar);
+      if (e2) throw e2;
+      await db.from("abonelikler").update({ rol: eskiRol }).in("cihaz", eskiCihazlar);
+      const yeniKod = "baskan-sk-" + String(crypto.getRandomValues(new Uint32Array(1))[0] % 9000 + 1000);
+      await db.from("ayarlar").upsert({ ad: "kod_baskan", deger: yeniKod });
+      await bildir({ cihaz: hedef }, "Yönetici oldunuz",
+        `${u.ad} yöneticiliği size devretti. Üyeler ve ayarlar artık sizde.`, { sayfa: "uyeler" });
+      return { rol: eskiRol };
     }
 
     case "kodlar": {
