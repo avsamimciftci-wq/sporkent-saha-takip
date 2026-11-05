@@ -98,27 +98,6 @@
     return { al: () => blob, sifirla: () => { blob = null; for (const g of girdiler) g.value = ""; onizleme.hidden = true; if (yazi) yazi.textContent = "📷 Fotoğraf çek"; } };
   }
 
-  // Sesle yazma: tarayıcı destekliyorsa Türkçe dinler, metni kutuya ekler.
-  function mikrofonBagla(dugme, kutu, ipucu) {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { dugme.hidden = true; ipucu.textContent = "Konuşarak yazmak için klavyedeki mikrofon tuşuna basın."; return; }
-    let tanima = null;
-    dugme.addEventListener("click", () => {
-      if (tanima) { tanima.stop(); return; }
-      tanima = new SR(); tanima.lang = "tr-TR"; tanima.interimResults = false; tanima.continuous = true;
-      const bas = kutu.value.trim();
-      let eklenen = "";
-      tanima.onresult = (e) => {
-        eklenen = Array.from(e.results).map((r) => r[0].transcript).join(" ").trim();
-        kutu.value = (bas ? bas + " " : "") + eklenen;
-      };
-      tanima.onerror = (e) => { if (e.error === "not-allowed") mesaj("Mikrofon izni verilmedi. Klavyedeki mikrofonu kullanın."); };
-      tanima.onend = () => { dugme.classList.remove("dinliyor"); tanima = null; };
-      dugme.classList.add("dinliyor");
-      try { tanima.start(); } catch { dugme.classList.remove("dinliyor"); tanima = null; }
-    });
-  }
-
   // ---------- Ekranlar ----------
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
@@ -300,11 +279,7 @@
           <label class="foto-dugme galeri-dugme"><input id="sonra-galeri" type="file" accept="image/*" hidden><span>🖼️ Galeriden Fotoğraf Yükle</span></label>
         </div>
         <label>Not (isteğe bağlı)
-          <div class="ses-satir">
-            <textarea name="sonuc" rows="2" maxlength="2000" placeholder="Örn. Batarya değiştirildi"></textarea>
-            <button type="button" class="mikrofon" id="sonra-mikrofon">🎤</button>
-          </div>
-          <small class="ipucu" id="sonra-ipucu"></small>
+          <textarea name="sonuc" rows="2" maxlength="2000" placeholder="Örn. Batarya değiştirildi"></textarea>
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
       </form>` : ""}
@@ -380,7 +355,6 @@
   function kapatBagla(k) {
     const form = $("#kapat-form");
     const foto = fotoSecici($("#sonra-foto"), $("#sonra-onizleme"), $("#sonra-yazi"), $("#sonra-galeri"));
-    mikrofonBagla($("#sonra-mikrofon"), form.querySelector("textarea"), $("#sonra-ipucu"));
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!foto.al()) return mesaj("Önce yapılan işin fotoğrafını çekin.");
@@ -573,7 +547,26 @@
         : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
 
       <h2>Gruptakiler (${gruptakiler.length} / ${MAKS_UYE})</h2>
-      ${gruptakiler.map((u) => uyeSatiri(u, d("uye_cikar", u.cihaz, "Çıkar", "tehlike"))).join("")}
+      ${gruptakiler.map((u) => uyeSatiri(u, u.rol === "baskan" ? "" : d("uye_cikar", u.cihaz, "Çıkar", "tehlike"))).join("")}
+
+      <h2>Yönetici Değiştir</h2>
+      <p class="ipucu">Yöneticilik (YK Başkanı) gruptaki başka bir kişiye devredilir. Sizin ve diğer yönetici telefonlarının yetkisi kalkar, yönetici giriş kodu da yenilenir.</p>
+      <button class="ikincil" style="width:100%" id="devret-ac" type="button">👑 Yönetici Değiştir</button>
+      <div id="devret" class="devret" hidden>
+        <label>Yeni yönetici
+          <select id="devret-kim">
+            <option value="">Kişi seçin…</option>
+            ${gruptakiler.filter((u) => u.rol !== "baskan").map((u) => `<option value="${kac(u.cihaz)}">${kac(u.ad)} (${kac(ROL_ADI[u.rol] || u.rol)})</option>`).join("")}
+          </select>
+        </label>
+        <label>Sizin yeni göreviniz
+          <select id="devret-rol">
+            <option value="yonetim">Yönetim Kurulu</option>
+            <option value="uye">Grup üyesi</option>
+          </select>
+        </label>
+        <button class="ana-dugme" type="button" data-eylem="yonetici_degistir">Yöneticiyi devret</button>
+      </div>
 
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
@@ -603,6 +596,21 @@
     let veri = { hedef };
     const ad = b.closest(".uye")?.querySelector("b")?.textContent || "";
     if (eylem === "uye_cikar" && !confirm(`${ad} gruptan çıkarılsın mı? Bu telefon bir daha giremez (geri alabilirsiniz).`)) return;
+    if (eylem === "yonetici_degistir") {
+      const kim = $("#devret-kim");
+      if (!kim.value) return mesaj("Yeni yöneticiyi seçin.");
+      const kimAd = kim.selectedOptions[0].textContent;
+      if (!confirm(`Yöneticilik ${kimAd} kişisine devredilsin mi? Siz artık yönetici olmayacaksınız. Bunu yalnızca yeni yönetici geri verebilir.`)) return;
+      b.disabled = true;
+      try {
+        const r = await api("yonetici_degistir", { hedef: kim.value, eski_rol: $("#devret-rol").value });
+        oturum.rol = r.rol; sakla.koy("sk_oturum", oturum);
+        history.replaceState(null, "", location.pathname);
+        goster("liste"); listeCiz();
+        mesaj("Yöneticilik devredildi. Yeni yöneticiye haber gitti.");
+      } catch (err) { mesaj(err.message); b.disabled = false; }
+      return;
+    }
     if (eylem === "uye_sil" && !confirm(`${ad} listeden silinsin mi?`)) return;
     if (eylem === "varsayilan_sure") {
       const gun = prompt("Yeni işler kaç günde yapılsın? (1 ile 60 arası)");
@@ -631,6 +639,9 @@
   });
 
   $("#yonetim-ac").addEventListener("click", yonetimAc);
+  $("#yonetim").addEventListener("click", (e) => {
+    if (e.target.closest("#devret-ac")) $("#devret").hidden = !$("#devret").hidden;
+  });
 
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
@@ -675,7 +686,6 @@
   // Yeni kayıt formu
   const yeniForm = $("#yeni-form");
   const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"), $("#yeni-galeri"));
-  mikrofonBagla($("#mikrofon"), yeniForm.querySelector("textarea"), $("#mikrofon-ipucu"));
 
   $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); goster("yeni"); });
 
