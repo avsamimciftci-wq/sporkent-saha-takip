@@ -217,3 +217,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
   .alanlar { grid-template-columns: 1fr; }
   .alanlar dt { margin-top: 6px; }
 }
+
+/* Yöneticinin cevabı ve müdür/şef görülme bilgisi */
+.satir-cevap { display: block; margin-top: 4px; font-size: 14px; color: #0d47a1; font-weight: 600; }
+.satir-gorulme { display: block; margin-top: 2px; font-size: 13px; color: var(--soluk); }
+.gorulmedi { color: #c62828; font-weight: 600; }
+.cevap-cumle { font-size: 18px; margin: 0 0 10px; }
+.cevap-cumle b { display: inline-block; min-width: 28px; text-align: center; border-bottom: 2px solid #1565c0; color: #0d47a1; }
+#cevap-gonder { margin-top: 12px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .galeri-dugme { background: #10263d; border-color: #2f5f8f; color: #9ccbff; }
+  :root:not([data-theme="light"]) .satir-cevap, :root:not([data-theme="light"]) .cevap-cumle b { color: #9ccbff; }
+  :root:not([data-theme="light"]) .gorulmedi { color: #ff8a80; }
+}
