@@ -205,6 +205,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yeni": {
+      // Müdür ve şef sorun bildirmez, yalnızca işi "Yapıldı" olarak kapatır
+      if (rol === "mudur" || rol === "sef") throw new Hata("Müdür ve şef yeni kayıt giremez; yalnızca \"Yapıldı\" girebilir.", 403);
       const kayit = {
         bildiren: u.ad,
         cihaz: u.cihaz,

@@ -60,6 +60,7 @@
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
+  const yeniGirebilir = () => !["mudur", "sef"].includes(oturum?.rol);
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
   let mesajZamani;
@@ -226,6 +227,8 @@
     $("#gorunurluk").textContent = kapatabilir()
       ? `${ROL_ADI[oturum.rol]}: sorunları fotoğrafla "Yapıldı" olarak kapatabilirsiniz.`
       : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
+    // Müdür ve şef sorun bildirmez, yalnızca "Yapıldı" girer
+    $("#yeni-ac").style.display = yeniGirebilir() ? "" : "none";
     const yd = $("#yonetim-ac");
     yd.hidden = !yonetici();
     yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
@@ -673,7 +676,7 @@
   const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"), $("#yeni-galeri"));
   mikrofonBagla($("#mikrofon"), yeniForm.querySelector("textarea"), $("#mikrofon-ipucu"));
 
-  $("#yeni-ac").addEventListener("click", () => { yeniForm.reset(); yeniFoto.sifirla(); goster("yeni"); });
+  $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); goster("yeni"); });
 
   yeniForm.addEventListener("submit", async (e) => {
     e.preventDefault();
