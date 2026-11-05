@@ -54,7 +54,7 @@
   const kac = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const tarihSaat = (t) => t ? new Date(t).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
-  const DURUM = { acik: "Açık", devam: "Açık", tamam: "Yapıldı" };
+  const DURUM = { acik: "Henüz yapılmayan", devam: "Henüz yapılmayan", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
   const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi" };
   const KAPATABILIR = ["baskan", "mudur", "sef"];
@@ -200,6 +200,19 @@
     return `<span class="sure">⏰ ${f} gün kaldı</span>`;
   }
 
+  // Yönetici için: müdür ve şef kaydı ne zaman gördü
+  const GOREN_ROLLER = [["mudur", "Müdür"], ["sef", "Şef"]];
+  const gorenler = (k, rol) => (k.gorenler || []).filter((g) => g.rol === rol);
+  const gorulmeSatiri = (k) => GOREN_ROLLER
+    .map(([r, ad]) => `${ad} ${gorenler(k, r).length ? "gördü ✓" : "görmedi"}`).join(" · ");
+  const gorulmeAlanlari = (k) => GOREN_ROLLER.map(([r, ad]) => {
+    const g = gorenler(k, r);
+    return `<dt>${ad}</dt><dd>${g.length
+      ? g.map((x) => `👁 ${tarihSaat(x.ilk_at)} gördü (${kac(x.ad)})`).join("<br>")
+      : `<span class="gorulmedi">Henüz görmedi</span>`}</dd>`;
+  }).join("");
+  const gorulduGonderilen = new Set();
+
   function listeCiz() {
     const acik = kayitlar.filter((k) => k.durum !== "tamam").length;
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
@@ -236,6 +249,8 @@
           </span>
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
+          ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
+          ${yonetici() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
   }
@@ -264,6 +279,8 @@
         <dt>Kayıt no</dt><dd>${kac(k.no)}</dd>
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
+        ${k.yanit ? `<dt>Cevap</dt><dd>💬 ${kac(k.yanit)}<br><small>${kac(k.yanit_veren || "")} · ${tarihSaat(k.yanit_at)}</small></dd>` : ""}
+        ${yonetici() ? gorulmeAlanlari(k) : ""}
         ${k.son_tarih ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
@@ -289,8 +306,17 @@
       </form>` : ""}
       ${yonetici() && k.durum !== "tamam" ? `
       <div class="islem">
+        <h2>Cevap yaz</h2>
+        <p class="cevap-cumle">Bu iş <b id="cevap-gun">…</b> gün içinde yapılacaktır.</p>
+        <div class="sure-sec" id="cevap-sec">
+          ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}">${g} gün</button>`).join("")}
+        </div>
+        <button type="button" class="ana-dugme" id="cevap-gonder" disabled>💬 Cevabı gönder</button>
+        <small class="ipucu">İş "Yapıldı" olmadan herkese bildirilir. Son gün bugünden itibaren bu süreye göre değişir.</small>
+      </div>
+      <div class="islem">
         <h2>Yapılma süresi</h2>
-        <div class="sure-sec">
+        <div class="sure-sec" id="sure-sec">
           ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}" class="${sureGun(k) === g ? "secili" : ""}">${g} gün</button>`).join("")}
         </div>
         <small class="ipucu">Kaydın açıldığı günden itibaren sayılır. Süre dolunca iş listede yanıp söner.</small>
@@ -302,7 +328,29 @@
       </div>` : ""}`;
     goster("detay");
     if (kapat) kapatBagla(k);
-    $(".sure-sec")?.addEventListener("click", async (e) => {
+    // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
+    if ((oturum.rol === "mudur" || oturum.rol === "sef") && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
+      gorulduGonderilen.add(k.id);
+      api("goruldu", { id: k.id }).catch(() => gorulduGonderilen.delete(k.id));
+    }
+    let cevapGun = null;
+    $("#cevap-sec")?.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-gun]"); if (!b) return;
+      cevapGun = Number(b.dataset.gun);
+      for (const x of $("#cevap-sec").children) x.classList.toggle("secili", x === b);
+      $("#cevap-gun").textContent = cevapGun;
+      $("#cevap-gonder").disabled = false;
+    });
+    $("#cevap-gonder")?.addEventListener("click", async (e) => {
+      if (!cevapGun) return;
+      e.target.disabled = true; e.target.textContent = "Gönderiliyor…";
+      try {
+        Object.assign(k, await api("cevap_ver", { id: k.id, gun: cevapGun }));
+        listeCiz(); detayGoster(k.id);
+        mesaj("Cevap gönderildi. Gruptaki herkes görecek.");
+      } catch (err) { mesaj(err.message); e.target.disabled = false; e.target.textContent = "💬 Cevabı gönder"; }
+    });
+    $("#sure-sec")?.addEventListener("click", async (e) => {
       const b = e.target.closest("[data-gun]"); if (!b) return;
       b.disabled = true;
       try {

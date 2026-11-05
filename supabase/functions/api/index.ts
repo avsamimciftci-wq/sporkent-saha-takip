@@ -185,6 +185,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (rol === "baskan") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "bekliyor");
         bekleyen = count ?? 0;
+        // Yönetici, müdür ve şefin her kaydı ne zaman gördüğünü de alır
+        const ids = kayitlar.map((k: any) => k.id);
+        const { data: g } = ids.length
+          ? await db.from("goruntulemeler").select("kayit_id, ad, rol, ilk_at").in("kayit_id", ids).order("ilk_at")
+          : { data: [] };
+        for (const k of kayitlar as any[]) {
+          k.gorenler = (g ?? []).filter((x: any) => x.kayit_id === k.id).map(({ kayit_id: _i, ...x }: any) => x);
+        }
       }
       return { kayitlar: await fotoUrlleri(kayitlar), rol, bekleyen };
     }
@@ -243,6 +251,30 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { error } = await db.from("kayitlar").update({ son_tarih }).eq("id", k.id);
       if (error) throw error;
       return { son_tarih };
+    }
+
+    case "goruldu": {
+      // Yalnızca müdür ve şefin ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
+      if (rol !== "mudur" && rol !== "sef") return { tamam: true };
+      await db.from("goruntulemeler").upsert(
+        { kayit_id: Number(g.id), cihaz: u.cihaz, ad: u.ad, rol },
+        { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
+      );
+      return { tamam: true };
+    }
+
+    case "cevap_ver": {
+      // Yönetici işi kapatmadan "Bu iş N gün içinde yapılacaktır." der; son gün bugünden sayılır
+      yonetici();
+      const gun = Number(g.gun);
+      if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
+      const yanitMetni = `Bu iş ${gun} gün içinde yapılacaktır.`;
+      const { data, error } = await db.from("kayitlar").update({
+        yanit: yanitMetni, yanit_veren: u.ad, yanit_at: new Date().toISOString(), son_tarih: sonGun(new Date(), gun),
+      }).eq("id", g.id).neq("durum", "tamam").select().single();
+      if (error) throw new Hata("Kayıt bulunamadı ya da iş zaten yapıldı.");
+      await bildir("hepsi", `Cevap • ${data.yer}`.slice(0, 80), yanitMetni, { kayitId: data.id });
+      return { yanit: data.yanit, yanit_veren: data.yanit_veren, yanit_at: data.yanit_at, son_tarih: data.son_tarih };
     }
 
     case "varsayilan_sure": {
