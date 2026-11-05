@@ -185,7 +185,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (rol === "baskan") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "bekliyor");
         bekleyen = count ?? 0;
-        // Yönetici, müdür ve şefin her kaydı ne zaman gördüğünü de alır
+      }
+      if (rol === "baskan" || rol === "yonetim") {
+        // Yönetici ve yönetim kurulu, müdür ve şefin her kaydı ne zaman gördüğünü de alır
         const ids = kayitlar.map((k: any) => k.id);
         const { data: g } = ids.length
           ? await db.from("goruntulemeler").select("kayit_id, ad, rol, ilk_at").in("kayit_id", ids).order("ilk_at")
