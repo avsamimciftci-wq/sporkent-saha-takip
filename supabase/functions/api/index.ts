@@ -28,12 +28,12 @@ class Hata extends Error {
 
 // baskan: YK başkanı ve yönetici (onay, üye çıkarma, kodlar, tümden silme)
 // baskan, mudur ve sef işi "yapıldı" olarak kapatır; onaylı her üye bütün kayıtları görür.
-type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "uye";
-const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "uye"];
+type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye";
+const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 const MAKS_UYE = 50; // başkan dahil onaylı üye sınırı
 const ROL_ADI: Record<Rol, string> = {
-  baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", uye: "Grup üyesi",
+  baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Grup üyesi",
 };
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
