@@ -231,13 +231,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 .devret { margin-top: 12px; padding: 14px; border: 1px solid var(--cizgi); border-radius: 12px; }
 .devret select { width: 100%; margin: 6px 0 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--cizgi); background: var(--kart); color: var(--yazi); font-size: 16px; }
 
-/* Yönetim işi */
-.gizli-sec { display: flex; gap: 12px; align-items: flex-start; padding: 12px; margin-bottom: 14px; border: 2px solid #8e24aa; border-radius: 12px; background: #f6ecf9; font-weight: 400; cursor: pointer; }
-.gizli-sec input { width: 24px; height: 24px; margin: 2px 0 0; flex: none; }
-.gizli-sec small { color: var(--soluk); }
-.gizli-rozet { background: #f3e5f5; color: #6a1b9a; }
-.gizli-not { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: #f3e5f5; color: #6a1b9a; font-weight: 600; font-size: 14px; }
+/* Yönetim İş Emri: lacivert */
+.tur-sec { border: 0; padding: 0; margin: 0 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tur-sec label { margin: 0; }
+.tur-sec input { position: absolute; opacity: 0; pointer-events: none; }
+.tur-sec span { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 58px; padding: 8px; border-radius: 12px; font-weight: 700; cursor: pointer; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); }
+.tur-yonetim input:checked + span { background: #1a237e; border-color: #1a237e; color: #fff; }
+.tur-genel input:checked + span { background: var(--yesil); border-color: var(--yesil); color: #fff; }
+.tur-sec input:focus-visible + span { outline: 3px solid #90caf9; }
+.tur-sec .ipucu { grid-column: 1 / -1; }
+.gizli-rozet { background: #e8eaf6; color: #1a237e; }
+.gizli-not { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: #e8eaf6; color: #1a237e; font-weight: 600; font-size: 14px; }
+.rozet.yapilmayan { color: #2e7d32; background: #e8f5e9; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gizli-sec { background: #2a1830; border-color: #9c5bb0; }
-  :root:not([data-theme="light"]) .gizli-rozet, :root:not([data-theme="light"]) .gizli-not { background: #2a1830; color: #e1b8ee; }
+  :root:not([data-theme="light"]) .gizli-rozet, :root:not([data-theme="light"]) .gizli-not { background: #1a2350; color: #c5cae9; }
+  :root:not([data-theme="light"]) .rozet.yapilmayan { color: #81c784; background: #1b3320; }
 }
