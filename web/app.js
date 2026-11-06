@@ -159,7 +159,8 @@
     document.body.appendChild(f);
   }
   function sesCal() {
-    ekranFlas();
+    // Ekran yanıp sönmesi yalnızca müdür ve şefte
+    if (["mudur", "sef"].includes(oturum?.rol)) ekranFlas();
     try { navigator.vibrate?.([500, 150, 500, 150, 500, 150, 800]); } catch {}
     if (!sesBaglam) return;
     const t = sesBaglam.currentTime;
