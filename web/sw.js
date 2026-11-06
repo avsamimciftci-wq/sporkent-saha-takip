@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v32";
+const SURUM = "sk-v33";
 const DURUM = "sk-durum"; // sürümden bağımsız küçük kayıt: temizlenmemiş bildirim var mı
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 

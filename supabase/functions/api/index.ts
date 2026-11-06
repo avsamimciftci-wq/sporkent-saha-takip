@@ -236,7 +236,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
       // Yeni sorun bütün gruba, yönetim işi yalnızca yönetim, müdür ve şefe duyurulur
-      await bildir(kimeBildir(data), `${data.gizli ? "🔒 Yönetim işi" : "Yeni sorun"} ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
+      await bildir(kimeBildir(data), `${data.gizli ? "🔒 Yönetim İş Emri" : "Yeni sorun"} ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
       const { cihaz: _c, ...donen } = data;
       return { kayit: { ...donen, benim: true } };
     }

@@ -55,14 +55,14 @@
   const tarihSaat = (t) => t ? new Date(t).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const DURUM = { acik: "Henüz yapılmayan", devam: "Henüz yapılmayan", tamam: "Yapıldı" };
-  const DURUM_ROZET = { acik: "oncelikli", devam: "oncelikli", tamam: "tamam" };
+  const DURUM_ROZET = { acik: "yapilmayan", devam: "yapilmayan", tamam: "tamam" };
   const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Grup üyesi" };
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
   const yeniGirebilir = () => !["mudur", "sef"].includes(oturum?.rol);
   const yonetimIsiGirebilir = () => ["baskan", "yonetim"].includes(oturum?.rol);
-  const yonetimIsiRozeti = (k) => k.gizli ? `<span class="rozet gizli-rozet">🔒 Yönetim işi</span>` : "";
+  const yonetimIsiRozeti = (k) => k.gizli ? `<span class="rozet gizli-rozet">🔒 Yönetim İş Emri</span>` : "";
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
   let mesajZamani;
@@ -255,7 +255,7 @@
         <button class="geri" data-geri>← Liste</button>
         <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
       </div>
-      ${k.gizli ? `<p class="gizli-not">🔒 Yönetim işi: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
+      ${k.gizli ? `<p class="gizli-not">🔒 Yönetim İş Emri: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
       <div class="fotolar">
@@ -691,7 +691,13 @@
   const yeniForm = $("#yeni-form");
   const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"), $("#yeni-galeri"));
 
-  $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); $("#gizli-alan").hidden = !yonetimIsiGirebilir(); goster("yeni"); });
+  // Yönetim İş Emri / Genel yapılacak işler seçimine göre açıklama
+  $("#gizli-alan").addEventListener("change", () => {
+    $("#tur-ipucu").textContent = yeniForm.tur.value === "yonetim"
+      ? "Yönetim İş Emri'ni yalnızca yönetici, yönetim kurulu, müdür ve şef görür. Diğer üyeler görmez."
+      : "Genel yapılacak işi gruptaki herkes görür.";
+  });
+  $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); $("#gizli-alan").hidden = !yonetimIsiGirebilir(); $("#gizli-alan").dispatchEvent(new Event("change")); goster("yeni"); });
 
   yeniForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -703,9 +709,9 @@
       const foto = yeniFoto.al() ? await fotoYukle(yeniFoto.al()) : null;
       const r = await api("yeni", {
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
-        gizli: yonetimIsiGirebilir() && f.get("gizli") === "1",
+        gizli: yonetimIsiGirebilir() && f.get("tur") === "yonetim",
       });
-      mesaj(r.kayit.gizli ? `Yönetim işi ${r.kayit.no} açıldı. Yalnızca yönetim, müdür ve şef görür.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
+      mesaj(r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. Yalnızca yönetim, müdür ve şef görür.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       // Kendi açtığımız kayıt için pencere açılmasın
       sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
       goster("liste");

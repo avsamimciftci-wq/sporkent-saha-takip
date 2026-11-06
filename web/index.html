@@ -88,10 +88,11 @@
         <small class="ipucu">Fotoğraf isteğe bağlıdır; fotoğrafsız da kayıt gönderebilirsiniz.</small>
       </div>
 
-      <label class="gizli-sec" id="gizli-alan" hidden>
-        <input type="checkbox" name="gizli" value="1">
-        <span>🔒 <b>Yönetim işi</b><br><small>Yalnızca yönetici, yönetim kurulu, müdür ve şef görür. Diğer üyeler görmez.</small></span>
-      </label>
+      <fieldset class="tur-sec" id="gizli-alan" hidden>
+        <label class="tur-yonetim"><input type="radio" name="tur" value="yonetim" checked><span>🔒 Yönetim İş Emri</span></label>
+        <label class="tur-genel"><input type="radio" name="tur" value="genel"><span>Genel yapılacak işler</span></label>
+        <small class="ipucu" id="tur-ipucu">Yönetim İş Emri'ni yalnızca yönetici, yönetim kurulu, müdür ve şef görür. Diğer üyeler görmez.</small>
+      </fieldset>
 
       <label>Yer
         <input name="yer" required maxlength="200" placeholder="Örn. 3 numaralı duş">
