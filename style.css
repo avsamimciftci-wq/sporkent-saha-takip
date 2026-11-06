@@ -247,3 +247,35 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
   :root:not([data-theme="light"]) .gizli-rozet, :root:not([data-theme="light"]) .gizli-not { background: #1a2350; color: #c5cae9; }
   :root:not([data-theme="light"]) .rozet.yapilmayan { color: #81c784; background: #1b3320; }
 }
+
+/* Günlük / haftalık görev programı */
+.gorev-dugme { width: 100%; margin-bottom: 12px; background: #e8eaf6; color: #1a237e; font-weight: 700; }
+.gorev-sekme { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 10px; }
+.gorev-sekme button { padding: 10px; border-radius: 12px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; }
+.gorev-sekme button.secili { background: #1a237e; border-color: #1a237e; color: #fff; }
+.gorev-sekme small { font-weight: 600; opacity: .85; }
+.gorev-donem { margin: 0 0 6px; }
+.gorev-cubuk { height: 10px; border-radius: 99px; background: var(--cizgi); overflow: hidden; margin-bottom: 12px; }
+.gorev-cubuk span { display: block; height: 100%; background: #2e7d32; border-radius: 99px; }
+.gorev-bolum { margin-top: 18px; color: #1a237e; }
+.gorev-bolum small { color: var(--soluk); font-weight: 600; }
+.gorev { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; border: 2px solid var(--cizgi); border-radius: 12px; background: var(--kart); color: var(--yazi); font: inherit; cursor: pointer; }
+.gorev:disabled { cursor: default; opacity: 1; }
+.gorev b { display: block; font-size: 16px; }
+.gorev small { display: block; color: var(--soluk); margin-top: 2px; line-height: 1.4; }
+.gorev em { display: block; font-style: normal; color: #2e7d32; font-weight: 700; margin-top: 6px; }
+.gorev-no { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; border: 2px solid #1a237e; color: #1a237e; }
+.gorev.yapildi { border-color: #2e7d32; background: #e8f5e9; }
+.gorev.yapildi .gorev-no { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+.gorev-gecmis { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.gorev-gecmis button { padding: 6px 4px; border-radius: 10px; border: 1px solid var(--cizgi); background: var(--kart); color: var(--yazi); font: inherit; font-size: 13px; cursor: pointer; }
+.gorev-gecmis button.tam { background: #e8f5e9; border-color: #2e7d32; }
+.gorev-gecmis button.bos-gun b { color: #c62828; }
+.gorev-gecmis button.secili { outline: 3px solid #1a237e; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gorev-dugme { background: #1a2350; color: #c5cae9; }
+  :root:not([data-theme="light"]) .gorev-bolum { color: #9fa8da; }
+  :root:not([data-theme="light"]) .gorev-no { border-color: #9fa8da; color: #c5cae9; }
+  :root:not([data-theme="light"]) .gorev.yapildi, :root:not([data-theme="light"]) .gorev-gecmis button.tam { background: #1b3320; }
+  :root:not([data-theme="light"]) .gorev em { color: #81c784; }
+}

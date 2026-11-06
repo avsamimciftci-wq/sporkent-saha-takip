@@ -61,6 +61,7 @@
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
   const yeniGirebilir = () => !["mudur", "sef"].includes(oturum?.rol);
+  const gorevGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
   const yonetimIsiGirebilir = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const yonetimIsiRozeti = (k) => k.gizli ? `<span class="rozet gizli-rozet">🔒 Yönetim İş Emri</span>` : "";
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
@@ -211,6 +212,7 @@
       : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
     // Müdür ve şef sorun bildirmez, yalnızca "Yapıldı" girer
     $("#yeni-ac").style.display = yeniGirebilir() ? "" : "none";
+    $("#gorevler-ac").hidden = !gorevGorur();
     const yd = $("#yonetim-ac");
     yd.hidden = !yonetici();
     yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
@@ -494,6 +496,7 @@
     bildirimKutusu();
     await yenile();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
+    if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     const m = location.hash.match(/^#kayit-(\d+)$/);
     if (m) detayGoster(Number(m[1]));
   }
@@ -643,6 +646,85 @@
   });
 
   $("#yonetim-ac").addEventListener("click", yonetimAc);
+
+  // ---------- Günlük / haftalık görev programı ----------
+  // Müdür ve şef bugünün ve bu haftanın kalemlerini işaretler; yönetici ve yönetim kurulu izler.
+  let gorevSekme = "gunluk";
+  let gorevVeri = null;
+  const gunYazisi = (g) => new Date(g + "T00:00:00").toLocaleDateString("tr-TR");
+  const saatYazisi = (t) => new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  const haftaSonu = (g) => { const d = new Date(g + "T00:00:00"); d.setDate(d.getDate() + 6); return d.toLocaleDateString("tr-TR"); };
+
+  async function gorevlerAc(sekme = gorevSekme, gun) {
+    if (!gorevGorur()) return;
+    gorevSekme = sekme;
+    const hash = sekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler";
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+    goster("gorevler");
+    if (!gorevVeri) $("#gorevler").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { gorevVeri = await api("gorevler", gun ? { gun } : {}); gorevCiz(); }
+    catch (e) { $("#gorevler").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+
+  function gorevCiz() {
+    const v = gorevVeri, p = v.program[gorevSekme];
+    const gunluk = gorevSekme === "gunluk";
+    const donem = gunluk ? v.gun : v.hafta;
+    const isaret = new Map(v.isaretler.filter((x) => x.tur === gorevSekme).map((x) => [x.kalem, x]));
+    const toplam = gunluk ? v.gecmis.gunlukToplam : v.gecmis.haftalikToplam;
+    const guncel = gunluk ? v.gun === v.bugun : v.hafta === v.buHafta;
+    const duzenler = v.isaretleyebilir && guncel;
+    const sayac = (tur) => v.isaretler.filter((x) => x.tur === tur).length;
+    let no = 0;
+    $("#gorevler").innerHTML = `
+      <div class="detay-ust"><button class="geri" data-geri>← Liste</button></div>
+      <h1>Görev ve denetim programı</h1>
+      <div class="gorev-sekme">
+        <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük<br><small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
+        <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık<br><small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
+      </div>
+      <p class="gorev-donem">${gunluk ? (guncel ? "Bugün, " : "") + gunYazisi(donem) : `Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)}`}
+        · <b>${isaret.size} / ${toplam} yapıldı</b></p>
+      <div class="gorev-cubuk"><span style="width:${Math.round((isaret.size / toplam) * 100)}%"></span></div>
+      ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>`
+        : !v.isaretleyebilir ? `<p class="ipucu">Görevleri müdür ve şef işaretler; siz kimin, ne zaman yaptığını görürsünüz.</p>`
+        : `<p class="ipucu">Yaptığınız kalemin üstüne dokunun, "yapıldı" işaretlensin. Yanlışlıkla işaretlediyseniz tekrar dokunun.</p>`}
+      <p class="ipucu">${kac(p.giris)}</p>
+      ${p.bolumler.map((b) => `
+        <h2 class="gorev-bolum">${b.harf}. ${kac(b.baslik)}${b.saat ? ` <small>(${b.saat})</small>` : ""}</h2>
+        ${b.kalemler.map((k) => {
+          const i = isaret.get(k.id); no++;
+          return `<button type="button" class="gorev ${i ? "yapildi" : ""}" data-kalem="${k.id}" ${duzenler ? "" : "disabled"}>
+            <span class="gorev-no">${i ? "✓" : no}</span>
+            <span><b>${no}. ${kac(k.baslik)}</b><small>${kac(k.aciklama)}</small>
+              ${i ? `<em>✓ Yapıldı · ${kac(i.ad || "")} · ${gunluk ? "" : gunYazisi(i.isaret_at.slice(0, 10)) + " "}${saatYazisi(i.isaret_at)}</em>` : ""}</span>
+          </button>`;
+        }).join("")}`).join("")}
+      <h2>Geçmiş ${gunluk ? "günler" : "haftalar"}</h2>
+      <div class="gorev-gecmis">
+        ${(gunluk ? v.gecmis.gunler : v.gecmis.haftalar).map((x) => `<button type="button" data-gun="${x.donem}" class="${x.donem === donem ? "secili" : ""} ${x.yapilan === toplam ? "tam" : x.yapilan ? "" : "bos-gun"}">
+          ${gunluk ? gunYazisi(x.donem).slice(0, 5) : gunYazisi(x.donem).slice(0, 5) + "–" + haftaSonu(x.donem).slice(0, 5)}<br><b>${x.yapilan}/${toplam}</b></button>`).join("")}
+      </div>`;
+  }
+
+  $("#gorevler").addEventListener("click", async (e) => {
+    const sekme = e.target.closest("[data-sekme]");
+    if (sekme) {
+      gorevSekme = sekme.dataset.sekme;
+      history.replaceState(null, "", gorevSekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler");
+      return gorevCiz();
+    }
+    const gunB = e.target.closest("[data-gun]");
+    if (gunB) return gorevlerAc(gorevSekme, gunB.dataset.gun || undefined);
+    const b = e.target.closest("[data-kalem]"); if (!b || b.disabled) return;
+    const yapildi = !b.classList.contains("yapildi");
+    if (!yapildi && !confirm('Bu kalemin "yapıldı" işareti kaldırılsın mı?')) return;
+    b.disabled = true;
+    try { gorevVeri = await api("gorev_isaretle", { kalem: b.dataset.kalem, yapildi }); gorevCiz(); }
+    catch (err) { mesaj(err.message); b.disabled = false; }
+  });
+  $("#gorevler-ac").addEventListener("click", () => gorevlerAc("gunluk"));
+
   $("#yonetim").addEventListener("click", (e) => {
     if (e.target.closest("#devret-ac")) $("#devret").hidden = !$("#devret").hidden;
   });
@@ -725,6 +807,9 @@
   window.addEventListener("hashchange", async () => {
     if (!onayli()) return;
     if (location.hash === "#uyeler") return yonetimAc();
+    if (location.hash.startsWith("#gorevler") && $("#ekran-gorevler").hidden) {
+      return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
+    }
     const m = location.hash.match(/^#kayit-(\d+)$/);
     if (!m) return;
     if (!kayitlar.some((k) => k.id === Number(m[1]))) await yenile();
