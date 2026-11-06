@@ -3,6 +3,7 @@
 // kendi gizli anahtarıyla çalışır. Tarayıcıya hiçbir tablo açık değildir.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
+import { GUNLUK, HAFTALIK, KALEM_IDLERI } from "./gorev_programi.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC") ?? "";
@@ -69,6 +70,50 @@ async function varsayilanSure(): Promise<number> {
 // Türkiye saatiyle (UTC+3, yaz saati yok) gün + n gün → "YYYY-MM-DD"
 const sonGun = (baslangic: string | Date, gun: number) =>
   new Date(new Date(baslangic).getTime() + 3 * 3600e3 + gun * 864e5).toISOString().slice(0, 10);
+
+// Görev programı: müdür ve şef işaretler; yönetici, yönetim kurulu, müdür ve şef görür
+const GOREV_GOREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
+const GOREV_ISARETLEYEN: Rol[] = ["mudur", "sef"];
+const kalemSayisi = (p: typeof GUNLUK) => p.bolumler.reduce((n, b) => n + b.kalemler.length, 0);
+// "YYYY-MM-DD" gününün haftasının pazartesisi
+const haftaBasi = (gun: string) => {
+  const d = new Date(gun + "T00:00:00Z");
+  return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+};
+const gunEkle = (gun: string, n: number) => new Date(Date.parse(gun + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+
+async function gorevDurumu(gun: string) {
+  const hafta = haftaBasi(gun);
+  const { data: isaretler, error } = await db.from("gorev_isaretleri").select("tur, donem, kalem, ad, rol, isaret_at")
+    .or(`and(tur.eq.gunluk,donem.eq.${gun}),and(tur.eq.haftalik,donem.eq.${hafta})`);
+  if (error) throw error;
+  // Geçmiş özeti: son 14 gün ve son 8 hafta, kaç kalem işaretlendi
+  const bugun = sonGun(new Date(), 0);
+  const { data: eski } = await db.from("gorev_isaretleri").select("tur, donem")
+    .gte("donem", gunEkle(haftaBasi(bugun), -7 * 7));
+  const say = (tur: string, donem: string) => (eski ?? []).filter((x: any) => x.tur === tur && x.donem === donem).length;
+  const gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: say("gunluk", d) }));
+  const haftalar = Array.from({ length: 8 }, (_, i) => gunEkle(haftaBasi(bugun), -7 * i)).map((d) => ({ donem: d, yapilan: say("haftalik", d) }));
+  return {
+    program: { gunluk: GUNLUK, haftalik: HAFTALIK },
+    gun, hafta, bugun, buHafta: haftaBasi(bugun),
+    isaretler: isaretler ?? [],
+    gecmis: { gunler, haftalar, gunlukToplam: kalemSayisi(GUNLUK), haftalikToplam: kalemSayisi(HAFTALIK) },
+  };
+}
+
+async function gorevHatirlat() {
+  const bugun = sonGun(new Date(), 0);
+  const sonuc: Record<string, unknown> = {};
+  sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📋 Günlük görevler",
+    `Bugünkü ${kalemSayisi(GUNLUK)} kalem görev ve denetim sizi bekliyor. Yaptıkça işaretleyin.`, { sayfa: "gorevler" });
+  // Pazartesi: haftalık program da hatırlatılır
+  if (haftaBasi(bugun) === bugun) {
+    sonuc.haftalik = await bildir(GOREV_ISARETLEYEN, "📋 Haftalık görevler",
+      `Bu haftanın ${kalemSayisi(HAFTALIK)} kalem görev ve denetimi sizi bekliyor.`, { sayfa: "gorevler-haftalik" });
+  }
+  return sonuc;
+}
 
 const anahtarUret = () => crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
 
@@ -296,6 +341,34 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { yanit: data.yanit, yanit_veren: data.yanit_veren, yanit_at: data.yanit_at, son_tarih: data.son_tarih };
     }
 
+    case "gorevler": {
+      if (!GOREV_GOREN.includes(rol)) throw new Hata("Görev programını yalnızca yönetici, yönetim kurulu, müdür ve şef görür.", 403);
+      const bugun = sonGun(new Date(), 0);
+      const gun = /^\d{4}-\d{2}-\d{2}$/.test(String(g.gun ?? "")) && g.gun <= bugun ? String(g.gun) : bugun;
+      return { ...(await gorevDurumu(gun)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol) };
+    }
+
+    case "gorev_isaretle": {
+      // Yalnızca müdür ve şef, yalnızca bugünün ve bu haftanın kalemlerini işaretler / geri alır
+      if (!GOREV_ISARETLEYEN.includes(rol)) throw new Hata("Görevleri yalnızca müdür ve şef işaretleyebilir.", 403);
+      const kalem = temiz(g.kalem, 10);
+      if (!KALEM_IDLERI.has(kalem)) throw new Hata("Böyle bir görev kalemi yok.");
+      const tur = kalem.startsWith("G-") ? "gunluk" : "haftalik";
+      const bugun = sonGun(new Date(), 0);
+      const donem = tur === "gunluk" ? bugun : haftaBasi(bugun);
+      if (g.yapildi) {
+        const { error } = await db.from("gorev_isaretleri").upsert(
+          { tur, donem, kalem, cihaz: u.cihaz, ad: u.ad, rol },
+          { onConflict: "tur,donem,kalem", ignoreDuplicates: true },
+        );
+        if (error) throw error;
+      } else {
+        const { error } = await db.from("gorev_isaretleri").delete().eq("tur", tur).eq("donem", donem).eq("kalem", kalem);
+        if (error) throw error;
+      }
+      return { ...(await gorevDurumu(bugun)), isaretleyebilir: true };
+    }
+
     case "varsayilan_sure": {
       yonetici();
       const gun = Number(g.gun);
@@ -452,6 +525,10 @@ Deno.serve(async (req) => {
     if (g.eylem === "gunluk_gecikme") {
       if (!CRON_ANAHTARI || g.cron !== CRON_ANAHTARI) throw new Hata("Yetkisiz.", 401);
       return yanit(await gunlukGecikme());
+    }
+    if (g.eylem === "gorev_hatirlat") {
+      if (!CRON_ANAHTARI || g.cron !== CRON_ANAHTARI) throw new Hata("Yetkisiz.", 401);
+      return yanit(await gorevHatirlat());
     }
     if (g.eylem === "giris") return yanit(await giris(g));
     const u = await kimlik(g);
