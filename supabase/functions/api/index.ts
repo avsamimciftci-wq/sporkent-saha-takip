@@ -226,7 +226,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   const yonetici = () => { if (rol !== "baskan") throw new Hata("Bu işlemi yalnızca yönetici (YK başkanı) yapabilir.", 403); };
 
   // Onay bekleyen telefon yalnızca durumunu sorabilir ve bildirime kaydolabilir
-  if (u.durum !== "onayli" && !["durum", "abone_ol"].includes(eylem)) {
+  if (u.durum !== "onayli" && !["durum", "abone_ol", "izin_bildir"].includes(eylem)) {
     throw new Hata("Kaydınız yönetici onayını bekliyor.", 403, { bekliyor: true });
   }
 
@@ -395,6 +395,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!a?.endpoint) throw new Hata("Geçersiz abonelik.");
       const { error } = await db.from("abonelikler").upsert({ endpoint: a.endpoint, abonelik: a, rol, cihaz: u.cihaz });
       if (error) throw error;
+      await db.from("uyeler").update({ bildirim_izni: "granted" }).eq("cihaz", u.cihaz);
+      return { tamam: true };
+    }
+
+    case "izin_bildir": {
+      // Telefonun bildirim izni; yönetici üye listesinde kimin bildirim alamadığını görür
+      const izin = ["granted", "denied", "default", "ios-tarayici", "desteklenmiyor"].includes(g.izin) ? g.izin : null;
+      await db.from("uyeler").update({ bildirim_izni: izin }).eq("cihaz", u.cihaz);
       return { tamam: true };
     }
 
@@ -402,9 +410,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "uye_listesi": {
       yonetici();
       const { data, error } = await db.from("uyeler")
-        .select("cihaz, ad, rol, durum, created_at, onay_at, son_gorulme").order("created_at", { ascending: false });
+        .select("cihaz, ad, rol, durum, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
       if (error) throw error;
-      return { uyeler: (data ?? []).map((x: any) => ({ ...x, ben: x.cihaz === u.cihaz })) };
+      const { data: ab } = await db.from("abonelikler").select("cihaz");
+      const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
+      return { uyeler: (data ?? []).map((x: any) => ({ ...x, bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz })) };
     }
 
     case "uye_onayla":

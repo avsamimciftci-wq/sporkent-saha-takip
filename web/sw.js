@@ -1,5 +1,5 @@
 // Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v34";
+const SURUM = "sk-v35";
 const DURUM = "sk-durum"; // sürümden bağımsız küçük kayıt: temizlenmemiş bildirim var mı
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
@@ -47,7 +47,7 @@ self.addEventListener("push", (e) => {
       renotify: true,
       requireInteraction: true,
       silent: false,
-      vibrate: [300, 100, 300, 100, 300],
+      vibrate: [500, 150, 500, 150, 500, 150, 800],
       data: { kayitId: v.kayitId, sayfa: v.sayfa },
     });
     await bekleyenVar(true);
