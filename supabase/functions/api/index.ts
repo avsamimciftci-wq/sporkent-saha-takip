@@ -31,6 +31,10 @@ class Hata extends Error {
 type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
+// Yönetim işleri: yönetici ve yönetim kurulu girer; yalnızca bu dört görev görür, bildirim de yalnızca onlara gider
+const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim"];
+const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
+const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
 const MAKS_UYE = 50; // başkan dahil onaylı üye sınırı
 const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Grup üyesi",
@@ -186,7 +190,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { rol, durum: u.durum, ad: u.ad };
 
     case "liste": {
-      const { data, error } = await db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
+      let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
+      if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
+      const { data, error } = await q;
       if (error) throw error;
       const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz }));
       let bekleyen: number | undefined;
@@ -223,13 +229,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         yer: temiz(g.yer, 200),
         sorun: temiz(g.sorun),
         foto_once: temiz(g.foto, 200) || null,
+        gizli: !!g.gizli && YONETIM_ISI_GIREN.includes(rol),
         son_tarih: sonGun(new Date(), await varsayilanSure()),
       };
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
-      // Yeni sorun bütün gruba duyurulur
-      await bildir("hepsi", `Yeni sorun ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
+      // Yeni sorun bütün gruba, yönetim işi yalnızca yönetim, müdür ve şefe duyurulur
+      await bildir(kimeBildir(data), `${data.gizli ? "🔒 Yönetim işi" : "Yeni sorun"} ${data.no}`, `${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
       const { cihaz: _c, ...donen } = data;
       return { kayit: { ...donen, benim: true } };
     }
@@ -245,9 +252,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         kapanis_at: new Date().toISOString(),
       }).eq("id", g.id).neq("durum", "tamam").select().single();
       if (error) throw new Hata("Kayıt bulunamadı ya da zaten kapatılmış.");
-      // Yapılan iş herkese: bildirimde yapılan işin fotoğrafı da görünsün
+      // Yapılan iş görenlere: bildirimde yapılan işin fotoğrafı da görünsün
       const { data: url } = await db.storage.from(BUCKET).createSignedUrl(data.foto_sonra, 60 * 60 * 24 * 7);
-      await bildir("hepsi", `Yapıldı • ${data.yer}`.slice(0, 80), (data.sonuc || data.sorun || "").slice(0, 180),
+      await bildir(kimeBildir(data), `Yapıldı • ${data.yer}`.slice(0, 80), (data.sonuc || data.sorun || "").slice(0, 180),
         { kayitId: data.id, resim: url?.signedUrl });
       return { tamam: true };
     }
@@ -285,7 +292,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         yanit: yanitMetni, yanit_veren: u.ad, yanit_at: new Date().toISOString(), son_tarih: sonGun(new Date(), gun),
       }).eq("id", g.id).neq("durum", "tamam").select().single();
       if (error) throw new Hata("Kayıt bulunamadı ya da iş zaten yapıldı.");
-      await bildir("hepsi", `Cevap • ${data.yer}`.slice(0, 80), yanitMetni, { kayitId: data.id });
+      await bildir(kimeBildir(data), `Cevap • ${data.yer}`.slice(0, 80), yanitMetni, { kayitId: data.id });
       return { yanit: data.yanit, yanit_veren: data.yanit_veren, yanit_at: data.yanit_at, son_tarih: data.son_tarih };
     }
 
