@@ -151,8 +151,16 @@
       if (sesBaglam.state === "suspended") sesBaglam.resume();
     } catch {}
   }
+  // Ekran birkaç kez yanıp söner (uygulama açıkken gelen yeni iş / iş emri)
+  function ekranFlas() {
+    const f = document.createElement("div");
+    f.className = "ekran-flas";
+    f.addEventListener("animationend", () => f.remove());
+    document.body.appendChild(f);
+  }
   function sesCal() {
-    try { navigator.vibrate?.([200, 100, 200]); } catch {}
+    ekranFlas();
+    try { navigator.vibrate?.([500, 150, 500, 150, 500, 150, 800]); } catch {}
     if (!sesBaglam) return;
     const t = sesBaglam.currentTime;
     for (const [frek, bas] of [[880, 0], [1175, 0.18], [880, 0.5], [1175, 0.68]]) {
@@ -395,17 +403,34 @@
 
   const iosTarayicida = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches && !navigator.standalone;
 
+  // İzin durumunu sunucuya bildir (yalnızca değişince): yönetici kimin bildirim alamadığını görür
+  function izinBildir(izin) {
+    if (sakla.al("sk_izin") === izin) return;
+    api("izin_bildir", { izin }).then(() => sakla.koy("sk_izin", izin)).catch(() => {});
+  }
+
   function bildirimKutusu() {
     const kutu = $("#bildirim-kutu");
     if (!oturum?.vapid) { kutu.hidden = true; return; }
+    // Müdür ve şefe iş emirleri bildirimle gelir: kapalıysa uyarı kırmızı ve büyük
+    const onemli = ["mudur", "sef"].includes(oturum.rol);
+    kutu.classList.toggle("bildirim-acil", onemli);
+    const basi = onemli ? "⚠ Bildirimleriniz kapalı! Yönetim iş emirleri ve yeni işler size ulaşmıyor. " : "";
     if (iosTarayicida()) {
-      $("#bildirim-metin").textContent = "iPhone'da bildirim için: Paylaş ⬆︎ → “Ana Ekrana Ekle”, sonra uygulamayı ana ekrandan açın.";
+      izinBildir("ios-tarayici");
+      $("#bildirim-metin").textContent = basi + "iPhone'da bildirim için: Paylaş ⬆︎ → “Ana Ekrana Ekle”, sonra uygulamayı ana ekrandan açın.";
       $("#bildirim-ac").hidden = true; kutu.hidden = false; return;
     }
-    if (!bildirimDestek()) { kutu.hidden = true; return; }
-    kutu.hidden = Notification.permission === "granted";
+    if (!bildirimDestek()) { izinBildir("desteklenmiyor"); kutu.hidden = true; return; }
+    const izin = Notification.permission;
+    if (izin !== "granted") izinBildir(izin);
+    kutu.hidden = izin === "granted";
+    $("#bildirim-ac").hidden = false;
+    $("#bildirim-metin").textContent = izin === "denied"
+      ? basi + "Bu telefonda bildirim izni kapatılmış. Açmak için: uygulama simgesine uzun basın → “Uygulama bilgisi” (ⓘ) → “Bildirimler” → Açık. Sonra uygulamayı kapatıp yeniden açın."
+      : basi + "Aşağıdaki düğmeye basın ve çıkan soruya “İzin ver” deyin.";
     // İzin varsa her açılışta sunucuya yeniden kaydol: kayıt silinmişse kendiliğinden düzelir
-    if (Notification.permission === "granted") bildirimAc(true);
+    if (izin === "granted") bildirimAc(true);
   }
 
   function base64Bayt(s) {
@@ -417,12 +442,16 @@
   async function bildirimAc(sessiz) {
     try {
       const izin = await Notification.requestPermission();
-      if (izin !== "granted") { if (!sessiz) mesaj("Bildirim izni verilmedi. Telefon ayarlarından açabilirsiniz."); return; }
+      if (izin !== "granted") {
+        izinBildir(izin);
+        if (!sessiz) { mesaj("Bildirim izni verilmedi. Telefon ayarlarından açabilirsiniz."); bildirimKutusu(); }
+        return;
+      }
       const kayit = await navigator.serviceWorker.ready;
       let abonelik = await kayit.pushManager.getSubscription();
       if (!abonelik) abonelik = await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64Bayt(oturum.vapid) });
       await api("abone_ol", { abonelik: abonelik.toJSON() });
-      sakla.koy("sk_abone", oturum.rol);
+      sakla.koy("sk_abone", oturum.rol); sakla.koy("sk_izin", "granted");
       $("#bildirim-kutu").hidden = true;
       if (!sessiz) mesaj("Bildirimler açıldı.");
     } catch (e) { if (!sessiz) mesaj("Bildirim açılamadı: " + e.message); }
@@ -531,9 +560,20 @@
     } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
+  function bildirimDurumu(u) {
+    if (u.bildirim) return `<br><small class="bildirim-acik">🔔 Bildirim açık</small>`;
+    const neden = {
+      denied: "telefonda izin reddedilmiş",
+      "ios-tarayici": "iPhone'da ana ekrana eklenmemiş",
+      desteklenmiyor: "tarayıcı desteklemiyor",
+    }[u.bildirim_izni] || "bildirimleri açmamış";
+    return `<br><small class="bildirim-kapali">🔕 Bildirim kapalı · ${neden}</small>`;
+  }
+
   function uyeSatiri(u, dugmeler) {
     return `<div class="uye">
-      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small></div>
+      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
+        ${u.durum === "onayli" ? bildirimDurumu(u) : ""}</div>
       <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
     </div>`;
   }
