@@ -744,7 +744,7 @@
         : `<p class="ipucu">Yaptığınız kalemin üstüne dokunun, "yapıldı" işaretlensin. Yanlışlıkla işaretlediyseniz tekrar dokunun.</p>`}
       <p class="ipucu">${kac(p.giris)}</p>
       ${p.bolumler.map((b) => `
-        <h2 class="gorev-bolum">${b.harf}. ${kac(b.baslik)}${b.saat ? ` <small>(${b.saat})</small>` : ""}</h2>
+        ${b.baslik ? `<h2 class="gorev-bolum">${b.harf}. ${kac(b.baslik)}${b.saat ? ` <small>(${b.saat})</small>` : ""}</h2>` : ""}
         ${b.kalemler.map((k) => {
           const i = isaret.get(k.id); no++;
           return `<button type="button" class="gorev ${i ? "yapildi" : ""}" data-kalem="${k.id}" ${duzenler ? "" : "disabled"}>
