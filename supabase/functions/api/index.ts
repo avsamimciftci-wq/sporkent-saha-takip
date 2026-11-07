@@ -82,22 +82,28 @@ const haftaBasi = (gun: string) => {
 };
 const gunEkle = (gun: string, n: number) => new Date(Date.parse(gun + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 
-async function gorevDurumu(gun: string) {
+// gecmisli: geçmiş günler / haftalar özeti yalnızca yöneticiye gönderilir
+async function gorevDurumu(gun: string, gecmisli = false) {
   const hafta = haftaBasi(gun);
   const { data: isaretler, error } = await db.from("gorev_isaretleri").select("tur, donem, kalem, ad, rol, isaret_at")
     .or(`and(tur.eq.gunluk,donem.eq.${gun}),and(tur.eq.haftalik,donem.eq.${hafta})`);
   if (error) throw error;
-  // Geçmiş özeti: son 14 gün ve son 8 hafta, kaç kalem işaretlendi
   const bugun = sonGun(new Date(), 0);
-  const { data: eski } = await db.from("gorev_isaretleri").select("tur, donem")
-    .gte("donem", gunEkle(haftaBasi(bugun), -7 * 7));
-  const say = (tur: string, donem: string) => (eski ?? []).filter((x: any) => x.tur === tur && x.donem === donem).length;
-  const gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: say("gunluk", d) }));
-  const haftalar = Array.from({ length: 8 }, (_, i) => gunEkle(haftaBasi(bugun), -7 * i)).map((d) => ({ donem: d, yapilan: say("haftalik", d) }));
+  let gunler: unknown[] = [], haftalar: unknown[] = [];
+  if (gecmisli) {
+    // Son 14 gün ve son 8 hafta, kaç kalem işaretlendi (programdan çıkarılan kalemler sayılmaz)
+    const { data: eski } = await db.from("gorev_isaretleri").select("tur, donem, kalem")
+      .gte("donem", gunEkle(haftaBasi(bugun), -7 * 7));
+    const say = (tur: string, donem: string) =>
+      (eski ?? []).filter((x: any) => x.tur === tur && x.donem === donem && KALEM_IDLERI.has(x.kalem)).length;
+    gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: say("gunluk", d) }));
+    haftalar = Array.from({ length: 8 }, (_, i) => gunEkle(haftaBasi(bugun), -7 * i)).map((d) => ({ donem: d, yapilan: say("haftalik", d) }));
+  }
   return {
     program: { gunluk: GUNLUK, haftalik: HAFTALIK },
     gun, hafta, bugun, buHafta: haftaBasi(bugun),
-    isaretler: isaretler ?? [],
+    isaretler: (isaretler ?? []).filter((x: any) => KALEM_IDLERI.has(x.kalem)),
+    gecmisGorur: gecmisli,
     gecmis: { gunler, haftalar, gunlukToplam: kalemSayisi(GUNLUK), haftalikToplam: kalemSayisi(HAFTALIK) },
   };
 }
@@ -245,17 +251,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "bekliyor");
         bekleyen = count ?? 0;
       }
+      let ykUyeler: string[] | undefined;
       if (rol === "baskan" || rol === "yonetim") {
-        // Yönetici ve yönetim kurulu, müdür ve şefin her kaydı ne zaman gördüğünü de alır
+        // Yönetici ve yönetim kurulu, müdür ve şefin her kaydı ne zaman gördüğünü de alır.
+        // Yönetim kurulu üyelerinin ne zaman gördüğünü yalnızca yönetici alır.
         const ids = kayitlar.map((k: any) => k.id);
-        const { data: g } = ids.length
-          ? await db.from("goruntulemeler").select("kayit_id, ad, rol, ilk_at").in("kayit_id", ids).order("ilk_at")
-          : { data: [] };
+        let gq = db.from("goruntulemeler").select("kayit_id, ad, rol, ilk_at").in("kayit_id", ids).order("ilk_at");
+        if (rol !== "baskan") gq = gq.in("rol", ["mudur", "sef"]);
+        const { data: g } = ids.length ? await gq : { data: [] };
         for (const k of kayitlar as any[]) {
           k.gorenler = (g ?? []).filter((x: any) => x.kayit_id === k.id).map(({ kayit_id: _i, ...x }: any) => x);
         }
+        if (rol === "baskan") {
+          const { data: yk } = await db.from("uyeler").select("ad").eq("rol", "yonetim").eq("durum", "onayli").order("ad");
+          ykUyeler = (yk ?? []).map((x: any) => x.ad);
+        }
       }
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, bekleyen };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, bekleyen, ykUyeler };
     }
 
     case "yukleme_adresi": {
@@ -318,8 +330,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "goruldu": {
-      // Yalnızca müdür ve şefin ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
-      if (rol !== "mudur" && rol !== "sef") return { tamam: true };
+      // Müdür, şef ve yönetim kurulunun ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
+      if (!["mudur", "sef", "yonetim"].includes(rol)) return { tamam: true };
       await db.from("goruntulemeler").upsert(
         { kayit_id: Number(g.id), cihaz: u.cihaz, ad: u.ad, rol },
         { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
@@ -344,8 +356,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "gorevler": {
       if (!GOREV_GOREN.includes(rol)) throw new Hata("Görev programını yalnızca yönetici, yönetim kurulu, müdür ve şef görür.", 403);
       const bugun = sonGun(new Date(), 0);
-      const gun = /^\d{4}-\d{2}-\d{2}$/.test(String(g.gun ?? "")) && g.gun <= bugun ? String(g.gun) : bugun;
-      return { ...(await gorevDurumu(gun)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol) };
+      // Geçmiş günleri yalnızca yönetici açabilir
+      const gecmisli = rol === "baskan";
+      const gun = gecmisli && /^\d{4}-\d{2}-\d{2}$/.test(String(g.gun ?? "")) && g.gun <= bugun ? String(g.gun) : bugun;
+      return { ...(await gorevDurumu(gun, gecmisli)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol) };
     }
 
     case "gorev_isaretle": {

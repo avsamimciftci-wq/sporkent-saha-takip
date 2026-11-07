@@ -113,6 +113,7 @@
     try {
       const r = await api("liste");
       kayitlar = r.kayitlar || [];
+      ykUyeler = r.ykUyeler || [];
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if (yonetici()) {
@@ -203,7 +204,18 @@
     return `<dt>${ad}</dt><dd>${g.length
       ? g.map((x) => `👁 ${tarihSaat(x.ilk_at)} gördü (${kac(x.ad)})`).join("<br>")
       : `<span class="gorulmedi">Henüz görmedi</span>`}</dd>`;
-  }).join("");
+  }).join("") + (yonetici() ? ykGorulme(k) : "");
+  // Yalnızca yönetici: yönetim kurulu üyelerinin her biri kaydı ne zaman gördü
+  let ykUyeler = [];
+  const ykGorulme = (k) => {
+    const g = gorenler(k, "yonetim");
+    const adlar = [...new Set([...ykUyeler, ...g.map((x) => x.ad)])];
+    if (!adlar.length) return "";
+    return `<dt>Yönetim kurulu</dt><dd>${adlar.map((ad) => {
+      const x = g.find((y) => y.ad === ad);
+      return x ? `👁 ${tarihSaat(x.ilk_at)} gördü (${kac(ad)})` : `<span class="gorulmedi">${kac(ad)}: henüz görmedi</span>`;
+    }).join("<br>")}</dd>`;
+  };
   const gorulduGonderilen = new Set();
 
   function listeCiz() {
@@ -263,7 +275,7 @@
     const kapat = kapatabilir() && k.durum !== "tamam";
     $("#detay").innerHTML = `
       <div class="detay-ust">
-        <button class="geri" data-geri>← Liste</button>
+        <button class="geri" data-geri>← İş Listesini Gör</button>
         <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
       </div>
       ${k.gizli ? `<p class="gizli-not">🔒 Yönetim İş Emri: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
@@ -323,7 +335,7 @@
     goster("detay");
     if (kapat) kapatBagla(k);
     // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
-    if ((oturum.rol === "mudur" || oturum.rol === "sef") && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
+    if (["mudur", "sef", "yonetim"].includes(oturum.rol) && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
       gorulduGonderilen.add(k.id);
       api("goruldu", { id: k.id }).catch(() => gorulduGonderilen.delete(k.id));
     }
@@ -587,7 +599,7 @@
     bekleyenSayisi = bekleyen.length;
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     $("#yonetim").innerHTML = `
-      <div class="detay-ust"><button class="geri" data-geri>← Liste</button></div>
+      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
@@ -718,7 +730,7 @@
     const sayac = (tur) => v.isaretler.filter((x) => x.tur === tur).length;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="detay-ust"><button class="geri" data-geri>← Liste</button></div>
+      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
       <h1>Görev ve denetim programı</h1>
       <div class="gorev-sekme">
         <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük<br><small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
@@ -741,11 +753,11 @@
               ${i ? `<em>✓ Yapıldı · ${kac(i.ad || "")} · ${gunluk ? "" : gunYazisi(i.isaret_at.slice(0, 10)) + " "}${saatYazisi(i.isaret_at)}</em>` : ""}</span>
           </button>`;
         }).join("")}`).join("")}
-      <h2>Geçmiş ${gunluk ? "günler" : "haftalar"}</h2>
+      ${v.gecmisGorur ? `<h2>Geçmiş ${gunluk ? "günler" : "haftalar"}</h2>
       <div class="gorev-gecmis">
         ${(gunluk ? v.gecmis.gunler : v.gecmis.haftalar).map((x) => `<button type="button" data-gun="${x.donem}" class="${x.donem === donem ? "secili" : ""} ${x.yapilan === toplam ? "tam" : x.yapilan ? "" : "bos-gun"}">
           ${gunluk ? gunYazisi(x.donem).slice(0, 5) : gunYazisi(x.donem).slice(0, 5) + "–" + haftaSonu(x.donem).slice(0, 5)}<br><b>${x.yapilan}/${toplam}</b></button>`).join("")}
-      </div>`;
+      </div>` : ""}`;
   }
 
   $("#gorevler").addEventListener("click", async (e) => {

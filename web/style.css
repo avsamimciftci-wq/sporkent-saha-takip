@@ -192,8 +192,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 .oncelik input { width: auto; min-height: 0; margin: 0; }
 .oncelik small { color: var(--soluk); font-size: 13px; }
 
-.detay-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.geri { background: #f5a623; border: 0; border-radius: 10px; color: #1b3d2f; font: inherit; font-size: 31.5px; font-weight: 800; line-height: 1.1; padding: 6px 16px 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
+.detay-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.geri { background: #f5a623; border: 0; border-radius: 10px; color: #1b3d2f; font: inherit; font-size: 24px; font-weight: 800; line-height: 1.15; padding: 8px 16px 10px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
 .detay-ust .rozet { font-size: 15px; padding: 3px 10px; }
 .alanlar { display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; font-size: 15px; margin: 10px 0; }
 .alanlar dt { color: var(--soluk); }
