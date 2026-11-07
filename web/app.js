@@ -276,7 +276,7 @@
     $("#detay").innerHTML = `
       <div class="detay-ust">
         <button class="geri" data-geri>← İş Listesini Gör</button>
-        <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
+        ${k.durum === "tamam" ? `<span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>` : ""}
       </div>
       ${k.gizli ? `<p class="gizli-not">🔒 Yönetim İş Emri: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
       <h1>${kac(k.yer)}</h1>
