@@ -117,6 +117,32 @@
     .not { background: #fff4ce; color: #5c4400; border-radius: 10px; padding: 6px 10px; font-size: 14px; margin: 0 0 4px; }
     .uygulamaya { background: var(--turuncu); color: #fff; }
     @media (prefers-reduced-motion: reduce) { .parmak, .ekran .kare { transition: none; } .parmak.bas, .parmak.uzun { animation: none; } }
+
+    /* ---------- PDF kılavuz (rehber.html?pdf=android | iphone) ---------- */
+    @page { size: A4; margin: 14mm 12mm; }
+    body.pdf { background: #fff; color: #1b2421; font-size: 19px; }
+    body.pdf .secim, body.pdf main, body.pdf .ust { display: none; }
+    body.pdf .ust { -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 12px; }
+    body.pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .pdf-kapak { text-align: center; padding: 60px 20px 0; }
+    .pdf-kapak img { width: 170px; height: 170px; border-radius: 50%; border: 4px solid #1f4e45; }
+    .pdf-kapak h1 { font-size: 34px; margin: 24px 0 6px; color: #1f4e45; }
+    .pdf-kapak h2 { font-size: 26px; margin: 0 0 30px; font-weight: 700; }
+    .pdf-kapak .tel-adi { display: inline-block; background: #e8772e; color: #fff; font-weight: 800; font-size: 24px; padding: 8px 24px; border-radius: 999px; }
+    .pdf-kapak .bag { margin: 34px auto 0; max-width: 560px; background: #e8f0ec; border-radius: 14px; padding: 16px; font-size: 20px; }
+    .pdf-kapak .bag b { color: #1a73e8; text-decoration: underline; word-break: break-all; }
+    .pdf-icerik { text-align: left; max-width: 560px; margin: 28px auto 0; font-size: 18px; columns: 2; }
+    .pdf-adim { break-before: page; padding-top: 4px; }
+    .pdf-adim .adim-no { font-size: 20px; }
+    .pdf-adim h1 { font-size: 30px; margin: 4px 0 10px; }
+    .pdf-adim .aciklama { font-size: 21px; line-height: 1.5; }
+    .pdf-adim .not { font-size: 18px; padding: 10px 14px; margin: 10px 0; }
+    .pdf-kareler { display: flex; justify-content: center; align-items: flex-start; gap: 6px; margin-top: 22px; }
+    .pdf-kare { text-align: center; font-weight: 800; color: #e8772e; font-size: 20px; }
+    .pdf-kare .telefon { position: relative; left: auto; top: auto; transform: none; margin: 6px auto 0; box-shadow: none; }
+    .pdf-ok { align-self: center; font-size: 30px; color: #e8772e; font-weight: 800; }
+    .pdf-kare .ekran .kare { opacity: 1; transition: none; }
+    .pdf-kare .parmak { transition: none; }
   </style>
 </head>
 <body>
@@ -167,7 +193,7 @@
       ortak_bas: [
         { baslik: "Bağlantıya dokunun", aciklama: "Size WhatsApp'tan gelen <b>mavi bağlantıya</b> bir kez dokunun. Uygulama telefonunuzun internet tarayıcısında açılır.",
           kareler: [
-            { ekran: `<div class="durum-cubugu"></div><div style="background:#075e54;color:#fff;padding:8px;font-weight:700">Sporkent Grubu</div><div style="background:#e5ddd5;height:100%;padding:10px"><div style="background:#fff;border-radius:8px;padding:8px;width:85%">Saha takip uygulamamız:<br><u style="color:#1a73e8">${BAGLANTI}</u></div></div>`, parmak: [50, 58] },
+            { ekran: `<div class="durum-cubugu"></div><div style="background:#075e54;color:#fff;padding:8px;font-weight:700">Sporkent Grubu</div><div style="background:#e5ddd5;height:100%;padding:10px"><div style="background:#fff;border-radius:8px;padding:8px;width:85%">Saha takip uygulamamız:<br><u style="color:#1a73e8">${BAGLANTI}</u></div></div>`, parmak: [38, 21] },
           ] },
       ],
       android_yukle: [
@@ -236,6 +262,40 @@
           ] },
       ],
     };
+
+    // Yazdırılabilir kılavuz: her adım ayrı sayfa, animasyonun bütün kareleri yan yana
+    const pdfTel = new URLSearchParams(location.search).get("pdf");
+    if (pdfTel === "android" || pdfTel === "iphone") {
+      const tum = [...ADIMLAR.ortak_bas, ...ADIMLAR[pdfTel + "_yukle"], ...ADIMLAR.ortak_son];
+      const ad = pdfTel === "iphone" ? "iPhone" : "Android";
+      document.body.classList.add("pdf");
+      document.title = `Sporkent SAHA TAKİP – Kurulum ve kullanım kılavuzu (${ad})`;
+      const olcek = (n) => (n === 1 ? 1 : n === 2 ? 0.95 : n === 3 ? 0.8 : 0.6);
+      const kapak = `<section class="pdf-kapak">
+        <img src="logo.png" alt="">
+        <h1>Sporkent İşletme Kooperatifi<br>SAHA TAKİP</h1>
+        <h2>Kurulum ve kullanım kılavuzu</h2>
+        <span class="tel-adi">${ad} telefonlar için</span>
+        <div class="bag">Uygulamanın adresi:<br><b>${BAGLANTI}</b><br><span style="font-size:16px;color:#5d6b66">Bu bağlantı size WhatsApp'tan da gönderilir.</span></div>
+        <ol class="pdf-icerik">${tum.map((a) => `<li>${a.baslik}</li>`).join("")}</ol>
+      </section>`;
+      const sayfalar = tum.map((a, i) => {
+        const z = olcek(a.kareler.length);
+        const kareler = a.kareler.map((k, n) => `${n ? `<div class="pdf-ok">→</div>` : ""}<div class="pdf-kare">${a.kareler.length > 1 ? n + 1 : ""}
+          <div class="telefon" style="zoom:${z}"><div class="ekran"><div class="kare aktif">${k.ekran}</div>
+          ${k.parmak[1] <= 100 ? `<div class="parmak" style="left:${k.parmak[0]}%;top:${k.parmak[1]}%"></div>` : ""}</div></div></div>`).join("");
+        return `<section class="pdf-adim">
+          <div class="adim-no">ADIM ${i + 1} / ${tum.length}</div>
+          <h1>${a.baslik}</h1>
+          <p class="aciklama">${a.aciklama}</p>
+          ${a.not ? `<p class="not">💡 ${a.not}</p>` : ""}
+          <div class="pdf-kareler">${kareler}</div>
+          ${a.kareler.length > 1 ? `<p style="text-align:center;color:#5d6b66;font-size:16px">Turuncu daire, parmağınızla dokunacağınız yeri gösterir. Ekranlar soldan sağa sırayla gelir.</p>` : `<p style="text-align:center;color:#5d6b66;font-size:16px">Turuncu daire, parmağınızla dokunacağınız yeri gösterir.</p>`}
+        </section>`;
+      }).join("");
+      document.body.insertAdjacentHTML("beforeend", kapak + sayfalar);
+      return;
+    }
 
     let tel = /iphone|ipad|ipod/i.test(navigator.userAgent) ? "iphone" : "android";
     let adimlar = [], sira = 0, zamanlayicilar = [];
