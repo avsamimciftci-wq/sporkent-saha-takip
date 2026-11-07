@@ -749,7 +749,7 @@
           const i = isaret.get(k.id); no++;
           return `<button type="button" class="gorev ${i ? "yapildi" : ""}" data-kalem="${k.id}" ${duzenler ? "" : "disabled"}>
             <span class="gorev-no">${i ? "✓" : no}</span>
-            <span><b>${no}. ${kac(k.baslik)}</b><small>${kac(k.aciklama)}</small>
+            <span><b>${kac(k.baslik)}</b><small>${kac(k.aciklama)}</small>
               ${i ? `<em>✓ Yapıldı · ${kac(i.ad || "")} · ${gunluk ? "" : gunYazisi(i.isaret_at.slice(0, 10)) + " "}${saatYazisi(i.isaret_at)}</em>` : ""}</span>
           </button>`;
         }).join("")}`).join("")}

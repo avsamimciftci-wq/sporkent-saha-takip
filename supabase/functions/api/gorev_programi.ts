@@ -15,15 +15,7 @@ export const GUNLUK: Program = {
         { id: "G-A1", baslik: "Tam saha devriyesi", aciklama: "Sitenin ana ve ara yolları, park alanları ve ortak kullanım alanları araçla dolaşılarak gözle kontrol edilir." },
         { id: "G-A3", baslik: "Sahil, iskele ve plaj", aciklama: "Sahil, iskele ve plaj öncelikli olarak denetlenir. Şezlongların düzeni, hizası ve temizliği kontrol edilir; ihtiyaç varsa yıkama ve temizlik talimatı verilir." },
         { id: "G-A6", baslik: "Deniz güvenliği", aciklama: "Emniyet halatları, yüzer emniyet elemanları (flatörler) ve şamandıralar gözle kontrol edilir." },
-      ],
-    },
-    {
-      harf: "B", baslik: "Personel sevk ve idaresi", saat: "10.30–10.45", kalemler: [
-        { id: "G-B1", baslik: "Gün başı değerlendirmesi", aciklama: "Bahçıvan, teknik personel, güvenlik ve temizlik personeliyle yaklaşık 15 dakikalık gün başı değerlendirmesi yapılır." },
-      ],
-    },
-    {
-      harf: "C", baslik: "Gün içi saha takibi ve idari işler", saat: "13.00–17.00", kalemler: [
+        { id: "G-B1", baslik: "Gün başı değerlendirmesi (10:00-10:15)", aciklama: "Bahçıvan, teknik personel, güvenlik ve temizlik personeliyle yaklaşık 15 dakikalık gün başı değerlendirmesi yapılır." },
         { id: "G-C3", baslik: "Güvenlik ve giriş-çıkış", aciklama: "Güvenlik kulübeleri ve bariyer sistemleri denetlenir; ziyaretçi kayıt defterleri incelenir." },
       ],
     },
