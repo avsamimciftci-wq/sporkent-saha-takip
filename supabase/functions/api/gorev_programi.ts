@@ -11,8 +11,8 @@ export const GUNLUK: Program = {
   giris: "Sabah saatlerinde bütün sahaya hâkim olunması, öncelikli alanlardaki eksikliklerin belirlenmesi, personelin görevlendirilmesi ve gün içinde verilen işlerin sonuçlandırılmasının takip edilmesi esasına dayanır.",
   bolumler: [
     {
-      harf: "A", baslik: "Sabah saha denetimi ve turu", saat: "08.30–10.00", kalemler: [
-        { id: "G-A1", baslik: "Tam saha devriyesi", aciklama: "Sitenin ana ve ara yolları, park alanları ve ortak kullanım alanları araçla dolaşılarak gözle kontrol edilir." },
+      harf: "A", baslik: "", kalemler: [
+        { id: "G-A1", baslik: "Tam saha devriyesi (08:30-10:00)", aciklama: "Sitenin ana ve ara yolları, park alanları ve ortak kullanım alanları araçla dolaşılarak gözle kontrol edilir." },
         { id: "G-A3", baslik: "Sahil, iskele ve plaj", aciklama: "Sahil, iskele ve plaj öncelikli olarak denetlenir. Şezlongların düzeni, hizası ve temizliği kontrol edilir; ihtiyaç varsa yıkama ve temizlik talimatı verilir." },
         { id: "G-A6", baslik: "Deniz güvenliği", aciklama: "Emniyet halatları, yüzer emniyet elemanları (flatörler) ve şamandıralar gözle kontrol edilir." },
         { id: "G-B1", baslik: "Gün başı değerlendirmesi (10:00-10:15)", aciklama: "Bahçıvan, teknik personel, güvenlik ve temizlik personeliyle yaklaşık 15 dakikalık gün başı değerlendirmesi yapılır." },
