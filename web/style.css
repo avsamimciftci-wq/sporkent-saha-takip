@@ -47,6 +47,14 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 [hidden] { display: none !important; }
+/* Yazıya ya da resme dokununca telefon kelimeyi seçip internette aramasın ("dokunarak ara"),
+   basılı tutunca resim menüsü açılmasın. Yalnızca yazı yazılan kutular seçilebilir. */
+html, body, body * {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+input, textarea, select, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+img { -webkit-user-drag: none; }
 
 .ust {
   position: sticky; top: 0; z-index: 5;

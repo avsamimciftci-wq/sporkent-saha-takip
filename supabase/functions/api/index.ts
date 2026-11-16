@@ -63,7 +63,8 @@ async function rolBul(kod: unknown): Promise<Rol | null> {
   const k = temiz(kod, 100).toLowerCase();
   if (!k) return null;
   const hepsi = await kodlar();
-  for (const r of ROLLER) if (r !== "uye" && hepsi[r] && k === hepsi[r].toLowerCase()) return r;
+  // TG üyeleri ve yönetim kurulu yalnızca kişisel kodla girer; ortak kodları kapalı
+  for (const r of ROLLER) if (r !== "uye" && r !== "yonetim" && hepsi[r] && k === hepsi[r].toLowerCase()) return r;
   return null;
 }
 
@@ -182,11 +183,11 @@ async function giris(g: any) {
     const { data: o } = await db.from("ortaklar").select("no").eq("no", Number(m[1])).eq("sifre", sifre).maybeSingle();
     if (o) { rol = "uye"; ad = `Ortak ${o.no}`; }
   }
-  // TG Başkanı ve TG üyeleri: kişiye özel kod; ad ve unvan listeden gelir, onay beklemez
-  let tg: { ad: string; unvan: string } | null = null;
+  // TG Başkanı, TG üyeleri ve YK üyeleri: kişiye özel kod; ad, unvan ve görev listeden gelir, onay beklemez
+  let tg: { ad: string; unvan: string; rol: Rol } | null = null;
   if (!rol && sifre) {
-    const { data: t } = await db.from("tg_uyeleri").select("ad, unvan").eq("kod", sifre.toUpperCase().replace(/\s+/g, "")).maybeSingle();
-    if (t) { tg = t; rol = "uye"; ad = t.ad; }
+    const { data: t } = await db.from("tg_uyeleri").select("ad, unvan, rol").eq("kod", sifre.toUpperCase().replace(/\s+/g, "")).maybeSingle();
+    if (t) { tg = t; rol = t.rol; ad = t.ad; }
   }
   if (!rol) rol = await rolBul(g.kod);
   if (!rol) throw new Hata("Kullanıcı adı ya da şifre / kod hatalı.", 401);
@@ -293,7 +294,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           ykUyeler = (yk ?? []).map((x: any) => x.ad);
         }
       }
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, bekleyen, ykUyeler };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler };
     }
 
     case "yukleme_adresi": {
@@ -622,9 +623,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "tg_listesi": {
       yonetici();
-      const { data, error } = await db.from("tg_uyeleri").select("ad, unvan, kod").order("id");
+      const { data, error } = await db.from("tg_uyeleri").select("ad, unvan, kod, rol").order("rol", { ascending: false }).order("id");
       if (error) throw error;
-      const { data: k } = await db.from("uyeler").select("ad").eq("rol", "uye").eq("durum", "onayli");
+      const { data: k } = await db.from("uyeler").select("ad").in("rol", ["uye", "yonetim"]).eq("durum", "onayli");
       const giren = new Set((k ?? []).map((x: any) => x.ad));
       return { tg: (data ?? []).map((t: any) => ({ ...t, kullaniliyor: giren.has(t.ad) })) };
     }
