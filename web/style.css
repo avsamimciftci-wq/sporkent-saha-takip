@@ -359,7 +359,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .iletisim-ikon.ara { background: #e3f4ea; }
 .iletisim-ikon.posta { background: #e3f2fd; }
 .iletisim-ikon.site { background: #fef0db; }
-.iletisim-ikon.insta { background: #fce4ec; }
+.iletisim-ikon.insta { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
 .iletisim-satir small { display: block; font-size: 16px; color: var(--soluk); font-weight: 700; }
 .iletisim-satir b { display: block; font-size: 22px; overflow-wrap: anywhere; color: var(--yesil); }
 .iletisim-satir em { display: block; font-style: normal; font-size: 14px; color: var(--soluk); }
