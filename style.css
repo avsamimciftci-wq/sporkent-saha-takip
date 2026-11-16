@@ -310,8 +310,20 @@ body.menulu .ekran { padding-bottom: calc(150px + env(safe-area-inset-bottom)); 
   display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 68px;
 }
 .alt-menu button span { font-size: 28px; line-height: 1.1; }
-.alt-menu button.secili { background: var(--yesil); color: #fff; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .alt-menu button.secili { color: #0d1a17; } }
+/* Her bölümün kendi rengi: seçili değilken açık zemin, seçiliyken dolu renk */
+.alt-menu [data-modul="saha"] { --renk: #1f6b4f; --renk-acik: #e3f4ea; }
+.alt-menu [data-modul="yonetim"] { --renk: #283593; --renk-acik: #e8eaf6; }
+.alt-menu [data-modul="aidat"] { --renk: #b26a00; --renk-acik: #fff3e0; }
+.alt-menu [data-modul="iletisim"] { --renk: #ad1457; --renk-acik: #fce4ec; }
+.alt-menu button { background: var(--renk-acik); color: var(--renk); border: 2px solid transparent; }
+.alt-menu button.secili { background: var(--renk); color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,.2); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .alt-menu [data-modul="saha"] { --renk: #6fcf97; --renk-acik: #15301f; }
+  :root:not([data-theme="light"]) .alt-menu [data-modul="yonetim"] { --renk: #9fa8da; --renk-acik: #1a2350; }
+  :root:not([data-theme="light"]) .alt-menu [data-modul="aidat"] { --renk: #ffb74d; --renk-acik: #3a2610; }
+  :root:not([data-theme="light"]) .alt-menu [data-modul="iletisim"] { --renk: #f48fb1; --renk-acik: #3b1426; }
+  :root:not([data-theme="light"]) .alt-menu button.secili { color: #111; }
+}
 body.menulu .yuzen { bottom: calc(96px + env(safe-area-inset-bottom)); }
 body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 
