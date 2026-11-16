@@ -251,9 +251,9 @@ async function ortakKayit(g: any) {
   else throw new Hata("Cep telefonu numaranızı doğru yazın (örn. 0532 123 45 67; yurt dışı ise +49 … ile).");
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
-  if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
+  // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
   // Aynı telefon aynı bilgilerle yeniden kayıt olursa durumu korunur; bilgi değişirse yeniden onay bekler
-  const ayni = var_ && var_.rol === "uye" && var_.ortak_no === no && var_.ad === ad && var_.telefon === telefon;
+  const ayni = var_ && var_.durum !== "cikarildi" && var_.rol === "uye" && var_.ortak_no === no && var_.ad === ad && var_.telefon === telefon;
   const durum = ayni ? var_.durum : "bekliyor";
   const anahtar = var_?.anahtar ?? anahtarUret();
   const unvan = `${no} No'lu Ortak`;
