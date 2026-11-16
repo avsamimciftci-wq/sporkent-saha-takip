@@ -128,6 +128,7 @@
       ykUyeler = r.ykUyeler || [];
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
+      if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
       if (yonetici()) {
         if ((r.bekleyen || 0) > bekleyenSayisi) { sesCal(); mesaj(`Onay bekleyen ${r.bekleyen} kişi var.`); }
         bekleyenSayisi = r.bekleyen || 0;
@@ -733,12 +734,12 @@
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
 
-      <h2>TG Başkanı ve TG üyeleri (${tg.length})</h2>
-      <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Ortak "TG üyesi" kodu kapalıdır.</p>
+      <h2>Kişisel kodlar: YK ve TG (${tg.length})</h2>
+      <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Yönetim kurulu ve TG üyesi için ortak kod kapalıdır.</p>
       <details class="ortak-liste" open>
         <summary>📋 Kişisel kodları göster</summary>
         <table><thead><tr><th>Ad</th><th>Kod</th><th>Durum</th></tr></thead><tbody>
-        ${tg.map((t) => `<tr><td>${kac(t.ad)}${t.unvan !== "TG Üyesi" ? `<br><small>${kac(t.unvan)}</small>` : ""}</td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
+        ${tg.map((t) => `<tr><td>${kac(t.ad)}<br><small>${kac(t.unvan)}</small></td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
         </tbody></table>
       </details>
 
@@ -760,7 +761,7 @@
 
       <h2>Giriş kodları</h2>
       <p class="ipucu">Kodu değiştirmek gruptakileri çıkarmaz; yalnızca yeni katılacaklar yeni kodu kullanır.</p>
-      ${ROL_SIRASI.filter((r) => r !== "uye").map((r) => `<div class="uye">
+      ${ROL_SIRASI.filter((r) => r !== "uye" && r !== "yonetim").map((r) => `<div class="uye">
         <div><b>${kac(ROL_ADI[r])}</b><br><code>${kac(kodlar[r] || "—")}</code></div>
         <div class="uye-dugmeler">${d("kod_degistir", r, "Değiştir")}</div>
       </div>`).join("")}
