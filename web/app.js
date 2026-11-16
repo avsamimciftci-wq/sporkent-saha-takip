@@ -959,7 +959,19 @@ Bu bilgileri ortağa iletin.`);
     if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
     goster("yonetimisleri");
   }
+  // İletişim açılınca siteyle bağlantı önceden kurulsun: dokununca daha çabuk açılır
+  let siteHazir = false;
+  function siteyeHazirlan() {
+    if (siteHazir) return;
+    siteHazir = true;
+    for (const rel of ["dns-prefetch", "preconnect"]) {
+      const l = document.createElement("link");
+      l.rel = rel; l.href = "https://sporkentsitesi.com";
+      document.head.appendChild(l);
+    }
+  }
   function iletisimAc() {
+    siteyeHazirlan();
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
