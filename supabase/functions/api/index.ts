@@ -63,7 +63,7 @@ async function rolBul(kod: unknown): Promise<Rol | null> {
   const k = temiz(kod, 100).toLowerCase();
   if (!k) return null;
   const hepsi = await kodlar();
-  for (const r of ROLLER) if (hepsi[r] && k === hepsi[r].toLowerCase()) return r;
+  for (const r of ROLLER) if (r !== "uye" && hepsi[r] && k === hepsi[r].toLowerCase()) return r;
   return null;
 }
 
@@ -182,6 +182,12 @@ async function giris(g: any) {
     const { data: o } = await db.from("ortaklar").select("no").eq("no", Number(m[1])).eq("sifre", sifre).maybeSingle();
     if (o) { rol = "uye"; ad = `Ortak ${o.no}`; }
   }
+  // TG Başkanı ve TG üyeleri: kişiye özel kod; ad ve unvan listeden gelir, onay beklemez
+  let tg: { ad: string; unvan: string } | null = null;
+  if (!rol && sifre) {
+    const { data: t } = await db.from("tg_uyeleri").select("ad, unvan").eq("kod", sifre.toUpperCase().replace(/\s+/g, "")).maybeSingle();
+    if (t) { tg = t; rol = "uye"; ad = t.ad; }
+  }
   if (!rol) rol = await rolBul(g.kod);
   if (!rol) throw new Hata("Kullanıcı adı ya da şifre / kod hatalı.", 401);
   const cihaz = temiz(g.cihaz, 80);
@@ -191,10 +197,10 @@ async function giris(g: any) {
   if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
 
   // Başkan kodu kendiliğinden onaylıdır; diğerleri (ya da rolü değişen telefon) onay bekler.
-  const durum = rol === "baskan" ? "onayli" : var_ && var_.rol === rol ? var_.durum : "bekliyor";
+  const durum = rol === "baskan" || tg ? "onayli" : var_ && var_.rol === rol ? var_.durum : "bekliyor";
   const anahtar = var_?.anahtar ?? anahtarUret();
   const { error } = await db.from("uyeler").upsert({
-    cihaz, anahtar, ad, rol, durum,
+    cihaz, anahtar, ad, rol, durum, unvan: tg?.unvan ?? null,
     onay_at: durum === "onayli" ? var_?.onay_at ?? new Date().toISOString() : null,
     son_gorulme: new Date().toISOString(),
   });
@@ -204,7 +210,7 @@ async function giris(g: any) {
   if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
     await bildir(["baskan"], "Onay bekleyen üye", `${ad} (${ROL_ADI[rol]}) gruba katılmak istiyor.`, { sayfa: "uyeler" });
   }
-  return { rol, durum, anahtar, ad, vapid: VAPID_PUBLIC || null };
+  return { rol, durum, anahtar, ad, unvan: tg?.unvan ?? null, vapid: VAPID_PUBLIC || null };
 }
 
 // Telefonu gizli anahtarıyla tanı
@@ -256,7 +262,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
   switch (eylem) {
     case "durum":
-      return { rol, durum: u.durum, ad: u.ad };
+      return { rol, durum: u.durum, ad: u.ad, unvan: (u as any).unvan ?? null };
 
     case "liste": {
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
@@ -546,7 +552,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "uye_listesi": {
       yonetici();
       const { data, error } = await db.from("uyeler")
-        .select("cihaz, ad, rol, durum, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
+        .select("cihaz, ad, rol, unvan, durum, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
       if (error) throw error;
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
@@ -612,6 +618,15 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       await duyur({ cihaz: hedef }, "Yönetici oldunuz",
         `${u.ad} yöneticiliği size devretti. Üyeler ve ayarlar artık sizde.`, { sayfa: "uyeler" });
       return { rol: eskiRol };
+    }
+
+    case "tg_listesi": {
+      yonetici();
+      const { data, error } = await db.from("tg_uyeleri").select("ad, unvan, kod").order("id");
+      if (error) throw error;
+      const { data: k } = await db.from("uyeler").select("ad").eq("rol", "uye").eq("durum", "onayli");
+      const giren = new Set((k ?? []).map((x: any) => x.ad));
+      return { tg: (data ?? []).map((t: any) => ({ ...t, kullaniliyor: giren.has(t.ad) })) };
     }
 
     case "ortak_listesi": {

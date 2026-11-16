@@ -4,3 +4,4 @@ supabase/.temp/
 
 # Ortak kullanıcı adı ve şifre listesi (gizli)
 Ortak_Sifreleri*.csv
+TG_Kodlari*.csv

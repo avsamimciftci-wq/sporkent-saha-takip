@@ -238,7 +238,7 @@
   function listeCiz() {
     const saat = new Date().getHours();
     const selam = saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
-    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(oturum.ad)}</b><small>${kac(ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
+    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
     const bekleyenKayit = kayitlar.filter(onayBekliyor);
     const ou = $("#onay-uyari");
     ou.hidden = !(kayitOnaylar() && bekleyenKayit.length);
@@ -596,7 +596,7 @@
 
   async function girisYap(ad, kod) {
     const r = await api("giris", { ad, kod });
-    oturum = { ad: r.ad || ad, rol: r.rol, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
+    oturum = { ad: r.ad || ad, rol: r.rol, unvan: r.unvan || null, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
     sakla.koy("sk_oturum", oturum);
     return r;
   }
@@ -669,8 +669,8 @@
     goster("yonetim");
     $("#yonetim").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     try {
-      const [{ uyeler }, { kodlar, varsayilan_sure }, { ortaklar }] = await Promise.all([api("uye_listesi"), api("kodlar"), api("ortak_listesi")]);
-      yonetimCiz(uyeler, kodlar, varsayilan_sure, ortaklar);
+      const [{ uyeler }, { kodlar, varsayilan_sure }, { ortaklar }, { tg }] = await Promise.all([api("uye_listesi"), api("kodlar"), api("ortak_listesi"), api("tg_listesi")]);
+      yonetimCiz(uyeler, kodlar, varsayilan_sure, ortaklar, tg);
     } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
@@ -686,13 +686,13 @@
 
   function uyeSatiri(u, dugmeler) {
     return `<div class="uye">
-      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
+      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(u.unvan || ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
         ${u.durum === "onayli" ? bildirimDurumu(u) : ""}</div>
       <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
     </div>`;
   }
 
-  function yonetimCiz(uyeler, kodlar, varsSure, ortaklar = []) {
+  function yonetimCiz(uyeler, kodlar, varsSure, ortaklar = [], tg = []) {
     const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
     const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
       .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
@@ -733,6 +733,15 @@
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
 
+      <h2>TG Başkanı ve TG üyeleri (${tg.length})</h2>
+      <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Ortak "TG üyesi" kodu kapalıdır.</p>
+      <details class="ortak-liste" open>
+        <summary>📋 Kişisel kodları göster</summary>
+        <table><thead><tr><th>Ad</th><th>Kod</th><th>Durum</th></tr></thead><tbody>
+        ${tg.map((t) => `<tr><td>${kac(t.ad)}${t.unvan !== "TG Üyesi" ? `<br><small>${kac(t.unvan)}</small>` : ""}</td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
+        </tbody></table>
+      </details>
+
       <h2>Ortak hesapları (${ortaklar.length})</h2>
       <p class="ipucu">Her ortak kendi kullanıcı adı (örn. <b>Ortak 12</b>) ve şifresiyle girer; ilk girişte yine sizin onayınıza düşer. Yeni eklenen ortak sıradaki numarayı alır.</p>
       <button class="ana-dugme" type="button" data-eylem="ortak_ekle">➕ Yeni ortak ekle</button>
@@ -751,7 +760,7 @@
 
       <h2>Giriş kodları</h2>
       <p class="ipucu">Kodu değiştirmek gruptakileri çıkarmaz; yalnızca yeni katılacaklar yeni kodu kullanır.</p>
-      ${ROL_SIRASI.map((r) => `<div class="uye">
+      ${ROL_SIRASI.filter((r) => r !== "uye").map((r) => `<div class="uye">
         <div><b>${kac(ROL_ADI[r])}</b><br><code>${kac(kodlar[r] || "—")}</code></div>
         <div class="uye-dugmeler">${d("kod_degistir", r, "Değiştir")}</div>
       </div>`).join("")}
