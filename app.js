@@ -252,6 +252,10 @@
     const acik = genel.filter((k) => k.durum !== "tamam" && listede(k)).length;
     const yapilan = genel.filter((k) => k.durum === "tamam").length;
     const geciken = genel.filter(gecikti).length;
+    // Alt menüdeki Saha Takip düğmesinde yapılmayan iş sayısı
+    const sr = $("#saha-rozet");
+    sr.textContent = acik > 99 ? "99+" : String(acik);
+    sr.hidden = !acik;
     $("#ozet").innerHTML = `
       <button data-filtre="acik" class="ozet-yapilmayan ${filtre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Henüz yapılmayanlar</span></button>
       <button data-filtre="tamam" class="ozet-yapilan ${filtre === "tamam" ? "secili" : ""}"><b>${yapilan}</b><span>Yapılanlar</span></button>`;
