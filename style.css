@@ -299,7 +299,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 body.menulu .ekran { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .alt-menu {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 8;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
   background: var(--kart); border-top: 1px solid var(--cizgi);
   box-shadow: 0 -4px 16px rgba(0,0,0,.10);
   padding: 6px max(6px, calc(50% - 320px)) calc(6px + env(safe-area-inset-bottom));
@@ -370,6 +370,46 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .aidat-resim figcaption { margin-top: 8px; font-size: 15px; color: var(--soluk); display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 .aidat-resim figcaption b { color: var(--yazi); font-size: 18px; }
 .aidat-ekle { margin-bottom: 16px; }
+
+/* Dört düğme olunca yazılar sığsın */
+.alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 15px; line-height: 1.15; }
+
+/* Sayfa başlığı bandı: "İş Listesini Gör" düğmesiyle aynı boyda ve aynı genişlikte */
+.baslik-cift { display: grid; gap: 10px; margin-bottom: 14px; }
+.baslik-cift .geri, .sayfa-bant {
+  display: block; width: 100%; margin: 0; text-align: center;
+  font-size: 24px; font-weight: 800; line-height: 1.15; padding: 10px 16px 12px; border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,.15);
+}
+.sayfa-bant { color: #fff; }
+.bant-program { background: #00695c; }
+.bant-gorev { background: #283593; }
+.bant-yonetim { background: #1f4e45; margin-bottom: 16px; }
+
+/* Yönetim İşleri ekranı: iki eş büyüklükte renkli kutu */
+.yonetim-kutular { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.yonetim-kutu {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  min-height: 170px; padding: 16px 10px; border: 0; border-radius: 18px; cursor: pointer;
+  font: inherit; font-size: 20px; font-weight: 800; line-height: 1.2; color: #fff; text-align: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,.18);
+}
+.yonetim-kutu span { font-size: 48px; line-height: 1; }
+.kutu-program { background: linear-gradient(145deg, #00897b, #00574b); }
+.kutu-gorev { background: linear-gradient(145deg, #3949ab, #1a237e); }
+.yonetim-kutu:active { transform: scale(.98); }
+
+/* Yıllık görünüm: 12 ay */
+.prog-yil { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.prog-yil button { min-height: 76px; border-radius: 12px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.prog-yil b { font-size: 17px; }
+.prog-yil small { font-size: 14px; color: var(--soluk); font-weight: 700; }
+.prog-yil button.dolu { background: #e0f2f1; border-color: #00695c; }
+.prog-yil button.dolu small { color: #00695c; }
+.prog-yil button.bugun { outline: 3px solid #00695c; }
+.prog-ay button.secili, .prog-ay button.dolu.secili { background: #00695c; border-color: #00695c; color: #fff; }
+.prog-ay button.secili i { background: #fff; color: #00695c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .prog-yil button.dolu { background: #0f2e2b; } }
 
 /* Yönetici: ortak hesapları listesi */
 .ortak-liste { margin: 10px 0 4px; border: 1px solid var(--cizgi); border-radius: 12px; padding: 10px 12px; }

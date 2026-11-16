@@ -107,13 +107,14 @@
 
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
-  const MODUL = { aidat: "aidat", iletisim: "iletisim" };
+  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim" };
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     const menulu = !["giris", "bekle"].includes(ad) && onayli();
     $("#alt-menu").hidden = !menulu;
     document.body.classList.toggle("menulu", menulu);
     const modul = MODUL[ad] || "saha";
+    $("#alt-menu [data-modul=yonetim]").hidden = !programGorur();
     for (const b of document.querySelectorAll("#alt-menu [data-modul]")) b.classList.toggle("secili", b.dataset.modul === modul);
     window.scrollTo(0, 0);
   }
@@ -242,7 +243,6 @@
     ou.classList.toggle("secili", filtre === "onay");
     ou.textContent = filtre === "onay" ? "⏳ Onay bekleyenler gösteriliyor · İş listesine dön" : `⏳ ${bekleyenKayit.length} kayıt onayınızı bekliyor`;
     if (filtre === "onay" && !(kayitOnaylar() && bekleyenKayit.length)) filtre = "acik";
-    $("#yonetim-isleri").hidden = !programGorur();
     const acik = kayitlar.filter((k) => k.durum !== "tamam" && listede(k)).length;
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const geciken = kayitlar.filter(gecikti).length;
@@ -257,7 +257,6 @@
       : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
     // Müdür ve şef sorun bildirmez, yalnızca "Yapıldı" girer
     $("#yeni-ac").style.display = yeniGirebilir() ? "" : "none";
-    $("#gorevler-ac").hidden = !gorevGorur();
     const yd = $("#yonetim-ac");
     yd.hidden = !yonetici();
     yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
@@ -598,6 +597,7 @@
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
+    if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#program") return programAc();
     if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     const m = location.hash.match(/^#kayit-(\d+)$/);
@@ -816,8 +816,7 @@ Bu bilgileri ortağa iletin.`);
     const sayac = (tur) => v.isaretler.filter((x) => x.tur === tur).length;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
-      <h1>Görev ve denetim programı</h1>
+      <div class="baslik-cift"><button class="geri" data-geri>← İş Listesini Gör</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
       <div class="gorev-sekme">
         <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük<br><small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
         <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık<br><small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
@@ -873,13 +872,18 @@ Bu bilgileri ortağa iletin.`);
     history.replaceState(null, "", location.pathname);
     goster("liste"); listeCiz();
   }
+  function yonetimIsleriAc() {
+    if (!programGorur()) return;
+    if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
+    goster("yonetimisleri");
+  }
   function iletisimAc() {
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
-    ({ saha: sahaAc, aidat: aidatAc, iletisim: iletisimAc })[b.dataset.modul]();
+    ({ saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc })[b.dataset.modul]();
   });
   $("#onay-uyari").addEventListener("click", () => { filtre = filtre === "onay" ? "acik" : "onay"; listeCiz(); });
 
@@ -945,7 +949,7 @@ Bu bilgileri ortağa iletin.`);
   const ayinGunu = (t) => tGun(t).getUTCDate();
   const ayinSonGunu = (t) => new Date(Date.UTC(tGun(t).getUTCFullYear(), tGun(t).getUTCMonth() + 1, 0)).getUTCDate();
   const uzunTarih = (t) => `${ayinGunu(t)} ${AYLAR[tGun(t).getUTCMonth()]} ${tGun(t).getUTCFullYear()}, ${GUNLER[haftaGunu(t)]}`;
-  let progGorunum = "gun", progTarih = bugun(), progVeri = [], progFormAcik = false;
+  let progGorunum = "hafta", progTarih = bugun(), progVeri = [], progFormAcik = false;
 
   // Bir iş o gün yapılacak mı (tekrarlayanlar başladığı günden itibaren)
   function oGunMu(x, gun) {
@@ -959,7 +963,7 @@ Bu bilgileri ortağa iletin.`);
   const gununIsleri = (gun) => progVeri.filter((x) => oGunMu(x, gun)).sort((a, b) => (a.saat || "99").localeCompare(b.saat || "99"));
 
   function progAralik() {
-    if (progGorunum === "gun") return [progTarih, progTarih];
+    if (progGorunum === "yil") { const y = progTarih.slice(0, 4); return [`${y}-01-01`, `${y}-12-31`]; }
     if (progGorunum === "hafta") { const b = tEkle(progTarih, -haftaGunu(progTarih)); return [b, tEkle(b, 6)]; }
     const ilk = progTarih.slice(0, 8) + "01";
     const bas = tEkle(ilk, -haftaGunu(ilk));
@@ -989,10 +993,17 @@ Bu bilgileri ortağa iletin.`);
     const [bas] = progAralik();
     const bugunT = bugun();
     let etiket, icerik;
-    if (progGorunum === "gun") {
-      etiket = uzunTarih(progTarih);
-      const isler = gununIsleri(progTarih);
-      icerik = isler.length ? isler.map(isKarti).join("") : `<p class="bos">Bu gün için girilmiş iş yok.</p>`;
+    if (progGorunum === "yil") {
+      const y = progTarih.slice(0, 4);
+      etiket = y;
+      const say = Array(12).fill(0);
+      for (let g = `${y}-01-01`; g <= `${y}-12-31`; g = tEkle(g, 1)) say[tGun(g).getUTCMonth()] += gununIsleri(g).length;
+      const buAy = bugunT.slice(0, 7);
+      icerik = `<div class="prog-yil">${AYLAR.map((ad, i) => {
+        const ay = `${y}-${String(i + 1).padStart(2, "0")}`;
+        return `<button type="button" data-prog-ay="${ay}-01" class="${say[i] ? "dolu" : ""} ${ay === buAy ? "bugun" : ""}"><b>${ad}</b><small>${say[i] ? `${say[i]} iş` : "İş yok"}</small></button>`;
+      }).join("")}</div>
+        <p class="ipucu" style="font-size:15px">Bir aya dokunun, o ayın takvimi açılsın.</p>`;
     } else if (progGorunum === "hafta") {
       etiket = `${ayinGunu(bas)} ${AYLAR[tGun(bas).getUTCMonth()]} – ${ayinGunu(tEkle(bas, 6))} ${AYLAR[tGun(tEkle(bas, 6)).getUTCMonth()]}`;
       icerik = Array.from({ length: 7 }, (_, i) => tEkle(bas, i)).map((g) => {
@@ -1006,15 +1017,20 @@ Bu bilgileri ortağa iletin.`);
       icerik = `<div class="prog-ay">${["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((g) => `<span class="gun-adi">${g}</span>`).join("")}
         ${Array.from({ length: Math.round((tGun(progAralik()[1]) - tGun(bas)) / 864e5) + 1 }, (_, i) => tEkle(bas, i)).map((g) => {
           const n = gununIsleri(g).length;
-          return `<button type="button" data-prog-gun="${g}" class="${g.slice(0, 7) !== ay ? "disarida" : ""} ${g === bugunT ? "bugun" : ""} ${n ? "dolu" : ""}">${ayinGunu(g)}${n ? `<i>${n}</i>` : ""}</button>`;
+          return `<button type="button" data-prog-gun="${g}" class="${g.slice(0, 7) !== ay ? "disarida" : ""} ${g === bugunT ? "bugun" : ""} ${n ? "dolu" : ""} ${g === progTarih ? "secili" : ""}">${ayinGunu(g)}${n ? `<i>${n}</i>` : ""}</button>`;
         }).join("")}</div>
-        <p class="ipucu" style="font-size:15px">Bir güne dokunun, o günün işleri açılsın.</p>`;
+        <p class="ipucu" style="font-size:15px">Bir güne dokunun, o günün işleri aşağıda görünsün.</p>`;
+      // Seçili günün işleri takvimin altında
+      if (progTarih.slice(0, 7) === ay) {
+        const isler = gununIsleri(progTarih);
+        icerik += `<div class="prog-gun"><h3 class="${progTarih === bugunT ? "bugun" : ""}">${uzunTarih(progTarih)}</h3>
+          ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">Bu gün için girilmiş iş yok</p>`}</div>`;
+      }
     }
     $("#program").innerHTML = `
-      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
-      <h1>📅 İş Programı</h1>
+      <div class="baslik-cift"><button class="geri" data-geri>← İş Listesini Gör</button><h1 class="sayfa-bant bant-program">📅 İş Programı</h1></div>
       <div class="prog-sekme">
-        ${[["gun", "Günlük"], ["hafta", "Haftalık"], ["ay", "Aylık"]].map(([k, ad]) => `<button type="button" data-prog-gorunum="${k}" class="${progGorunum === k ? "secili" : ""}">${ad}</button>`).join("")}
+        ${[["hafta", "Haftalık"], ["ay", "Aylık"], ["yil", "Yıllık"]].map(([k, ad]) => `<button type="button" data-prog-gorunum="${k}" class="${progGorunum === k ? "secili" : ""}">${ad}</button>`).join("")}
       </div>
       <div class="prog-gezin"><button type="button" data-prog-git="-1" aria-label="Önceki">‹</button><b>${etiket}</b><button type="button" data-prog-git="1" aria-label="Sonraki">›</button></div>
       ${progAralik()[0] <= bugunT && bugunT <= progAralik()[1] ? "" : `<button type="button" class="ikincil prog-bugun" data-prog-bugun>Bugüne dön</button>`}
@@ -1052,14 +1068,20 @@ Bu bilgileri ortağa iletin.`);
     const git = t.closest("[data-prog-git]");
     if (git) {
       const n = Number(git.dataset.progGit);
-      if (progGorunum === "gun") progTarih = tEkle(progTarih, n);
+      if (progGorunum === "yil") progTarih = `${Number(progTarih.slice(0, 4)) + n}-01-01`;
       else if (progGorunum === "hafta") progTarih = tEkle(progTarih, 7 * n);
       else { const d = tGun(progTarih.slice(0, 8) + "01"); d.setUTCMonth(d.getUTCMonth() + n); progTarih = tYaz(d); }
       return programAc();
     }
     if (t.closest("[data-prog-bugun]")) { progTarih = bugun(); return programAc(); }
     const gun = t.closest("[data-prog-gun]");
-    if (gun) { progTarih = gun.dataset.progGun; progGorunum = "gun"; return programAc(); }
+    if (gun) {
+      const ayDegisti = gun.dataset.progGun.slice(0, 7) !== progTarih.slice(0, 7);
+      progTarih = gun.dataset.progGun;
+      return ayDegisti ? programAc() : programCiz();
+    }
+    const ayB = t.closest("[data-prog-ay]");
+    if (ayB) { progTarih = ayB.dataset.progAy; progGorunum = "ay"; return programAc(); }
     if (t.closest("#prog-ekle-ac")) {
       progFormAcik = true; $("#prog-form").hidden = false; t.closest("#prog-ekle-ac").hidden = true;
       $("#prog-form").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1088,7 +1110,7 @@ Bu bilgileri ortağa iletin.`);
       await programAc();
     } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Kaydet"; }
   });
-  $("#program-ac").addEventListener("click", () => { progGorunum = "gun"; progTarih = bugun(); progFormAcik = false; programAc(); });
+  $("#program-ac").addEventListener("click", () => { progGorunum = "hafta"; progTarih = bugun(); progFormAcik = false; programAc(); });
 
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
@@ -1171,6 +1193,7 @@ Bu bilgileri ortağa iletin.`);
     if (location.hash === "#uyeler") return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
+    if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#program" && $("#ekran-program").hidden) return programAc();
     if (location.hash.startsWith("#gorevler") && $("#ekran-gorevler").hidden) {
       return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
