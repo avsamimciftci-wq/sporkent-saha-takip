@@ -236,15 +236,19 @@ async function giris(g: any) {
 async function ortakKayit(g: any) {
   const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
   const no = Number(temiz(g.ortak_no, 6));
-  let tel = temiz(g.telefon, 30).replace(/\D/g, "");
-  if (tel.startsWith("90") && tel.length === 12) tel = tel.slice(2);
-  if (tel.startsWith("0")) tel = tel.slice(1);
+  const ham = temiz(g.telefon, 30);
+  let tel = ham.replace(/\D/g, "");
   const cihaz = temiz(g.cihaz, 80);
   if (ad.split(" ").length < 2) throw new Hata("Adınızı ve soyadınızı birlikte yazın.");
   if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata("Ortaklık numaranızı doğru yazın.");
-  if (!/^5\d{9}$/.test(tel)) throw new Hata("Cep telefonu numaranızı doğru yazın (örn. 0532 123 45 67).");
   if (!cihaz) throw new Hata("Cihaz bilgisi gerekli.");
-  const telefon = `0${tel.slice(0, 3)} ${tel.slice(3, 6)} ${tel.slice(6, 8)} ${tel.slice(8)}`;
+  // Türkiye numarası: 0532 123 45 67 biçiminde saklanır; yurt dışı numarası (+49 …) olduğu gibi
+  let telefon: string;
+  if (tel.startsWith("90") && tel.length === 12) tel = tel.slice(2);
+  else if (tel.startsWith("0") && tel.length === 11) tel = tel.slice(1);
+  if (/^[2-5]\d{9}$/.test(tel)) telefon = `0${tel.slice(0, 3)} ${tel.slice(3, 6)} ${tel.slice(6, 8)} ${tel.slice(8)}`;
+  else if (/^(\+|00)/.test(ham) && tel.replace(/^00/, "").length >= 9 && tel.length <= 15) telefon = "+" + tel.replace(/^00/, "");
+  else throw new Hata("Cep telefonu numaranızı doğru yazın (örn. 0532 123 45 67; yurt dışı ise +49 … ile).");
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
@@ -260,7 +264,9 @@ async function ortakKayit(g: any) {
   if (error) throw error;
   await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
   if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
-    await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor.`, { sayfa: "uyeler" });
+    const { data: r } = await db.from("ortak_rehberi").select("telefonlar").eq("no", no).maybeSingle();
+    const uyuyor = !!r?.telefonlar?.some((t: string) => t.replace(/\D/g, "").slice(-10) === telefon.replace(/\D/g, "").slice(-10));
+    await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Bilgileri örtüşmüyor!"}`, { sayfa: "uyeler" });
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
 }
@@ -612,7 +618,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (error) throw error;
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
-      return { uyeler: (data ?? []).map((x: any) => ({ ...x, bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz })) };
+      // Ortak başvurusunu resmi ortak listesiyle karşılaştır: aynı ortak no + listedeki telefonlardan biri
+      const nolar = [...new Set((data ?? []).map((x: any) => x.ortak_no).filter(Boolean))];
+      const { data: rehber } = nolar.length ? await db.from("ortak_rehberi").select("no, ad, telefonlar").in("no", nolar) : { data: [] };
+      const rh = new Map((rehber ?? []).map((r: any) => [r.no, r]));
+      const son10 = (t: string) => String(t ?? "").replace(/\D/g, "").slice(-10);
+      const eslesme = (x: any) => {
+        if (!x.ortak_no) return undefined;
+        const r: any = rh.get(x.ortak_no);
+        if (!r) return { uyuyor: false, liste_ad: null };
+        return { uyuyor: r.telefonlar.some((t: string) => son10(t) === son10(x.telefon)), liste_ad: r.ad };
+      };
+      return { uyeler: (data ?? []).map((x: any) => ({ ...x, eslesme: eslesme(x), bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz })) };
     }
 
     case "uye_onayla":
