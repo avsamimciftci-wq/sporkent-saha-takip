@@ -536,3 +536,11 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .davet-kod { font-size: 18px; margin: 10px 0 0; text-align: center; }
 .davet-kod b { font-size: 26px; letter-spacing: 2px; }
 .davet-kisi .ipucu { margin: 6px 0 8px; }
+/* Ortağa davet: büyük, renkli bölüm */
+.davet-bolum { background: linear-gradient(135deg, #1a73e8, #0b4fa8); color: #fff; border-radius: 16px; padding: 18px 16px; margin: 6px 0 18px; box-shadow: 0 4px 14px rgba(11,79,168,.3); }
+.davet-bolum h2 { color: #fff; font-size: 24px; margin: 0 0 8px; }
+.davet-bolum > p { color: #e3efff; font-size: 16px; margin: 0 0 12px; line-height: 1.45; }
+.davet-bolum .davet-ara { font-size: 22px; padding: 16px; border: 0; border-radius: 12px; background: #fff; color: #1b2421; }
+.davet-bolum .davet-kisi { background: #fff; color: #1b2421; border: 0; }
+.davet-bolum .davet-kisi .ipucu { color: #5d6b66; }
+.davet-bolum > #davet-sonuc > .ipucu, .davet-bolum > #davet-sonuc > .hata { color: #fff; }

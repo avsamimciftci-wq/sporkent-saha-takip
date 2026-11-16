@@ -844,10 +844,12 @@
       <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
-      <h2>📨 Ortağa davet gönder</h2>
-      <p class="ipucu">Ortak numarasını yazın. Davet metni o numaraya göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
-      <input id="davet-ara" class="davet-ara" type="search" inputmode="numeric" placeholder="Ortak numarası, örn. 12" autocomplete="off">
-      <div id="davet-sonuc"></div>
+      <section class="davet-bolum">
+        <h2>📨 Ortağa davet gönder</h2>
+        <p>Ortak numarasını yazın. Davet kodu ve mesajı o numaraya göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
+        <input id="davet-ara" class="davet-ara" type="search" inputmode="numeric" placeholder="Ortak numarası, örn. 12" autocomplete="off">
+        <div id="davet-sonuc"></div>
+      </section>
 
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
       ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"), ayniNo(u))).join("")
