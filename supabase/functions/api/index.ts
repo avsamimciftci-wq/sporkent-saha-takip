@@ -382,8 +382,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "gorevler": {
       if (!GOREV_GOREN.includes(rol)) throw new Hata("Görev programını yalnızca yönetici, yönetim kurulu, müdür ve şef görür.", 403);
       const bugun = sonGun(new Date(), 0);
-      // Geçmiş günleri yalnızca yönetici açabilir
-      const gecmisli = rol === "baskan";
+      // Geçmiş günleri yönetici ve yönetim kurulu açabilir; müdür ve şef açamaz
+      const gecmisli = rol === "baskan" || rol === "yonetim";
       const gun = gecmisli && /^\d{4}-\d{2}-\d{2}$/.test(String(g.gun ?? "")) && g.gun <= bugun ? String(g.gun) : bugun;
       return { ...(await gorevDurumu(gun, gecmisli)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol) };
     }
