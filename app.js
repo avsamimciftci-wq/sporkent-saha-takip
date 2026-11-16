@@ -788,9 +788,9 @@
     const tel = u.telefon ? ` · <a href="tel:${kac(u.telefon.replace(/\s/g, ""))}">📞 ${kac(u.telefon)}</a>` : "";
     return `<div class="uye">
       <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(u.unvan || ROL_ADI[u.rol] || u.rol)}${tel} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
-        ${uyari}
         ${u.durum === "onayli" ? bildirimDurumu(u) : ""}</div>
       <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
+      ${uyari ? `<div class="uye-uyari">${uyari}</div>` : ""}
     </div>`;
   }
 
@@ -803,8 +803,17 @@
     // Aynı ortaklık numarasıyla gruptaki biri varsa onaylamadan önce uyar
     const ayniNo = (u) => {
       const k = u.ortak_no && uyeler.find((x) => x.cihaz !== u.cihaz && x.ortak_no === u.ortak_no && x.durum !== "cikarildi");
-      return k ? `<br><small class="ayni-no">⚠ Bu numara zaten kayıtlı: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski kayıt silinir.</small>` : "";
+      const ayni = k ? `<br><small class="ayni-no">⚠ Bu numara zaten kayıtlı: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski kayıt silinir.</small>` : "";
+      return eslesmeKutusu(u) + ayni;
     };
+    // Resmi ortak listesiyle karşılaştırma: mavi örtüşüyor, kırmızı örtüşmüyor
+    function eslesmeKutusu(u) {
+      const e = u.eslesme;
+      if (!e) return "";
+      if (e.uyuyor) return `<div class="eslesme eslesme-uyuyor">✔ Ortağın bilgileri örtüşüyor<small>Listede ${kac(u.ortak_no)} No: ${kac(e.liste_ad)}</small></div>`;
+      const neden = e.liste_ad ? `Listede ${kac(u.ortak_no)} No: ${kac(e.liste_ad)} · telefon listedekiyle aynı değil` : `${kac(u.ortak_no)} numaralı ortak listede yok`;
+      return `<div class="eslesme eslesme-uymuyor">✖ Ortağın bilgileri örtüşmüyor<small>${neden}</small></div>`;
+    }
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     $("#yonetim").innerHTML = `
       <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>

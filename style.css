@@ -74,7 +74,7 @@ img { -webkit-user-drag: none; }
 .ust { touch-action: none; }
 .yonetim-dugme { width: 100%; margin-bottom: 12px; }
 .yonetim-dugme.uyari { background: var(--oncelikli-zemin); color: var(--oncelikli); }
-.uye { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--cizgi); }
+.uye { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--cizgi); }
 .uye small { color: var(--soluk); }
 .uye code { font-size: 15px; }
 .uye-dugmeler { display: flex; gap: 6px; flex: none; }
@@ -138,6 +138,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 .kvkk { font-size: 15px; color: var(--soluk); background: #f3f5f4; border-radius: 8px; padding: 8px 10px; margin: 4px 0 12px; }
 .metin-dugme { background: none; border: none; color: var(--yesil); font-size: 16px; font-weight: 600; padding: 14px 0 4px; width: 100%; text-decoration: underline; cursor: pointer; }
 .ayni-no { color: var(--acil); font-weight: 600; }
+.uye-uyari { flex-basis: 100%; }
+.uye-uyari > br:first-child { display: none; }
+.eslesme { margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-weight: 700; font-size: 16px; }
+.eslesme small { display: block; font-weight: 400; font-size: 13px; margin-top: 2px; }
+.eslesme-uyuyor { background: #e3effd; color: #0b4fa8; border: 2px solid #1a73e8; }
+.eslesme-uymuyor { background: var(--acil-zemin); color: var(--acil); border: 2px solid var(--acil); }
 
 .foto-bos { aspect-ratio: 1; border-radius: 10px; background: var(--yesil-acik); display: grid; place-items: center; color: var(--soluk); font-size: 14px; text-align: center; padding: 8px; }
 /* Yapılanlar (kırmızı) / Yapılmayanlar (yeşil): sayılı süzme düğmeleri; seçili olan dolu renkte */
