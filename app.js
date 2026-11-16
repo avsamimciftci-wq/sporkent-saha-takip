@@ -798,7 +798,7 @@ Bu bilgileri ortağa iletin.`);
     if (!gorevGorur()) return;
     gorevSekme = sekme;
     const hash = sekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler";
-    if (location.hash !== hash) history.replaceState(null, "", hash);
+    if (location.hash !== hash) history.replaceState(history.state, "", hash);
     goster("gorevler");
     if (!gorevVeri) $("#gorevler").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     try { gorevVeri = await api("gorevler", gun ? { gun } : {}); gorevCiz(); }
@@ -816,7 +816,7 @@ Bu bilgileri ortağa iletin.`);
     const sayac = (tur) => v.isaretler.filter((x) => x.tur === tur).length;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri>← İş Listesini Gör</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
+      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
       <div class="gorev-sekme">
         <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük<br><small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
         <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık<br><small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
@@ -849,7 +849,7 @@ Bu bilgileri ortağa iletin.`);
     const sekme = e.target.closest("[data-sekme]");
     if (sekme) {
       gorevSekme = sekme.dataset.sekme;
-      history.replaceState(null, "", gorevSekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler");
+      history.replaceState(history.state, "", gorevSekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler");
       return gorevCiz();
     }
     const gunB = e.target.closest("[data-gun]");
@@ -861,7 +861,12 @@ Bu bilgileri ortağa iletin.`);
     try { gorevVeri = await api("gorev_isaretle", { kalem: b.dataset.kalem, yapildi }); gorevCiz(); }
     catch (err) { mesaj(err.message); b.disabled = false; }
   });
-  $("#gorevler-ac").addEventListener("click", () => gorevlerAc("gunluk"));
+  // Yönetim Kurulu ekranından açılan sayfalar geçmişe eklenir: telefonun geri tuşu da Yönetim Kurulu'na döner
+  $("#gorevler-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler"); gorevlerAc("gunluk"); });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-geri-yk]")) return;
+    if (history.state?.yk) history.back(); else yonetimIsleriAc();
+  });
 
   $("#yonetim").addEventListener("click", (e) => {
     if (e.target.closest("#devret-ac")) $("#devret").hidden = !$("#devret").hidden;
@@ -973,7 +978,7 @@ Bu bilgileri ortağa iletin.`);
 
   async function programAc() {
     if (!programGorur()) return;
-    if (location.hash !== "#program") history.replaceState(null, "", "#program");
+    if (location.hash !== "#program") history.replaceState(history.state, "", "#program");
     goster("program");
     if (!$("#program").innerHTML) $("#program").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     const [bas, bit] = progAralik();
@@ -1028,7 +1033,7 @@ Bu bilgileri ortağa iletin.`);
       }
     }
     $("#program").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri>← İş Listesini Gör</button><h1 class="sayfa-bant bant-program">📅 İş Programı</h1></div>
+      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-program">📅 İş Programı</h1></div>
       <div class="prog-sekme">
         ${[["hafta", "Haftalık"], ["ay", "Aylık"], ["yil", "Yıllık"]].map(([k, ad]) => `<button type="button" data-prog-gorunum="${k}" class="${progGorunum === k ? "secili" : ""}">${ad}</button>`).join("")}
       </div>
@@ -1110,7 +1115,11 @@ Bu bilgileri ortağa iletin.`);
       await programAc();
     } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Kaydet"; }
   });
-  $("#program-ac").addEventListener("click", () => { progGorunum = "hafta"; progTarih = bugun(); progFormAcik = false; programAc(); });
+  $("#program-ac").addEventListener("click", () => {
+    progGorunum = "hafta"; progTarih = bugun(); progFormAcik = false;
+    history.pushState({ yk: 1 }, "", "#program");
+    programAc();
+  });
 
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
