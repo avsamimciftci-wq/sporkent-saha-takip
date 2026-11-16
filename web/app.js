@@ -637,7 +637,9 @@
   const masaustu = !(iosCihaz || androidCihaz);
   const kurulumGerekli = () => masaustu || !anaEkranda();
 
-  function girisEkrani(kodla = false) {
+  // TG üyelerine özel link (…?tg=1): giriş ekranı doğrudan kişisel kod formuyla açılır
+  if (/[?&]tg/.test(location.search)) sakla.koy("sk_tg", 1);
+  function girisEkrani(kodla = !!sakla.al("sk_tg")) {
     const kurulmali = kurulumGerekli();
     $("#kurulum").hidden = !kurulmali;
     $("#kayit-form").hidden = kurulmali || kodla;

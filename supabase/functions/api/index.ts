@@ -232,6 +232,8 @@ async function giris(g: any) {
   return { rol, durum, anahtar, ad, unvan: tg?.unvan ?? null, vapid: VAPID_PUBLIC || null };
 }
 
+const adNorm = (s: string) => String(s ?? "").toLocaleUpperCase("tr").replace(/\s+/g, " ").trim();
+
 // Ortak kaydı: kod yok. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
 async function ortakKayit(g: any) {
   const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
@@ -249,6 +251,14 @@ async function ortakKayit(g: any) {
   if (/^[2-5]\d{9}$/.test(tel)) telefon = `0${tel.slice(0, 3)} ${tel.slice(3, 6)} ${tel.slice(6, 8)} ${tel.slice(8)}`;
   else if (/^(\+|00)/.test(ham) && tel.replace(/^00/, "").length >= 9 && tel.length <= 15) telefon = "+" + tel.replace(/^00/, "");
   else throw new Hata("Cep telefonu numaranızı doğru yazın (örn. 0532 123 45 67; yurt dışı ise +49 … ile).");
+
+  // Kişisel kodu olan (TG/YK) kişi düz ortak olarak kayıt olamaz: kendi koduyla girmeli.
+  // Yazdığı ad ya da ortak listesinde bu numaradaki ad, kişisel kod listesindeki bir adla eşleşirse engellenir.
+  const { data: kodlular } = await db.from("tg_uyeleri").select("ad, unvan");
+  const { data: listede } = await db.from("ortak_rehberi").select("ad").eq("no", no).maybeSingle();
+  const adlar = new Set([adNorm(ad), listede ? adNorm(listede.ad) : ""]);
+  const kodlu = (kodlular ?? []).find((t: any) => adlar.has(adNorm(t.ad)));
+  if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Alttaki "Görevli misiniz? Kişisel kodla giriş" yazısına dokunun.`, 403);
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
