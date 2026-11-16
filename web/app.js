@@ -120,12 +120,14 @@
   }
 
   let bekleyenSayisi = 0;
+  let varsSure = null; // yeni işlerin yapılma süresi (yönetici ve yönetim kurulu görür)
   async function yenile() {
     if (!onayli()) return;
     try {
       const r = await api("liste");
       kayitlar = r.kayitlar || [];
       ykUyeler = r.ykUyeler || [];
+      if (r.varsayilan_sure) varsSure = r.varsayilan_sure;
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
@@ -383,7 +385,7 @@
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
       </form>` : ""}
-      ${yonetici() && k.durum !== "tamam" && !bekliyor ? `
+      ${kayitOnaylar() && k.durum !== "tamam" && !bekliyor ? `
       <div class="islem">
         <h2>Cevap yaz</h2>
         <p class="cevap-cumle">Bu iş <b id="cevap-gun">…</b> gün içinde yapılacaktır.</p>
@@ -399,6 +401,10 @@
           ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}" class="${sureGun(k) === g ? "secili" : ""}">${g} gün</button>`).join("")}
         </div>
         <small class="ipucu">Kaydın açıldığı günden itibaren sayılır. Süre dolunca iş listede yanıp söner.</small>
+        <div class="uye">
+          <div><b>Yeni işlerin süresi: ${varsSure ?? "—"} gün</b><br><small>Her yeni kayda kendiliğinden verilir.</small></div>
+          <div class="uye-dugmeler"><button type="button" class="kucuk-dugme" id="vars-sure">Değiştir</button></div>
+        </div>
       </div>` : ""}
       ${yonetici() ? `
       <div class="islem">
@@ -438,6 +444,17 @@
         listeCiz(); detayGoster(k.id);
         mesaj(`Yapılma süresi ${b.dataset.gun} gün olarak ayarlandı.`);
       } catch (err) { mesaj(err.message); b.disabled = false; }
+    });
+    $("#vars-sure")?.addEventListener("click", async (e) => {
+      const gun = prompt("Yeni işler kaç günde yapılsın? (1 ile 60 arası)", varsSure ?? "");
+      if (!gun) return;
+      e.target.disabled = true;
+      try {
+        await api("varsayilan_sure", { gun: Number(gun) });
+        varsSure = Number(gun);
+        detayGoster(k.id);
+        mesaj(`Yeni işlerin süresi ${gun} gün olarak ayarlandı.`);
+      } catch (err) { mesaj(err.message); e.target.disabled = false; }
     });
     $("#kayit-onayla")?.addEventListener("click", async (e) => {
       e.target.disabled = true; e.target.textContent = "Onaylanıyor…";

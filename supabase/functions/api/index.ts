@@ -255,6 +255,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   // Deneme telefonları (cihaz "test-…") kimseye bildirim göndermez
   const duyur: typeof bildir = (...a) => (u.cihaz.startsWith("test-") ? Promise.resolve({ hedef: 0, basarili: 0 }) : bildir(...a));
   const yonetici = () => { if (rol !== "baskan") throw new Hata("Bu işlemi yalnızca yönetici (YK başkanı) yapabilir.", 403); };
+  // Cevap yazma ve yapılma süresi: yönetici ve yönetim kurulu
+  const ykVeYonetici = () => { if (rol !== "baskan" && rol !== "yonetim") throw new Hata("Bu işlemi yalnızca yönetici ve yönetim kurulu yapabilir.", 403); };
 
   // Onay bekleyen telefon yalnızca durumunu sorabilir ve bildirime kaydolabilir
   if (u.durum !== "onayli" && !["durum", "abone_ol", "izin_bildir"].includes(eylem)) {
@@ -294,7 +296,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           ykUyeler = (yk ?? []).map((x: any) => x.ad);
         }
       }
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler };
+      const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure };
     }
 
     case "yukleme_adresi": {
@@ -350,7 +353,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "sure_degistir": {
-      yonetici();
+      ykVeYonetici();
       const gun = Number(g.gun);
       if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
       const { data: k } = await db.from("kayitlar").select("id, created_at, durum").eq("id", g.id).maybeSingle();
@@ -373,8 +376,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "cevap_ver": {
-      // Yönetici işi kapatmadan "Bu iş N gün içinde yapılacaktır." der; son gün bugünden sayılır
-      yonetici();
+      // Yönetici ya da yönetim kurulu işi kapatmadan "Bu iş N gün içinde yapılacaktır." der; son gün bugünden sayılır
+      ykVeYonetici();
       const gun = Number(g.gun);
       if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
       const yanitMetni = `Bu iş ${gun} gün içinde yapılacaktır.`;
@@ -417,7 +420,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "varsayilan_sure": {
-      yonetici();
+      ykVeYonetici();
       const gun = Number(g.gun);
       if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
       const { error } = await db.from("ayarlar").upsert({ ad: "varsayilan_sure", deger: String(gun) });
