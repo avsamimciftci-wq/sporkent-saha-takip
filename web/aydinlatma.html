@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Aydınlatma Metni – Sporkent SAHA TAKİP</title>
+  <meta name="theme-color" content="#1f4e45">
+  <link rel="icon" href="icons/logo-192.png">
+  <style>
+    :root { --yesil: #1f4e45; --zemin: #f4f6f4; --kart: #fff; --yazi: #1b2421; --soluk: #5d6b66; --cizgi: #d7e0dc; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --zemin: #121a18; --kart: #1b2522; --yazi: #e6ece9; --soluk: #a3b1ac; --cizgi: #2f3d39; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--zemin); color: var(--yazi); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    header { background: var(--yesil); color: #fff; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
+    header b { display: block; font-size: 20px; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .kart { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 14px; padding: 18px 18px 8px; }
+    h1 { font-size: 22px; margin: 0 0 6px; line-height: 1.3; }
+    h2 { font-size: 18px; margin: 22px 0 6px; }
+    p, li { margin: 0 0 8px; }
+    ul { padding-left: 22px; margin: 0 0 8px; }
+    .soluk { color: var(--soluk); font-size: 15px; }
+    .geri { display: inline-block; margin: 0 0 14px; padding: 10px 18px; border-radius: 10px; background: #f5a623; color: #1b2421; font-weight: 700; font-size: 18px; border: 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header><b>Sporkent İşletme Kooperatifi</b>SAHA TAKİP</header>
+  <main>
+    <button class="geri" onclick="history.length > 1 ? history.back() : location.replace('./')">← Geri</button>
+    <div class="kart">
+      <h1>Kişisel Verilerin Korunması Hakkında Aydınlatma Metni</h1>
+      <p class="soluk">6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) madde 10 uyarınca</p>
+
+      <h2>1. Veri sorumlusu</h2>
+      <p>Sporkent İşletme Kooperatifi (“Kooperatif”). İletişim: <a href="mailto:kooperatif@sporkentsitesi.com">kooperatif@sporkentsitesi.com</a></p>
+
+      <h2>2. İşlenen kişisel veriler</h2>
+      <ul>
+        <li><b>Kimlik ve ortaklık bilgisi:</b> adınız soyadınız, ortaklık numaranız, unvanınız (TG / YK üyeliği gibi)</li>
+        <li><b>İletişim bilgisi:</b> cep telefonu numaranız</li>
+        <li><b>Uygulama kullanım bilgisi:</b> telefonunuza özel cihaz kimliği, son kullanım zamanı, bildirim izni ve bildirim adresi</li>
+        <li><b>Bildirdiğiniz işler:</b> yazdığınız iş ve sorun kayıtları, eklediğiniz fotoğraflar</li>
+      </ul>
+
+      <h2>3. İşleme amaçları</h2>
+      <ul>
+        <li>Uygulamaya katılan kişinin kooperatif ortağı olduğunun doğrulanması</li>
+        <li>Uygulamaya erişimin sağlanması ve yönetilmesi</li>
+        <li>Site ve tesislerdeki işlerin bildirilmesi, takibi ve sonuçlandırılması</li>
+        <li>Kooperatif içi iletişim ve uygulama bildirimlerinin gönderilmesi</li>
+      </ul>
+
+      <h2>4. Hukuki sebepler</h2>
+      <p>Kişisel verileriniz, KVKK md. 5/2-c (ortaklık ilişkisinin kurulması ve ifasıyla doğrudan ilgili olması) ve md. 5/2-f (temel hak ve özgürlüklerinize zarar vermemek kaydıyla Kooperatifin meşru menfaati: tesislerin işletilmesi ve bakımı) hukuki sebeplerine dayanılarak işlenir.</p>
+
+      <h2>5. Toplama yöntemi</h2>
+      <p>Veriler, uygulamadaki kayıt ve iş bildirim ekranlarına sizin yazdığınız bilgilerden elektronik ortamda toplanır. Kayıt sırasında yazdığınız ortak numarası ve telefon, Kooperatifin ortak kayıtlarıyla karşılaştırılır. Bu karşılaştırma için ortak listesi sunucuda okunamayan, şifreli özetler biçiminde tutulur.</p>
+
+      <h2>6. Aktarım</h2>
+      <ul>
+        <li>Veriler, uygulamanın veritabanı ve sunucu hizmetini sağlayan <b>Supabase Inc.</b>'in <b>Almanya (Frankfurt, Avrupa Birliği)</b>'deki sunucularında saklanır. Bu, KVKK md. 9 kapsamında yurt dışına aktarımdır.</li>
+        <li>Uygulama bildirimleri, telefonunuzun bildirim hizmeti (Google veya Apple) üzerinden iletilir. Bu hizmetlere yalnızca bildirim metni gider.</li>
+        <li>Verileriniz Kooperatif yönetimi dışında üçüncü kişilerle paylaşılmaz; satılmaz, reklam amacıyla kullanılmaz.</li>
+      </ul>
+
+      <h2>7. Saklama süresi</h2>
+      <ul>
+        <li>Üyeliğiniz sürdükçe saklanır.</li>
+        <li>Uygulamadan çıkarılan kişinin bilgileri <b>90 gün</b>, onaylanmayan başvurular <b>30 gün</b> sonra kendiliğinden silinir.</li>
+        <li>İş kayıtları, Kooperatifin işletme kayıtları olarak tutulur.</li>
+      </ul>
+
+      <h2>8. Haklarınız (KVKK md. 11)</h2>
+      <p>Kooperatife başvurarak; kişisel verilerinizin işlenip işlenmediğini öğrenme, işlenmişse bilgi talep etme, işlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme, yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri bilme, eksik veya yanlış işlenmişse düzeltilmesini, KVKK md. 7 şartları çerçevesinde silinmesini veya yok edilmesini isteme, bu işlemlerin aktarıldığı üçüncü kişilere bildirilmesini isteme, münhasıran otomatik sistemlerle analiz edilmesi sonucu aleyhinize bir sonuç çıkmasına itiraz etme ve kanuna aykırı işleme nedeniyle zarara uğramanız hâlinde zararın giderilmesini talep etme haklarına sahipsiniz.</p>
+      <p>Başvurularınızı <a href="mailto:kooperatif@sporkentsitesi.com">kooperatif@sporkentsitesi.com</a> adresine ya da Kooperatif yönetimine yazılı olarak iletebilirsiniz. Başvurular en geç 30 gün içinde ücretsiz olarak sonuçlandırılır.</p>
+    </div>
+    <p class="soluk" style="margin-top:12px">Son güncelleme: Kasım 2026</p>
+  </main>
+</body>
+</html>

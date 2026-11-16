@@ -236,6 +236,28 @@ async function giris(g: any) {
 }
 
 const adNorm = (s: string) => String(s ?? "").toLocaleUpperCase("tr").replace(/\s+/g, " ").trim();
+const telNorm = (t: string) => String(t ?? "").replace(/\D/g, "").slice(-10);
+
+// KVKK: resmi ortak listesinde ad ve telefonlar okunabilir değil, gizli anahtarlı özet (HMAC-SHA256)
+// olarak durur. Karşılaştırma için başvurudaki bilgi de aynı anahtarla özetlenir (yedekleme/rehber_yukle.py ile aynı).
+const REHBER_ANAHTARI = Deno.env.get("REHBER_ANAHTARI") ?? "";
+let rehberAnahtar: CryptoKey | null = null;
+async function rehberOzeti(metin: string) {
+  if (!REHBER_ANAHTARI) throw new Error("REHBER_ANAHTARI tanımlı değil");
+  rehberAnahtar ??= await crypto.subtle.importKey("raw", new TextEncoder().encode(REHBER_ANAHTARI), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const imza = await crypto.subtle.sign("HMAC", rehberAnahtar, new TextEncoder().encode(metin));
+  return [...new Uint8Array(imza)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+// Başvurunun listeyle karşılaştırılması: telefon listedekilerden biri mi, ad listedekiyle aynı mı
+async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
+  if (!r) return { listede: false, uyuyor: false, ad_uyuyor: false };
+  const tel = telNorm(telefon);
+  return {
+    listede: true,
+    uyuyor: tel.length >= 7 && r.tel_ozetleri.includes(await rehberOzeti(tel)),
+    ad_uyuyor: r.ad_ozet === await rehberOzeti(adNorm(ad)),
+  };
+}
 
 // Ortak kaydı: kod yok. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
 async function ortakKayit(g: any) {
@@ -258,9 +280,11 @@ async function ortakKayit(g: any) {
   // Kişisel kodu olan (TG/YK) kişi düz ortak olarak kayıt olamaz: kendi koduyla girmeli.
   // Yazdığı ad ya da ortak listesinde bu numaradaki ad, kişisel kod listesindeki bir adla eşleşirse engellenir.
   const { data: kodlular } = await db.from("tg_uyeleri").select("ad, unvan");
-  const { data: listede } = await db.from("ortak_rehberi").select("ad").eq("no", no).maybeSingle();
-  const adlar = new Set([adNorm(ad), listede ? adNorm(listede.ad) : ""]);
-  const kodlu = (kodlular ?? []).find((t: any) => adlar.has(adNorm(t.ad)));
+  const { data: listede } = await db.from("ortak_rehberi").select("ad_ozet, tel_ozetleri").eq("no", no).maybeSingle();
+  let kodlu: any = (kodlular ?? []).find((t: any) => adNorm(t.ad) === adNorm(ad));
+  if (!kodlu && listede) {
+    for (const t of kodlular ?? []) if (await rehberOzeti(adNorm(t.ad)) === listede.ad_ozet) { kodlu = t; break; }
+  }
   if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Alttaki "Görevli misiniz? Kişisel kodla giriş" yazısına dokunun.`, 403);
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
@@ -277,8 +301,7 @@ async function ortakKayit(g: any) {
   if (error) throw error;
   await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
   if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
-    const { data: r } = await db.from("ortak_rehberi").select("telefonlar").eq("no", no).maybeSingle();
-    const uyuyor = !!r?.telefonlar?.some((t: string) => t.replace(/\D/g, "").slice(-10) === telefon.replace(/\D/g, "").slice(-10));
+    const { uyuyor } = await listeyleKarsilastir(listede, ad, telefon);
     await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Bilgileri örtüşmüyor!"}`, { sayfa: "uyeler" });
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
@@ -633,26 +656,22 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
       // Ortak başvurusunu resmi ortak listesiyle karşılaştır: aynı ortak no + listedeki telefonlardan biri
       const nolar = [...new Set((data ?? []).map((x: any) => x.ortak_no).filter(Boolean))];
-      const { data: rehber } = nolar.length ? await db.from("ortak_rehberi").select("no, ad, telefonlar").in("no", nolar) : { data: [] };
+      const { data: rehber } = nolar.length ? await db.from("ortak_rehberi").select("no, ad_ozet, tel_ozetleri").in("no", nolar) : { data: [] };
       const rh = new Map((rehber ?? []).map((r: any) => [r.no, r]));
-      const son10 = (t: string) => String(t ?? "").replace(/\D/g, "").slice(-10);
-      const eslesme = (x: any) => {
-        if (!x.ortak_no) return undefined;
-        const r: any = rh.get(x.ortak_no);
-        if (!r) return { uyuyor: false, liste_ad: null };
-        return { uyuyor: r.telefonlar.some((t: string) => son10(t) === son10(x.telefon)), liste_ad: r.ad };
-      };
-      return { uyeler: (data ?? []).map((x: any) => ({ ...x, eslesme: eslesme(x), bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz })) };
+      const liste = await Promise.all((data ?? []).map(async (x: any) => ({
+        ...x,
+        eslesme: x.ortak_no ? await listeyleKarsilastir(rh.get(x.ortak_no), x.ad, x.telefon) : undefined,
+        bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz,
+      })));
+      return { uyeler: liste };
     }
 
     case "rehber_ara": {
-      // Yönetici davet göndermek için resmi ortak listesinde numara ya da adla arar
+      // Yönetici davet göndermek için ortak numarasıyla arar (listede ad ve telefon okunabilir değil)
       yonetici();
-      const q = temiz(g.q, 60);
-      if (!q) return { sonuc: [] };
-      let sorgu = db.from("ortak_rehberi").select("no, ad, telefonlar").order("no").limit(20);
-      sorgu = /^\d+$/.test(q) ? sorgu.eq("no", Number(q)) : sorgu.ilike("ad", `%${q.replace(/[%_\\]/g, "").toLocaleUpperCase("tr")}%`);
-      const { data, error } = await sorgu;
+      const q = temiz(g.q, 10);
+      if (!/^\d+$/.test(q)) return { sonuc: [] };
+      const { data, error } = await db.from("ortak_rehberi").select("no").eq("no", Number(q));
       if (error) throw error;
       const nolar = (data ?? []).map((r: any) => r.no);
       const { data: kayitli } = nolar.length
@@ -675,7 +694,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi). Yeni üye için önce birini çıkarın.`);
       }
       const { data, error } = await db.from("uyeler")
-        .update({ durum, onay_at: durum === "onayli" ? new Date().toISOString() : null })
+        .update({ durum, onay_at: durum === "onayli" ? new Date().toISOString() : null, cikarilma_at: durum === "cikarildi" ? new Date().toISOString() : null })
         .eq("cihaz", hedef).select("ad, ortak_no").maybeSingle();
       if (error) throw error;
       if (!data) throw new Hata("Üye bulunamadı.");
@@ -800,7 +819,22 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 // Her sabah zamanlayıcı (pg_cron) çağırır: süresi geçen işleri yönetime bildirir.
 const CRON_ANAHTARI = Deno.env.get("CRON_ANAHTARI") ?? "";
 
+// KVKK saklama süresi: çıkarılan üye 90 gün, onaylanmadan bekleyen başvuru 30 gün sonra kendiliğinden silinir
+const CIKARILAN_SAKLAMA_GUN = 90, BASVURU_SAKLAMA_GUN = 30;
+async function eskiUyeleriSil() {
+  const once = (gun: number) => new Date(Date.now() - gun * 864e5).toISOString();
+  const { data: a } = await db.from("uyeler").select("cihaz").eq("durum", "cikarildi").lt("cikarilma_at", once(CIKARILAN_SAKLAMA_GUN));
+  const { data: b } = await db.from("uyeler").select("cihaz").eq("durum", "bekliyor").lt("created_at", once(BASVURU_SAKLAMA_GUN));
+  const cihazlar = [...(a ?? []), ...(b ?? [])].map((x: any) => x.cihaz);
+  if (cihazlar.length) {
+    await db.from("abonelikler").delete().in("cihaz", cihazlar);
+    await db.from("uyeler").delete().in("cihaz", cihazlar).neq("rol", "baskan");
+  }
+  return cihazlar.length;
+}
+
 async function gunlukGecikme() {
+  await eskiUyeleriSil().catch(() => {});
   const bugun = sonGun(new Date(), 0);
   const { data, error } = await db.from("kayitlar").select("id, no, yer, son_tarih")
     .neq("durum", "tamam").eq("onay_durumu", "onayli").lt("son_tarih", bugun).order("son_tarih");

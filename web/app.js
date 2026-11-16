@@ -830,8 +830,8 @@
     function eslesmeKutusu(u) {
       const e = u.eslesme;
       if (!e) return "";
-      if (e.uyuyor) return `<div class="eslesme eslesme-uyuyor">✔ Ortağın bilgileri örtüşüyor<small>Listede ${kac(u.ortak_no)} No: ${kac(e.liste_ad)}</small></div>`;
-      const neden = e.liste_ad ? `Listede ${kac(u.ortak_no)} No: ${kac(e.liste_ad)} · telefon listedekiyle aynı değil` : `${kac(u.ortak_no)} numaralı ortak listede yok`;
+      if (e.uyuyor) return `<div class="eslesme eslesme-uyuyor">✔ Ortağın bilgileri örtüşüyor<small>${kac(u.ortak_no)} numaralı ortağın listedeki telefonu${e.ad_uyuyor ? " ve adı" : ""} ile aynı${e.ad_uyuyor ? "" : " (ad listedekinden farklı yazılmış)"}</small></div>`;
+      const neden = e.listede ? `Telefon listedekiyle aynı değil${e.ad_uyuyor ? " (ad tutuyor)" : ", ad da tutmuyor"}` : `${kac(u.ortak_no)} numaralı ortak listede yok`;
       return `<div class="eslesme eslesme-uymuyor">✖ Ortağın bilgileri örtüşmüyor<small>${neden}</small></div>`;
     }
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
@@ -840,8 +840,8 @@
       <h1>Üyeler ve ayarlar</h1>
 
       <h2>📨 Ortağa davet gönder</h2>
-      <p class="ipucu">Ortak numarasını ya da adını yazın. Çıkan kişiye uygulama bağlantısını WhatsApp ya da SMS ile gönderin.</p>
-      <input id="davet-ara" class="davet-ara" type="search" inputmode="search" placeholder="Örn. 12 ya da Yılmaz" autocomplete="off">
+      <p class="ipucu">Ortak numarasını yazın. Davet metni o numaraya göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
+      <input id="davet-ara" class="davet-ara" type="search" inputmode="numeric" placeholder="Ortak numarası, örn. 12" autocomplete="off">
       <div id="davet-sonuc"></div>
 
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
@@ -913,12 +913,7 @@
 
   // ---------- Ortağa davet (yönetici) ----------
   const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-takip";
-  const basHarf = (ad) => ad.toLocaleLowerCase("tr").replace(/(^|\s)(\S)/g, (_, b, h) => b + h.toLocaleUpperCase("tr"));
-  // Listede telefonlar uluslararası biçimde (90532…, 49…); 10 haneliyse Türkiye kabul edilir
-  const uluslararasi = (t) => { const d = String(t).replace(/\D/g, ""); return d.length === 10 ? "90" + d : d; };
-  const telGoster = (t) => { const d = uluslararasi(t); return d.startsWith("90") && d.length === 12 ? `0${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8, 10)} ${d.slice(10)}` : "+" + d; };
-  const cepMi = (t) => { const d = uluslararasi(t); return !d.startsWith("90") || d[2] === "5"; };
-  const davetMetni = (r) => `Sayın ${basHarf(r.ad)},
+  const davetMetni = (r) => `Sayın Ortağımız,
 
 Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
 
@@ -926,7 +921,7 @@ ${UYGULAMA_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}) ve bu cep telefonu numaranızı yazıp "Kayıt ol"a basın.
+3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}) ve kooperatifte kayıtlı cep telefonu numaranızı yazıp "Kayıt ol"a basın.
 
 Bilgileriniz onaylandığında uygulama kendiliğinden açılır. Şifre gerekmez.
 
@@ -948,15 +943,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           const durum = r.durum === "onayli" ? `<span class="davet-durum katildi">✔ Uygulamada</span>`
             : r.durum === "bekliyor" ? `<span class="davet-durum bekliyor">⏳ Onay bekliyor</span>` : "";
           const metin = encodeURIComponent(davetMetni(r));
-          const teller = r.telefonlar.filter(cepMi);
           return `<div class="davet-kisi">
-            <div><b>${kac(r.no)} · ${kac(basHarf(r.ad))}</b> ${durum}</div>
-            ${teller.length ? teller.map((t) => `<div class="davet-tel"><span>📞 ${kac(telGoster(t))}</span>
-              <a class="davet-dugme wa" href="https://wa.me/${uluslararasi(t)}?text=${metin}" target="_blank" rel="noopener">WhatsApp</a>
-              <a class="davet-dugme sms" href="sms:+${uluslararasi(t)}?&body=${metin}">SMS</a></div>`).join("")
-              : `<p class="ipucu">Listede cep telefonu yok.</p>`}
+            <div><b>${kac(r.no)} numaralı ortak</b> ${durum}</div>
+            <div class="davet-tel">
+              <a class="davet-dugme wa" href="https://wa.me/?text=${metin}" target="_blank" rel="noopener">WhatsApp ile gönder</a>
+              <a class="davet-dugme sms" href="sms:?&body=${metin}">SMS ile gönder</a></div>
           </div>`;
-        }).join("") : `<p class="ipucu">Listede bulunamadı.</p>`;
+        }).join("") : `<p class="ipucu">Bu numara ortak listesinde yok.</p>`;
       } catch (err) { kutu.innerHTML = `<p class="hata">${kac(err.message)}</p>`; }
     }, 350);
   });
