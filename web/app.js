@@ -704,7 +704,7 @@
     const hata = $("#kayit-hata"); hata.hidden = true;
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
-      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")) });
+      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")), davet_kodu: String(f.get("davet_kodu")) });
       oturum = { ad: r.ad, rol: r.rol, unvan: r.unvan, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
       sakla.koy("sk_oturum", oturum);
       await basla();
@@ -830,6 +830,11 @@
     function eslesmeKutusu(u) {
       const e = u.eslesme;
       if (!e) return "";
+      return listeKutusu(u, e) + (u.davetli_at
+        ? `<div class="eslesme eslesme-uyuyor">✔ Davet kodu doğru<small>Size gönderdiğiniz kodla kayıt oldu</small></div>`
+        : `<div class="eslesme eslesme-uymuyor">✖ Davet koduyla kayıt olmadı<small>Davet kodu sisteminden önceki başvuru</small></div>`);
+    }
+    function listeKutusu(u, e) {
       if (e.uyuyor) return `<div class="eslesme eslesme-uyuyor">✔ Ortağın bilgileri örtüşüyor<small>${kac(u.ortak_no)} numaralı ortağın listedeki telefonu${e.ad_uyuyor ? " ve adı" : ""} ile aynı${e.ad_uyuyor ? "" : " (ad listedekinden farklı yazılmış)"}</small></div>`;
       const neden = e.listede ? `Telefon listedekiyle aynı değil${e.ad_uyuyor ? " (ad tutuyor)" : ", ad da tutmuyor"}` : `${kac(u.ortak_no)} numaralı ortak listede yok`;
       return `<div class="eslesme eslesme-uymuyor">✖ Ortağın bilgileri örtüşmüyor<small>${neden}</small></div>`;
@@ -921,11 +926,30 @@ ${UYGULAMA_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}) ve kooperatifte kayıtlı cep telefonu numaranızı yazıp "Kayıt ol"a basın.
+3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
+
+Davet kodunuz: ${r.kod.slice(0, 3)} ${r.kod.slice(3)}
+(Bu kod yalnızca size özeldir, ${r.gun} gün geçerlidir. Kimseyle paylaşmayın.)
 
 Bilgileriniz onaylandığında uygulama kendiliğinden açılır. Şifre gerekmez.
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
+
+  // Davet kodu: her basışta yeni kod üretilir, öncekiler geçersiz olur
+  $("#yonetim").addEventListener("click", async (e) => {
+    const b = e.target.closest(".davet-hazirla"); if (!b) return;
+    const kutu = b.closest(".davet-kisi"); const no = Number(kutu.dataset.no);
+    b.disabled = true;
+    try {
+      const { kod, gun } = await api("davet_kodu", { ortak_no: no });
+      const metin = encodeURIComponent(davetMetni({ no, kod, gun }));
+      b.textContent = "🔑 Yeni kod hazırla (öncekini geçersiz kılar)";
+      kutu.querySelector(".davet-gonder").innerHTML = `<p class="davet-kod">Davet kodu: <b>${kod.slice(0, 3)} ${kod.slice(3)}</b></p>
+        <div class="davet-tel">
+          <a class="davet-dugme wa" href="https://wa.me/?text=${metin}" target="_blank" rel="noopener">WhatsApp ile gönder</a>
+          <a class="davet-dugme sms" href="sms:?&body=${metin}">SMS ile gönder</a></div>`;
+    } catch (err) { mesaj(err.message); } finally { b.disabled = false; }
+  });
 
   let davetZamani = null;
   $("#yonetim").addEventListener("input", (e) => {
@@ -942,12 +966,11 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         kutu.innerHTML = sonuc.length ? sonuc.map((r) => {
           const durum = r.durum === "onayli" ? `<span class="davet-durum katildi">✔ Uygulamada</span>`
             : r.durum === "bekliyor" ? `<span class="davet-durum bekliyor">⏳ Onay bekliyor</span>` : "";
-          const metin = encodeURIComponent(davetMetni(r));
-          return `<div class="davet-kisi">
+          return `<div class="davet-kisi" data-no="${kac(r.no)}">
             <div><b>${kac(r.no)} numaralı ortak</b> ${durum}</div>
-            <div class="davet-tel">
-              <a class="davet-dugme wa" href="https://wa.me/?text=${metin}" target="_blank" rel="noopener">WhatsApp ile gönder</a>
-              <a class="davet-dugme sms" href="sms:?&body=${metin}">SMS ile gönder</a></div>
+            <p class="ipucu">Davet kodu hazırlanınca mesajı bu ortağın <b>kooperatifte kayıtlı telefonuna</b> gönderin.</p>
+            <button type="button" class="ikincil davet-hazirla" style="width:100%">🔑 Davet kodu hazırla</button>
+            <div class="davet-gonder"></div>
           </div>`;
         }).join("") : `<p class="ipucu">Bu numara ortak listesinde yok.</p>`;
       } catch (err) { kutu.innerHTML = `<p class="hata">${kac(err.message)}</p>`; }

@@ -259,7 +259,40 @@ async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
   };
 }
 
-// Ortak kaydı: kod yok. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
+// ---------- Davet kodu ----------
+const DAVET_GUN = 14, DAVET_DENEME = 5;
+const davetOzeti = (no: number, kod: string) => rehberOzeti(`davet:${no}:${kod}`);
+async function davetKoduUret(no: number, olusturan: string) {
+  const sayi = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
+  const kod = String(sayi).padStart(6, "0");
+  // Aynı ortağa önceden verilmiş, kullanılmamış kodlar geçersiz olur: geçerli olan yalnızca son kod
+  await db.from("davet_kodlari").update({ son_tarih: new Date().toISOString() }).eq("ortak_no", no).is("kullanildi_at", null);
+  const { error } = await db.from("davet_kodlari").insert({
+    ortak_no: no, kod_ozet: await davetOzeti(no, kod), olusturan,
+    son_tarih: new Date(Date.now() + DAVET_GUN * 864e5).toISOString(),
+  });
+  if (error) throw error;
+  return kod;
+}
+// Kodu doğrular; doğruysa kaydın kimliğini döndürür (kayıt başarılı olunca "kullanıldı" işaretlenir)
+async function davetKoduDogrula(no: number, kod: string) {
+  if (!kod) throw new Hata("Size gönderilen davet mesajındaki 6 haneli kodu yazın.");
+  const { data: d } = await db.from("davet_kodlari").select("id, kod_ozet, deneme")
+    .eq("ortak_no", no).is("kullanildi_at", null).gt("son_tarih", new Date().toISOString())
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!d || d.deneme >= DAVET_DENEME) {
+    throw new Hata("Bu ortak numarası için geçerli bir davet kodu yok. Kooperatif yönetiminden davet isteyin.", 403);
+  }
+  if (!/^\d{6}$/.test(kod) || d.kod_ozet !== await davetOzeti(no, kod)) {
+    await db.from("davet_kodlari").update({ deneme: d.deneme + 1 }).eq("id", d.id);
+    const kalan = DAVET_DENEME - d.deneme - 1;
+    throw new Hata(kalan > 0 ? `Davet kodu hatalı. Size gönderilen mesajdaki 6 haneli kodu yazın (${kalan} deneme hakkınız kaldı).`
+      : "Davet kodu çok kez hatalı yazıldı ve geçersiz oldu. Kooperatif yönetiminden yeni davet isteyin.", 403);
+  }
+  return d.id as number;
+}
+
+// Ortak kaydı: şifre yok; yöneticinin gönderdiği davet koduyla. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
 async function ortakKayit(g: any) {
   const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
   const no = Number(temiz(g.ortak_no, 6));
@@ -291,17 +324,25 @@ async function ortakKayit(g: any) {
   // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
   // Aynı telefon aynı bilgilerle yeniden kayıt olursa durumu korunur; bilgi değişirse yeniden onay bekler
   const ayni = var_ && var_.durum !== "cikarildi" && var_.rol === "uye" && var_.ortak_no === no && var_.ad === ad && var_.telefon === telefon;
+  const davetId = ayni && var_.davetli_at ? null : await davetKoduDogrula(no, temiz(g.davet_kodu, 12).replace(/\D/g, ""));
   const durum = ayni ? var_.durum : "bekliyor";
   const anahtar = var_?.anahtar ?? anahtarUret();
   const unvan = `${no} No'lu Ortak`;
   const { error } = await db.from("uyeler").upsert({
     cihaz, anahtar, ad, rol: "uye", durum, unvan, ortak_no: no, telefon,
     onay_at: durum === "onayli" ? var_.onay_at : null, son_gorulme: new Date().toISOString(),
+    davetli_at: davetId ? new Date().toISOString() : var_?.davetli_at ?? null,
   });
   if (error) throw error;
+  if (davetId) await db.from("davet_kodlari").update({ kullanildi_at: new Date().toISOString(), kullanan_cihaz: cihaz }).eq("id", davetId);
   await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
   if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
     const { uyuyor } = await listeyleKarsilastir(listede, ad, telefon);
+    const { data: mevcutlar } = await db.from("uyeler").select("cihaz").eq("ortak_no", no).eq("durum", "onayli").neq("cihaz", cihaz);
+    for (const m of mevcutlar ?? []) {
+      await bildir({ cihaz: m.cihaz }, "⚠ Numaranızla yeni başvuru",
+        `${no} numaralı ortaklığınız adına başka bir telefondan uygulamaya katılma başvurusu yapıldı. Siz yapmadıysanız hemen kooperatif yönetimine bildirin.`);
+    }
     await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Bilgileri örtüşmüyor!"}`, { sayfa: "uyeler" });
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
@@ -650,7 +691,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "uye_listesi": {
       yonetici();
       const { data, error } = await db.from("uyeler")
-        .select("cihaz, ad, rol, unvan, durum, ortak_no, telefon, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
+        .select("cihaz, ad, rol, unvan, durum, ortak_no, telefon, davetli_at, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
       if (error) throw error;
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
@@ -679,6 +720,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         : { data: [] };
       const durum = new Map((kayitli ?? []).map((k: any) => [k.ortak_no, k.durum]));
       return { sonuc: (data ?? []).map((r: any) => ({ ...r, durum: durum.get(r.no) ?? null })) };
+    }
+
+    case "davet_kodu": {
+      yonetici();
+      const no = Number(temiz(g.ortak_no, 6));
+      const { data: r } = await db.from("ortak_rehberi").select("no").eq("no", no).maybeSingle();
+      if (!r) throw new Hata("Bu numara ortak listesinde yok.");
+      return { kod: await davetKoduUret(no, u.ad), gun: DAVET_GUN };
     }
 
     case "uye_onayla":
