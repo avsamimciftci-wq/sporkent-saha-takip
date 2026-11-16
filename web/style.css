@@ -120,7 +120,24 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 
 .hata { color: var(--acil); font-weight: 600; margin: 12px 0 0; }
 .ipucu { display: block; color: var(--soluk); font-weight: 400; font-size: 13px; margin-top: 6px; }
-.ana-ekran-ipucu { background: #fff4d6; border: 2px solid #e0a800; border-radius: 10px; padding: 12px 14px; font-size: 17px; line-height: 1.45; margin: 0 0 16px; color: #3b2a00; }
+/* Ana ekrana ekleme ve ortak kaydı */
+.kurulum { text-align: center; }
+.kurulum-simge img { border-radius: 18px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+.kurulum-metin { font-size: 20px; line-height: 1.45; background: #fff4d6; border: 2px solid #e0a800; border-radius: 12px; padding: 14px; color: #3b2a00; }
+.kur-dugme { font-size: 22px; padding: 18px; margin-top: 6px; }
+.kur-adim { text-align: left; font-size: 18px; line-height: 1.5; margin-top: 16px; background: #eef6f2; border-radius: 12px; padding: 14px 16px; }
+.kur-adim ol { padding-left: 22px; margin: 6px 0; }
+.kur-adim li { margin-bottom: 10px; }
+.kur-not { margin: 6px 0; font-size: 16px; }
+.paylas-simge { display: inline-block; border: 2px solid #1a73e8; color: #1a73e8; border-radius: 6px; padding: 0 6px; font-weight: 700; }
+.asagi-ok { text-align: center; font-size: 46px; color: #1a73e8; animation: zipla 1s infinite; }
+@keyframes zipla { 50% { transform: translateY(10px); } }
+.chrome-ac { display: block; text-align: center; padding: 12px; border-radius: 10px; text-decoration: none; font-weight: 700; margin: 6px 0; }
+.kurulum-alt { font-size: 15px; margin-top: 14px; }
+.kayit-ust { font-size: 15px; margin-top: 0; }
+.kvkk { font-size: 15px; color: var(--soluk); background: #f3f5f4; border-radius: 8px; padding: 8px 10px; margin: 4px 0 12px; }
+.metin-dugme { background: none; border: none; color: var(--yesil); font-size: 16px; font-weight: 600; padding: 14px 0 4px; width: 100%; text-decoration: underline; cursor: pointer; }
+.ayni-no { color: var(--acil); font-weight: 600; }
 
 .foto-bos { aspect-ratio: 1; border-radius: 10px; background: var(--yesil-acik); display: grid; place-items: center; color: var(--soluk); font-size: 14px; text-align: center; padding: 8px; }
 /* Yapılanlar (kırmızı) / Yapılmayanlar (yeşil): sayılı süzme düğmeleri; seçili olan dolu renkte */

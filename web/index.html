@@ -25,18 +25,47 @@
 
   <!-- Giriş -->
   <main id="ekran-giris" class="ekran" hidden>
-    <form id="giris-form" class="kart">
-      <h1>Giriş</h1>
-      <p id="ana-ekran-ipucu" class="ana-ekran-ipucu" hidden>📲 <b>Önce ana ekrana ekleyin</b>, sonra ana ekrandaki <b>Sporkent</b> simgesinden açıp giriş yapın. Böylece yalnızca bir kez giriş yaparsınız.</p>
-      <label>Kullanıcı adı
-        <input name="ad" autocomplete="username" required maxlength="80" placeholder="Örn. Ortak 12">
-        <small class="ipucu">Ortaklar size verilen adı yazar (örn. <b>Ortak 12</b>). TG üyeleri ve görevliler kendi adını yazar.</small>
+    <!-- Telefonun tarayıcısında açılınca: önce ana ekrana ekletir -->
+    <section id="kurulum" class="kart kurulum" hidden>
+      <div class="kurulum-simge"><img src="icons/logo-192.png" alt="" width="84" height="84"></div>
+      <h1>Ana ekrana ekleyin</h1>
+      <p class="kurulum-metin">Bu otomasyonu kullanmak için telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></p>
+      <button id="kur-dugme" class="ana-dugme kur-dugme" type="button">📲 Ana Ekrana Ekle</button>
+      <div id="kur-adim" class="kur-adim" hidden></div>
+      <p class="ipucu kurulum-alt">Ekledikten sonra bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun. Kaydınızı oradan yaparsınız.</p>
+    </section>
+
+    <form id="kayit-form" class="kart" hidden>
+      <h1>Ortak kaydı</h1>
+      <p class="ipucu kayit-ust">Bilgilerinizi yazın. Yönetici onayladığında uygulama açılır. Şifre gerekmez.</p>
+      <label>Adınız ve soyadınız
+        <input name="ad_soyad" autocomplete="name" required maxlength="80" placeholder="Örn. Ayşe Yılmaz">
       </label>
-      <label>Şifre / kişisel kod
+      <label>Ortaklık numaranız
+        <input name="ortak_no" required inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Örn. 12">
+      </label>
+      <label>Cep telefonunuz
+        <input name="telefon" type="tel" autocomplete="tel" required maxlength="20" placeholder="0532 123 45 67">
+      </label>
+      <p class="kvkk">🔒 Bilgileriniz yalnızca kooperatif içi iletişim için kullanılır.</p>
+      <button class="ana-dugme" type="submit">Kayıt ol</button>
+      <p id="kayit-hata" class="hata" hidden></p>
+      <button id="kodla-gir" class="metin-dugme" type="button">Görevli misiniz? Kişisel kodla giriş →</button>
+      <a class="rehber-bag" href="rehber.html">📖 Nasıl kullanılır? Adım adım anlatım</a>
+    </form>
+
+    <form id="giris-form" class="kart" hidden>
+      <h1>Görevli girişi</h1>
+      <label>Adınız
+        <input name="ad" autocomplete="username" required maxlength="80">
+        <small class="ipucu">TG ve YK üyeleri, müdür, şef ve muhasebe size verilen kişisel kodla girer.</small>
+      </label>
+      <label>Kişisel kod / şifre
         <input name="kod" required autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text">
       </label>
       <button class="ana-dugme" type="submit">Giriş yap</button>
       <p id="giris-hata" class="hata" hidden></p>
+      <button id="kayda-don" class="metin-dugme" type="button">← Ortak kaydına dön</button>
       <a class="rehber-bag" href="rehber.html">📖 Nasıl kullanılır? Adım adım anlatım</a>
       <div class="pdf-bag">📄 Kılavuzu PDF olarak aç: <a href="kilavuz-android.pdf" target="_blank">Android</a> · <a href="kilavuz-iphone.pdf" target="_blank">iPhone</a></div>
     </form>

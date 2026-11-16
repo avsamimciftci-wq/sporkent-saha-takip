@@ -184,6 +184,8 @@
     const bant = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt="">SAHA TAKİP</div>`;
     const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
     const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Kullanıcı adı<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Şifre<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
+    const kurulum = `${bant}<div class="e-kart" style="text-align:center"><b style="font-size:15px">Ana ekrana ekleyin</b><div style="background:#fff4d6;border:1px solid #e0a800;border-radius:8px;padding:6px;margin:8px 0">Bu otomasyonu kullanmak için telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></div><div class="e-dugme">📲 Ana Ekrana Ekle</div></div>`;
+    const kayit = (ad, no, tel, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Ortak kaydı</b><br><br>Adınız ve soyadınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Ortaklık numaranız<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${no}</div>Cep telefonunuz<div class="e-alan ${yaz === 3 ? "yaziyor" : ""}">${tel}</div><div style="font-size:11px;color:#5d6b66">🔒 Bilgileriniz yalnızca kooperatif içi iletişim için kullanılır.</div><div class="e-dugme">Kayıt ol</div></div>`;
     const liste = (ek = "") => `${bant}
       <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Henüz yapılmayanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>1</b><br>Yapılanlar</div></div>
       <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-acik">Açık</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
@@ -200,20 +202,20 @@
           ] },
       ],
       android_yukle: [
-        { baslik: "Ana ekrana ekleyin", aciklama: "Sağ üstteki <b>üç noktaya (⋮)</b> dokunun. Açılan listede <b>“Ana ekrana ekle”</b> yazısına dokunun. Sonra <b>“Ekle”</b> ya da <b>“Yükle”</b> deyin.",
-          not: "Bu işi yalnızca bir kez yaparsınız. Sonra uygulamayı her zaman ana ekrandaki Sporkent simgesinden açarsınız.",
+        { baslik: "Ana ekrana ekleyin", aciklama: "Açılan sayfada yeşil <b>“📲 Ana Ekrana Ekle”</b> düğmesine dokunun. Telefon sorunca <b>“Yükle”</b> ya da <b>“Ekle”</b> deyin.",
+          not: "Bu işi yalnızca bir kez yaparsınız. Pencere açılmazsa sağ üstteki üç noktaya (⋮) dokunup “Ana ekrana ekle”yi seçin.",
           kareler: [
-            { ekran: `${tarayiciAndroid}${giris("", "")}`, parmak: [90, 7] },
-            { ekran: `${tarayiciAndroid}${giris("", "")}<div class="e-menu"><div>Yeni sekme</div><div>Yer işaretleri</div><div>Paylaş…</div><div class="vurgu">📲 Ana ekrana ekle</div><div>Ayarlar</div></div>`, parmak: [75, 35] },
-            { ekran: `${tarayiciAndroid}${giris("", "")}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>Sporkent İşletme Kooperatifi SAHA TAKİP</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 60] },
+            { ekran: `${tarayiciAndroid}${kurulum}`, parmak: [50, 52] },
+            { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>Sporkent İşletme Kooperatifi SAHA TAKİP</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 60] },
           ] },
       ],
       iphone_yukle: [
-        { baslik: "Ana ekrana ekleyin", aciklama: "Bağlantıyı <b>Safari</b>'de açın. Alttaki <b>paylaş düğmesine (kare içinde yukarı ok ⬆︎)</b> dokunun. Listeyi biraz kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.",
+        { baslik: "Ana ekrana ekleyin", aciklama: "Bağlantıyı <b>Safari</b>'de açın. <b>“📲 Ana Ekrana Ekle”</b> düğmesine dokunun; ekranda adımlar çıkar. Alttaki <b>paylaş düğmesine (kare içinde yukarı ok ⬆︎)</b> dokunun. Listeyi biraz kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.",
           not: "iPhone'da bildirimler yalnızca uygulamayı ana ekrana ekleyip oradan açarsanız gelir. Bu adımı atlamayın.",
           kareler: [
-            { ekran: `<div class="durum-cubugu"></div>${giris("", "")}<div class="e-safari"><span>‹</span><span>›</span><span>⬆︎</span><span>📖</span><span>⧉</span></div>`, parmak: [50, 94] },
-            { ekran: `<div class="durum-cubugu"></div>${giris("", "")}<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`, parmak: [45, 82] },
+            { ekran: `<div class="durum-cubugu"></div>${kurulum}`, parmak: [50, 46] },
+            { ekran: `<div class="durum-cubugu"></div>${kurulum}<div class="e-safari"><span>‹</span><span>›</span><span>⬆︎</span><span>📖</span><span>⧉</span></div>`, parmak: [50, 94] },
+            { ekran: `<div class="durum-cubugu"></div>${kurulum}<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`, parmak: [45, 82] },
             { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/logo-192.png) center/cover;border:1px solid #ddd"></span><div>Sporkent İşletme Kooperatifi SAHA TAKİP</div></div>`, parmak: [88, 9] },
           ] },
       ],
@@ -222,16 +224,16 @@
           kareler: [
             { ekran: `<div class="e-ana"><div><div class="ikon" style="background:#4caf50">📞</div>Telefon</div><div><div class="ikon" style="background:#25d366">💬</div>WhatsApp</div><div><div class="ikon" style="background:#fff">🌐</div>Chrome</div><div><div class="ikon sk"></div>Sporkent İşletme Kooperatifi SAHA TAKİP</div></div>`, parmak: [86, 13] },
           ] },
-        { baslik: "Kullanıcı adınızı ve şifrenizi yazın", aciklama: "Size verilen <b>kullanıcı adını</b> yazın (örn. <b>Ortak 12</b>). Altına <b>şifrenizi</b> yazın. Sonra <b>“Giriş yap”</b> düğmesine dokunun.",
-          not: "Kullanıcı adınızı ve şifrenizi yönetim size ayrıca verir. Şifrenizi başkasıyla paylaşmayın. Görevliler kendi adını ve görev kodunu yazar.",
+        { baslik: "Bilgilerinizi yazın", aciklama: "<b>Adınızı ve soyadınızı</b>, <b>ortaklık numaranızı</b> ve <b>cep telefonunuzu</b> yazın. Sonra <b>“Kayıt ol”</b> düğmesine dokunun. Şifre gerekmez.",
+          not: "Görevliler (TG, YK, müdür, şef, muhasebe) alttaki “Görevli misiniz? Kişisel kodla giriş” yazısına dokunup kendi kodlarıyla girer.",
           kareler: [
-            { ekran: giris("Ortak 1", "", 1), parmak: [50, 31] },
-            { ekran: giris("Ortak 12", "•••", 2), parmak: [50, 44] },
-            { ekran: giris("Ortak 12", "••••••"), parmak: [50, 54] },
+            { ekran: kayit("Ayşe Yılmaz", "", "", 1), parmak: [50, 30] },
+            { ekran: kayit("Ayşe Yılmaz", "12", "", 2), parmak: [50, 42] },
+            { ekran: kayit("Ayşe Yılmaz", "12", "0532 123 45 67"), parmak: [50, 66] },
           ] },
         { baslik: "Onay bekleyin", aciklama: "İlk girişte <b>“Onay bekleniyor”</b> yazar. Yönetim Kurulu Başkanı sizi onaylayınca ekran <b>kendiliğinden açılır</b>. Bir şey yapmanıza gerek yok.",
           kareler: [
-            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ortak 12 · TG Üyesi<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
+            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ayşe Yılmaz · 12 No'lu Ortak<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
             { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#fff url(icons/logo-192.png) center/cover"></div><div><b>Gruba kabul edildiniz</b><br>Kullanmaya başlayabilirsiniz.</div></div>`, parmak: [50, 120] },
           ] },
         { baslik: "Bildirimleri açın", aciklama: "Listenin üstündeki <b>“Bildirimleri aç”</b> düğmesine dokunun. Telefon sorunca <b>“İzin ver”</b> deyin. Böylece yapılan işlerin haberi telefonunuza gelir.",

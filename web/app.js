@@ -593,7 +593,7 @@
   // ---------- Giriş / onay bekleme / çıkış ----------
   function cikisYap() {
     oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen");
-    kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); goster("giris");
+    kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); girisEkrani(); goster("giris");
   }
 
   // Kodu girdikten sonra yönetici onaylayana kadar bu ekran görünür; onaylanınca kendiliğinden açılır.
@@ -601,7 +601,7 @@
   function bekleEkrani() {
     goster("bekle");
     $("#bekle-ad").textContent = oturum.ad;
-    $("#bekle-rol").textContent = ROL_ADI[oturum.rol] || "";
+    $("#bekle-rol").textContent = oturum.unvan || ROL_ADI[oturum.rol] || "";
     bildirimKutusu();
     clearInterval(bekleZamani);
     bekleZamani = setInterval(durumKontrol, 10000);
@@ -620,6 +620,79 @@
       }
     } catch {}
   }
+
+  // ---------- Giriş ekranı: ana ekrana ekleme, ortak kaydı, görevli girişi ----------
+  const ua = navigator.userAgent;
+  const iosCihaz = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const androidCihaz = /android/i.test(ua);
+  const anaEkranda = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  // WhatsApp, Instagram, Facebook gibi uygulamaların içindeki tarayıcı ana ekrana ekleyemez
+  const uygulamaIci = /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)|GSA\//i.test(ua);
+  let kurulumIstegi = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); kurulumIstegi = e; });
+  window.addEventListener("appinstalled", () => kurAdim(`✅ <b>Eklendi.</b> Şimdi bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun.`));
+
+  function girisEkrani(kodla = false) {
+    const kurulmali = (iosCihaz || androidCihaz) && !anaEkranda();
+    $("#kurulum").hidden = !kurulmali;
+    $("#kayit-form").hidden = kurulmali || kodla;
+    $("#giris-form").hidden = kurulmali || !kodla;
+  }
+  $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
+  $("#kayda-don").addEventListener("click", () => girisEkrani(false));
+
+  function kurAdim(html) { const k = $("#kur-adim"); k.innerHTML = html; k.hidden = false; }
+
+  $("#kur-dugme").addEventListener("click", async () => {
+    const adres = location.href.split("#")[0];
+    if (kurulumIstegi) {
+      kurulumIstegi.prompt();
+      const { outcome } = await kurulumIstegi.userChoice;
+      kurulumIstegi = null;
+      if (outcome === "accepted") kurAdim(`✅ <b>Ekleniyor…</b> Birkaç saniye sonra bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun.`);
+      else kurAdim(`Eklemediniz. Uygulamayı kullanmak için <b>📲 Ana Ekrana Ekle</b> tuşuna tekrar basıp <b>Yükle</b>'yi seçin.`);
+      return;
+    }
+    if (iosCihaz && uygulamaIci) {
+      return kurAdim(`<ol>
+        <li>Bu sayfa başka bir uygulamanın içinde açıldı. Önce <b>Safari'de açın</b>: sağ alttaki <b>pusula 🧭</b> ya da <b>⋯</b> simgesine dokunup <b>“Safari'de Aç”</b>ı seçin.</li>
+        <li>Safari'de açılınca bu tuşa yeniden basın.</li></ol>`);
+    }
+    if (iosCihaz) {
+      return kurAdim(`<p class="kur-not">iPhone'da ekleme işini telefonun kendi menüsü yapar. 3 adım:</p>
+        <ol>
+          <li>Ekranın altındaki <b>Paylaş</b> simgesine dokunun <span class="paylas-simge">⬆︎</span><br><small>(kare ve yukarı ok; görünmüyorsa sayfayı biraz aşağı kaydırın ya da <b>⋯</b> simgesine dokunun)</small></li>
+          <li>Açılan listede aşağı kaydırıp <b>“Ana Ekrana Ekle”</b>yi seçin.</li>
+          <li>Sağ üstteki <b>“Ekle”</b>ye dokunun.</li>
+        </ol>
+        <div class="asagi-ok">⬇︎</div>`);
+    }
+    // Android: Chrome ekleme penceresini açmadıysa (başka tarayıcı, uygulama içi ya da zaten ekli)
+    const chrome = `intent://${adres.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+    kurAdim(`<ol>
+      <li>Sağ üstteki <b>⋮</b> (üç nokta) menüsüne dokunun.</li>
+      <li><b>“Ana ekrana ekle”</b> ya da <b>“Uygulamayı yükle”</b>yi seçin, sonra <b>Ekle / Yükle</b>'ye dokunun.</li>
+    </ol>
+    <p class="kur-not">Menüde bu seçenek yoksa sayfayı Chrome'da açın:</p>
+    <a class="ikincil chrome-ac" href="${chrome}">Chrome'da aç</a>
+    <p class="kur-not">Daha önce eklediyseniz ana ekrandaki <b>Sporkent</b> simgesinden açın.</p>`);
+  });
+
+  $("#kayit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const hata = $("#kayit-hata"); hata.hidden = true;
+    const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
+    try {
+      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")) });
+      oturum = { ad: r.ad, rol: r.rol, unvan: r.unvan, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
+      sakla.koy("sk_oturum", oturum);
+      await basla();
+      if (r.durum === "onayli") mesaj("Hoş geldiniz.");
+    } catch (err) {
+      oturum = null; hata.textContent = err.message; hata.hidden = false;
+    } finally { d.disabled = false; }
+  });
 
   async function girisYap(ad, kod) {
     const r = await api("giris", { ad, kod });
@@ -648,12 +721,7 @@
         else yenile();
       });
     }
-    if (!oturum) {
-      // Telefonun tarayıcısındaysa (ana ekran uygulaması değilse): önce ana ekrana eklemesini söyle
-      const uygulamada = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-      $("#ana-ekran-ipucu").hidden = uygulamada || !/android|iphone|ipad|ipod/i.test(navigator.userAgent);
-      return goster("giris");
-    }
+    if (!oturum) { girisEkrani(); return goster("giris"); }
     // Eski sürümden kalan oturum (kodla çalışıyordu): bir kez kodla katılım isteği gönder
     if (!oturum.anahtar) {
       if (!oturum.kod) return cikisYap();
@@ -716,9 +784,11 @@
     return `<br><small class="bildirim-kapali">🔕 Bildirim kapalı · ${neden}</small>`;
   }
 
-  function uyeSatiri(u, dugmeler) {
+  function uyeSatiri(u, dugmeler, uyari = "") {
+    const tel = u.telefon ? ` · <a href="tel:${kac(u.telefon.replace(/\s/g, ""))}">📞 ${kac(u.telefon)}</a>` : "";
     return `<div class="uye">
-      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(u.unvan || ROL_ADI[u.rol] || u.rol)} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
+      <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(u.unvan || ROL_ADI[u.rol] || u.rol)}${tel} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
+        ${uyari}
         ${u.durum === "onayli" ? bildirimDurumu(u) : ""}</div>
       <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
     </div>`;
@@ -730,13 +800,18 @@
       .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
     const cikan = uyeler.filter((u) => u.durum === "cikarildi");
     bekleyenSayisi = bekleyen.length;
+    // Aynı ortaklık numarasıyla gruptaki biri varsa onaylamadan önce uyar
+    const ayniNo = (u) => {
+      const k = u.ortak_no && uyeler.find((x) => x.cihaz !== u.cihaz && x.ortak_no === u.ortak_no && x.durum !== "cikarildi");
+      return k ? `<br><small class="ayni-no">⚠ Bu numara zaten kayıtlı: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski kayıt silinir.</small>` : "";
+    };
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     $("#yonetim").innerHTML = `
       <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
-      ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"))).join("")
+      ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"), ayniNo(u))).join("")
         : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
 
       <h2>Gruptakiler (${gruptakiler.length} / ${MAKS_UYE})</h2>

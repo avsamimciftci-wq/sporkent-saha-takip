@@ -232,6 +232,39 @@ async function giris(g: any) {
   return { rol, durum, anahtar, ad, unvan: tg?.unvan ?? null, vapid: VAPID_PUBLIC || null };
 }
 
+// Ortak kaydı: kod yok. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
+async function ortakKayit(g: any) {
+  const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
+  const no = Number(temiz(g.ortak_no, 6));
+  let tel = temiz(g.telefon, 30).replace(/\D/g, "");
+  if (tel.startsWith("90") && tel.length === 12) tel = tel.slice(2);
+  if (tel.startsWith("0")) tel = tel.slice(1);
+  const cihaz = temiz(g.cihaz, 80);
+  if (ad.split(" ").length < 2) throw new Hata("Adınızı ve soyadınızı birlikte yazın.");
+  if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata("Ortaklık numaranızı doğru yazın.");
+  if (!/^5\d{9}$/.test(tel)) throw new Hata("Cep telefonu numaranızı doğru yazın (örn. 0532 123 45 67).");
+  if (!cihaz) throw new Hata("Cihaz bilgisi gerekli.");
+  const telefon = `0${tel.slice(0, 3)} ${tel.slice(3, 6)} ${tel.slice(6, 8)} ${tel.slice(8)}`;
+
+  const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
+  if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
+  // Aynı telefon aynı bilgilerle yeniden kayıt olursa durumu korunur; bilgi değişirse yeniden onay bekler
+  const ayni = var_ && var_.rol === "uye" && var_.ortak_no === no && var_.ad === ad && var_.telefon === telefon;
+  const durum = ayni ? var_.durum : "bekliyor";
+  const anahtar = var_?.anahtar ?? anahtarUret();
+  const unvan = `${no} No'lu Ortak`;
+  const { error } = await db.from("uyeler").upsert({
+    cihaz, anahtar, ad, rol: "uye", durum, unvan, ortak_no: no, telefon,
+    onay_at: durum === "onayli" ? var_.onay_at : null, son_gorulme: new Date().toISOString(),
+  });
+  if (error) throw error;
+  await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
+  if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
+    await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor.`, { sayfa: "uyeler" });
+  }
+  return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
+}
+
 // Telefonu gizli anahtarıyla tanı
 async function kimlik(g: any) {
   const cihaz = temiz(g.cihaz, 80);
@@ -575,7 +608,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "uye_listesi": {
       yonetici();
       const { data, error } = await db.from("uyeler")
-        .select("cihaz, ad, rol, unvan, durum, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
+        .select("cihaz, ad, rol, unvan, durum, ortak_no, telefon, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
       if (error) throw error;
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
@@ -596,9 +629,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       }
       const { data, error } = await db.from("uyeler")
         .update({ durum, onay_at: durum === "onayli" ? new Date().toISOString() : null })
-        .eq("cihaz", hedef).select("ad").maybeSingle();
+        .eq("cihaz", hedef).select("ad, ortak_no").maybeSingle();
       if (error) throw error;
       if (!data) throw new Hata("Üye bulunamadı.");
+      // Bir ortaklık numarasında tek kişi: onaylanan kayıt aynı numaralı eski kayıtların yerine geçer
+      if (durum === "onayli" && data.ortak_no) {
+        const { data: eskiler } = await db.from("uyeler").select("cihaz").eq("ortak_no", data.ortak_no).neq("cihaz", hedef);
+        const ec = (eskiler ?? []).map((e: any) => e.cihaz).filter((c: string) => c !== u.cihaz);
+        if (ec.length) {
+          await db.from("abonelikler").delete().in("cihaz", ec);
+          await db.from("uyeler").delete().in("cihaz", ec);
+        }
+      }
       if (durum === "cikarildi") {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
       } else {
@@ -737,6 +779,7 @@ Deno.serve(async (req) => {
       return yanit(await gorevHatirlat());
     }
     if (g.eylem === "giris") return yanit(await giris(g));
+    if (g.eylem === "ortak_kayit") return yanit(await ortakKayit(g));
     const u = await kimlik(g);
     return yanit(await islem(String(g.eylem), u, g));
   } catch (e: any) {
