@@ -944,13 +944,26 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     b.disabled = true;
     try {
       const { kod, gun } = await api("davet_kodu", { ortak_no: no });
-      const metin = encodeURIComponent(davetMetni({ no, kod, gun }));
+      const duz = davetMetni({ no, kod, gun });
+      const metin = encodeURIComponent(duz);
       b.textContent = "🔑 Yeni kod hazırla (öncekini geçersiz kılar)";
-      kutu.querySelector(".davet-gonder").innerHTML = `<p class="davet-kod">Davet kodu: <b>${kod.slice(0, 3)} ${kod.slice(3)}</b></p>
+      kutu.querySelector(".davet-gonder").innerHTML = `<div class="davet-hazir">
+          <div class="davet-satir"><span>Link</span><b>${kac(UYGULAMA_ADRESI.replace(/^https:\/\//, ""))}</b></div>
+          <div class="davet-satir"><span>Davet kodu</span><b class="davet-kod-sayi">${kod.slice(0, 3)} ${kod.slice(3)}</b></div>
+          <small>Link ve kod aşağıdaki mesajın içinde birlikte gider.</small>
+        </div>
+        <details class="davet-onizle"><summary>Gidecek mesajı göster</summary><pre>${kac(duz)}</pre></details>
+        <button type="button" class="ikincil davet-kopyala" style="width:100%;margin-top:8px">📋 Mesajı kopyala</button>
         <div class="davet-tel">
           <a class="davet-dugme wa" href="https://wa.me/?text=${metin}" target="_blank" rel="noopener">WhatsApp ile gönder</a>
           <a class="davet-dugme sms" href="sms:?&body=${metin}">SMS ile gönder</a></div>`;
     } catch (err) { mesaj(err.message); } finally { b.disabled = false; }
+  });
+  $("#yonetim").addEventListener("click", async (e) => {
+    const b = e.target.closest(".davet-kopyala"); if (!b) return;
+    const metin = b.closest(".davet-kisi").querySelector(".davet-onizle pre").textContent;
+    try { await navigator.clipboard.writeText(metin); mesaj("Mesaj kopyalandı. WhatsApp'ta sohbete yapıştırabilirsiniz."); }
+    catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
   });
 
   let davetZamani = null;
