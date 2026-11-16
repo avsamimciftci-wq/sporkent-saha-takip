@@ -544,3 +544,12 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .davet-bolum .davet-kisi { background: #fff; color: #1b2421; border: 0; }
 .davet-bolum .davet-kisi .ipucu { color: #5d6b66; }
 .davet-bolum > #davet-sonuc > .ipucu, .davet-bolum > #davet-sonuc > .hata { color: #fff; }
+.davet-hazir { background: #eef5ff; border: 2px solid #1a73e8; border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+.davet-satir { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #cfe0fa; }
+.davet-satir span { color: #4a5753; font-size: 15px; }
+.davet-satir b { font-size: 18px; color: #0b4fa8; word-break: break-all; text-align: right; }
+.davet-satir b.davet-kod-sayi { font-size: 26px; letter-spacing: 2px; }
+.davet-hazir small { display: block; color: #4a5753; margin-top: 6px; }
+.davet-onizle { margin-top: 8px; color: #1b2421; }
+.davet-onizle summary { cursor: pointer; font-weight: 600; color: #0b4fa8; }
+.davet-onizle pre { white-space: pre-wrap; font: 14px/1.45 system-ui, sans-serif; background: #f4f6f4; border-radius: 8px; padding: 10px; margin: 6px 0 0; }
