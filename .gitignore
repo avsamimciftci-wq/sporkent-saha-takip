@@ -1,3 +1,6 @@
 *.env
 .gizli.env
 supabase/.temp/
+
+# Ortak kullanıcı adı ve şifre listesi (gizli)
+Ortak_Sifreleri*.csv

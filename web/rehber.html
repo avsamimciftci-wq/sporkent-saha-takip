@@ -180,7 +180,7 @@
     const BAGLANTI = "avsamimciftci-wq.github.io/sporkent-saha-takip";
     const bant = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt="">SAHA TAKİP</div>`;
     const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
-    const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Adınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Giriş kodu<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
+    const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Kullanıcı adı<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Şifre<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
     const liste = (ek = "") => `${bant}
       <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Henüz yapılmayanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>1</b><br>Yapılanlar</div></div>
       <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-acik">Açık</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
@@ -219,16 +219,16 @@
           kareler: [
             { ekran: `<div class="e-ana"><div><div class="ikon" style="background:#4caf50">📞</div>Telefon</div><div><div class="ikon" style="background:#25d366">💬</div>WhatsApp</div><div><div class="ikon" style="background:#fff">🌐</div>Chrome</div><div><div class="ikon sk"></div>Sporkent İşletme Kooperatifi SAHA TAKİP</div></div>`, parmak: [86, 13] },
           ] },
-        { baslik: "Adınızı ve kodu yazın", aciklama: "<b>Adınızı soyadınızla</b> yazın. Size verilen <b>giriş kodunu</b> yazın. Sonra <b>“Giriş yap”</b> düğmesine dokunun.",
-          not: "Giriş kodunu yönetim size ayrıca verir. Kodu başkasıyla paylaşmayın.",
+        { baslik: "Kullanıcı adınızı ve şifrenizi yazın", aciklama: "Size verilen <b>kullanıcı adını</b> yazın (örn. <b>Ortak 12</b>). Altına <b>şifrenizi</b> yazın. Sonra <b>“Giriş yap”</b> düğmesine dokunun.",
+          not: "Kullanıcı adınızı ve şifrenizi yönetim size ayrıca verir. Şifrenizi başkasıyla paylaşmayın. Görevliler kendi adını ve görev kodunu yazar.",
           kareler: [
-            { ekran: giris("Ahmet Yıl", "", 1), parmak: [50, 31] },
-            { ekran: giris("Ahmet Yılmaz", "••••••", 2), parmak: [50, 44] },
-            { ekran: giris("Ahmet Yılmaz", "••••••••••••"), parmak: [50, 54] },
+            { ekran: giris("Ortak 1", "", 1), parmak: [50, 31] },
+            { ekran: giris("Ortak 12", "•••", 2), parmak: [50, 44] },
+            { ekran: giris("Ortak 12", "••••••"), parmak: [50, 54] },
           ] },
         { baslik: "Onay bekleyin", aciklama: "İlk girişte <b>“Onay bekleniyor”</b> yazar. Yönetim Kurulu Başkanı sizi onaylayınca ekran <b>kendiliğinden açılır</b>. Bir şey yapmanıza gerek yok.",
           kareler: [
-            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ahmet Yılmaz · Grup üyesi<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
+            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ortak 12 · TG Üyesi<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
             { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#fff url(icons/logo-192.png) center/cover"></div><div><b>Gruba kabul edildiniz</b><br>Kullanmaya başlayabilirsiniz.</div></div>`, parmak: [50, 120] },
           ] },
         { baslik: "Bildirimleri açın", aciklama: "Listenin üstündeki <b>“Bildirimleri aç”</b> düğmesine dokunun. Telefon sorunca <b>“İzin ver”</b> deyin. Böylece yapılan işlerin haberi telefonunuza gelir.",
@@ -237,6 +237,7 @@
             { ekran: `${bant}${izin("Sporkent İşletme Kooperatifi SAHA TAKİP bildirim göndermek istiyor")}`, parmak: [80, 54] },
           ] },
         { baslik: "Sorun bildirin", aciklama: "Sağ alttaki <b>“+ Yeni kayıt”</b>a dokunun. <b>📷 Fotoğraf çek</b>in ya da soluk mavi <b>🖼️ Galeriden Fotoğraf Yükle</b> ile telefondaki bir fotoğrafı seçin. <b>Yeri</b> yazın (örn. 3 numaralı duş). <b>Sorunu</b> yazın; konuşarak yazmak için telefon klavyenizdeki <b>🎤 mikrofon</b> tuşunu kullanın. En son <b>“Gönder”</b>e dokunun.",
+          not: "TG üyelerinin yazdığı kayıt önce yönetimin onayına gider. Onaylanınca iş listesine düşer ve herkes görür.",
           kareler: [
             { ekran: liste(), parmak: [80, 93] },
             { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div class="e-dugme acik" style="margin:8px 0;padding:16px">📷 Fotoğraf çek</div><div class="e-dugme" style="margin:0 0 8px;background:#e3f2fd;color:#0d47a1;border:1px solid #90caf9">🖼️ Galeriden Fotoğraf Yükle</div>Yer<div class="e-alan"></div>Sorun<div class="e-alan" style="min-height:40px"></div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 26] },
