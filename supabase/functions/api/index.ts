@@ -39,7 +39,10 @@ const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOR
 const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
 // Bu dört görevin yazdığı kayıt doğrudan iş listesine düşer; diğerlerininki (TG üyesi, muhasebe)
 // önce yönetici / yönetim kurulu onayını bekler, onaylanınca herkes görür.
-const ONAYSIZ_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
+// Kaydı onay beklemeden iş listesine düşenler. TG üyeleri (rolü "uye", unvanı TG…) de onaysız girer;
+// yalnızca düz ortakların kaydı yönetici ya da YK onayı bekler.
+const ONAYSIZ_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef", "muhasebe"];
+const onaysizGirer = (u: any) => ONAYSIZ_GIREN.includes(u.rol) || (u.rol === "uye" && !u.ortak_no && /^TG/.test(u.unvan ?? ""));
 const KAYIT_ONAYLAYAN: Rol[] = ["baskan", "yonetim"];
 // Aidat resmini yönetici ve muhasebe ekler; iş programına bu dört görev girer
 const AIDAT_EKLEYEN: Rol[] = ["baskan", "muhasebe"];
@@ -385,7 +388,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         foto_once: temiz(g.foto, 200) || null,
         gizli: !!g.gizli && YONETIM_ISI_GIREN.includes(rol),
         son_tarih: sonGun(new Date(), await varsayilanSure()),
-        onay_durumu: ONAYSIZ_GIREN.includes(rol) ? "onayli" : "bekliyor",
+        onay_durumu: onaysizGirer(u) ? "onayli" : "bekliyor",
       };
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
