@@ -708,11 +708,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "rehber_ara": {
-      // Yönetici davet göndermek için ortak numarasıyla arar (listede ad ve telefon okunabilir değil)
+      // Yönetici davet için ortak numarasıyla ya da telefonla arar. Listede telefon okunabilir değil;
+      // yazılan telefonun özeti çıkarılıp listedeki özetlerle karşılaştırılır.
       yonetici();
-      const q = temiz(g.q, 10);
-      if (!/^\d+$/.test(q)) return { sonuc: [] };
-      const { data, error } = await db.from("ortak_rehberi").select("no").eq("no", Number(q));
+      const q = temiz(g.q, 20).replace(/\D/g, "");
+      if (!q) return { sonuc: [] };
+      const { data, error } = q.length >= 7
+        ? await db.from("ortak_rehberi").select("no").contains("tel_ozetleri", [await rehberOzeti(telNorm(q))]).order("no")
+        : await db.from("ortak_rehberi").select("no").eq("no", Number(q));
       if (error) throw error;
       const nolar = (data ?? []).map((r: any) => r.no);
       const { data: kayitli } = nolar.length
