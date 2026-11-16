@@ -633,7 +633,9 @@
   window.addEventListener("appinstalled", () => kurAdim(`✅ <b>Eklendi.</b> Şimdi bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun.`));
 
   // Telefonda ana ekrana eklenmemiş (tarayıcıda açılmış) uygulama kullanılamaz: ortak, görevli, yönetici herkes için
-  const kurulumGerekli = () => (iosCihaz || androidCihaz) && !anaEkranda();
+  // Bilgisayarda (telefon ya da tablet değil) hiç kullanılamaz
+  const masaustu = !(iosCihaz || androidCihaz);
+  const kurulumGerekli = () => masaustu || !anaEkranda();
 
   function girisEkrani(kodla = false) {
     const kurulmali = kurulumGerekli();
@@ -642,6 +644,12 @@
     $("#giris-form").hidden = kurulmali || !kodla;
     // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
     if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
+    if (kurulmali && masaustu) {
+      $("#kurulum").innerHTML = `<div class="kurulum-simge"><img src="icons/logo-192.png" alt="" width="84" height="84"></div>
+        <h1>Telefonunuzdan açın</h1>
+        <p class="kurulum-metin">Bu otomasyon <b>yalnızca telefondan</b> kullanılabilir. Bilgisayardan kullanılamaz.</p>
+        <p class="kur-adim">Aşağıdaki bağlantıyı telefonunuzda açın, sonra ana ekranınıza ekleyin:<br><b class="masaustu-link">tinyurl.com/sporkent-takip</b></p>`;
+    }
   }
 
   function iosAdimlari() {
