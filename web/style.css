@@ -553,3 +553,5 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .davet-onizle { margin-top: 8px; color: #1b2421; }
 .davet-onizle summary { cursor: pointer; font-weight: 600; color: #0b4fa8; }
 .davet-onizle pre { white-space: pre-wrap; font: 14px/1.45 system-ui, sans-serif; background: #f4f6f4; border-radius: 8px; padding: 10px; margin: 6px 0 0; }
+.tg-giris-dugme { width: 100%; background: #fff4d6; border: 2px solid #e0a800; color: #3b2a00; border-radius: 12px; padding: 12px 14px; font-size: 16px; line-height: 1.4; margin: 0 0 14px; cursor: pointer; text-align: center; }
+.tg-giris-dugme b { font-size: 18px; }

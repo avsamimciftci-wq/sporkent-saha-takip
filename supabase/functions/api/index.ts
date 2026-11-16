@@ -318,7 +318,7 @@ async function ortakKayit(g: any) {
   if (!kodlu && listede) {
     for (const t of kodlular ?? []) if (await rehberOzeti(adNorm(t.ad)) === listede.ad_ozet) { kodlu = t; break; }
   }
-  if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Alttaki "Görevli misiniz? Kişisel kodla giriş" yazısına dokunun.`, 403);
+  if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Ekranın en üstündeki "Şahsi kodunuzla buradan girin" düğmesine dokunun.`, 403);
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
