@@ -359,6 +359,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .iletisim-ikon.ara { background: #e3f4ea; }
 .iletisim-ikon.posta { background: #e3f2fd; }
 .iletisim-ikon.site { background: #fef0db; }
+.iletisim-ikon.insta { background: #fce4ec; }
 .iletisim-satir small { display: block; font-size: 16px; color: var(--soluk); font-weight: 700; }
 .iletisim-satir b { display: block; font-size: 22px; overflow-wrap: anywhere; color: var(--yesil); }
 .iletisim-satir em { display: block; font-style: normal; font-size: 14px; color: var(--soluk); }
