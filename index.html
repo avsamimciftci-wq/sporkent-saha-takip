@@ -36,6 +36,7 @@
     </section>
 
     <form id="kayit-form" class="kart" hidden>
+      <button id="kodla-gir-ust" class="tg-giris-dugme" type="button">👤 TG / YK üyesi ya da görevliyseniz<br><b>Şahsi kodunuzla buradan girin →</b></button>
       <h1>Ortak kaydı</h1>
       <p class="ipucu kayit-ust">Bilgilerinizi yazın. Yönetici onayladığında uygulama açılır. Şifre gerekmez.</p>
       <label>Adınız ve soyadınız
@@ -46,7 +47,7 @@
       </label>
       <label>Davet kodu
         <input name="davet_kodu" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6 haneli kod">
-        <small class="ipucu">Kooperatif yönetiminin size gönderdiği davet mesajındaki kod.</small>
+        <small class="ipucu">Kooperatif yönetiminin size gönderdiği davet mesajındaki 6 haneli kod. TG / YK şahsi kodu buraya yazılmaz; en üstteki düğmeyi kullanın.</small>
       </label>
       <label>Cep telefonunuz
         <input name="telefon" type="tel" autocomplete="tel" required maxlength="20" placeholder="0532 123 45 67">
@@ -60,7 +61,8 @@
     </form>
 
     <form id="giris-form" class="kart" hidden>
-      <h1>Görevli girişi</h1>
+      <h1>Şahsi kodla giriş</h1>
+      <p class="ipucu kayit-ust">TG ve YK üyeleri, müdür, şef ve muhasebe. Kodu harfleriyle birlikte yazın (örn. TG1234).</p>
       <label>Adınız
         <input name="ad" autocomplete="username" required maxlength="80">
         <small class="ipucu">TG ve YK üyeleri, müdür, şef ve muhasebe size verilen kişisel kodla girer.</small>

@@ -672,6 +672,7 @@
       <div class="ios-ok">↘</div>`;
   }
   $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
+  $("#kodla-gir-ust").addEventListener("click", () => { girisEkrani(true); window.scrollTo(0, 0); });
   $("#kayda-don").addEventListener("click", () => girisEkrani(false));
 
   function kurAdim(html) { const k = $("#kur-adim"); k.innerHTML = html; k.hidden = false; }
