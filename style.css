@@ -533,3 +533,6 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .masaustu-link { display: block; font-size: 24px; margin-top: 8px; text-align: center; user-select: all; -webkit-user-select: all; }
 .okudum-kutu { display: flex !important; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; margin: 0 0 14px; }
 .okudum-kutu input { width: 26px; height: 26px; flex: none; margin: 0; }
+.davet-kod { font-size: 18px; margin: 10px 0 0; text-align: center; }
+.davet-kod b { font-size: 26px; letter-spacing: 2px; }
+.davet-kisi .ipucu { margin: 6px 0 8px; }
