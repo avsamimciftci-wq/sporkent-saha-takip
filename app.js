@@ -275,6 +275,10 @@
     if (!$("#ekran-yksaha").hidden) ykSahaCiz();
     const ykAcik = kayitlar.filter((k) => k.gizli && k.durum !== "tamam").length;
     $("#yksaha-sayi").textContent = ykAcik ? `${ykAcik} iş yapılmadı` : "";
+    // Alt menüdeki Yönetim Kurulu düğmesinde yapılmayan iş emri sayısı
+    const rozet = $("#yk-rozet");
+    rozet.textContent = ykAcik > 99 ? "99+" : String(ykAcik);
+    rozet.hidden = !ykAcik;
   }
 
   // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
@@ -358,7 +362,7 @@
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
       <div class="fotolar">
         ${fotoKutu(k.foto_once_url, "Sorun", "Fotoğraf yok")}
-        ${fotoKutu(k.foto_sonra_url, "Yapıldı", "Henüz yapılmadı")}
+        ${fotoKutu(k.foto_sonra_url, "Yapıldı", k.durum === "tamam" ? "Fotoğraf eklenmedi" : "Henüz yapılmadı")}
       </div>
       <dl class="alanlar">
         <dt>Kayıt no</dt><dd>${kac(k.no)}</dd>
@@ -378,6 +382,7 @@
         <div class="foto-alan">
           <img id="sonra-onizleme" alt="" hidden>
           <label class="foto-dugme"><input id="sonra-foto" type="file" accept="image/*" capture="environment" hidden><span id="sonra-yazi">📷 Yapılan işin fotoğrafını çek</span></label>
+          <small class="ipucu">Fotoğraf isteğe bağlıdır; fotoğrafsız da "Yapıldı" girebilirsiniz.</small>
           <label class="foto-dugme galeri-dugme"><input id="sonra-galeri" type="file" accept="image/*" hidden><span>🖼️ Galeriden Fotoğraf Yükle</span></label>
         </div>
         <label>Not (isteğe bağlı)
@@ -495,11 +500,11 @@
     const foto = fotoSecici($("#sonra-foto"), $("#sonra-onizleme"), $("#sonra-yazi"), $("#sonra-galeri"));
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!foto.al()) return mesaj("Önce yapılan işin fotoğrafını çekin.");
       const d = form.querySelector("button[type=submit]");
       d.disabled = true; d.textContent = "Gönderiliyor…";
       try {
-        const yol = await fotoYukle(foto.al());
+        // Fotoğraf isteğe bağlı: bazı işlerin fotoğrafı olmaz
+        const yol = foto.al() ? await fotoYukle(foto.al()) : null;
         await api("kapat", { id: k.id, foto: yol, sonuc: new FormData(form).get("sonuc"), ad: oturum.ad });
         sakla.koy("sk_gorulen", [k.id + ":t", ...(sakla.al("sk_gorulen") || [])]);
         form.remove();
