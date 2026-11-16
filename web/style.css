@@ -120,6 +120,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--yesil); out
 
 .hata { color: var(--acil); font-weight: 600; margin: 12px 0 0; }
 .ipucu { display: block; color: var(--soluk); font-weight: 400; font-size: 13px; margin-top: 6px; }
+.ana-ekran-ipucu { background: #fff4d6; border: 2px solid #e0a800; border-radius: 10px; padding: 12px 14px; font-size: 17px; line-height: 1.45; margin: 0 0 16px; color: #3b2a00; }
 
 .foto-bos { aspect-ratio: 1; border-radius: 10px; background: var(--yesil-acik); display: grid; place-items: center; color: var(--soluk); font-size: 14px; text-align: center; padding: 8px; }
 /* Yapılanlar (kırmızı) / Yapılmayanlar (yeşil): sayılı süzme düğmeleri; seçili olan dolu renkte */

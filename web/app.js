@@ -648,7 +648,12 @@
         else yenile();
       });
     }
-    if (!oturum) return goster("giris");
+    if (!oturum) {
+      // Telefonun tarayıcısındaysa (ana ekran uygulaması değilse): önce ana ekrana eklemesini söyle
+      const uygulamada = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+      $("#ana-ekran-ipucu").hidden = uygulamada || !/android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      return goster("giris");
+    }
     // Eski sürümden kalan oturum (kodla çalışıyordu): bir kez kodla katılım isteği gönder
     if (!oturum.anahtar) {
       if (!oturum.kod) return cikisYap();

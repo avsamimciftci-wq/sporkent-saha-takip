@@ -197,12 +197,30 @@ async function giris(g: any) {
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
 
+  // Kişiye özel hesap (Ortak N ya da kişisel kod): aynı kişinin başka bir yerden (tarayıcı,
+  // ana ekran uygulaması, eski telefon) yaptığı eski girişler tek kayda indirilir.
+  // Önceden onaylanmışsa yeniden onay beklemez.
+  const kisisel = !!(m && rol === "uye" && ad.startsWith("Ortak ")) || !!tg;
+  let eskiOnayli: string | null = null;
+  if (kisisel) {
+    const { data: eskiler } = await db.from("uyeler").select("cihaz, durum, onay_at").eq("ad", ad).eq("rol", rol).neq("cihaz", cihaz);
+    if ((eskiler ?? []).some((e: any) => e.durum === "cikarildi")) {
+      throw new Hata("Bu hesabın erişimi yönetici tarafından kaldırıldı.", 403);
+    }
+    eskiOnayli = (eskiler ?? []).find((e: any) => e.durum === "onayli")?.onay_at ?? null;
+    const eskiCihazlar = (eskiler ?? []).map((e: any) => e.cihaz);
+    if (eskiCihazlar.length) {
+      await db.from("abonelikler").delete().in("cihaz", eskiCihazlar);
+      await db.from("uyeler").delete().in("cihaz", eskiCihazlar);
+    }
+  }
+
   // Başkan kodu kendiliğinden onaylıdır; diğerleri (ya da rolü değişen telefon) onay bekler.
-  const durum = rol === "baskan" || tg ? "onayli" : var_ && var_.rol === rol ? var_.durum : "bekliyor";
+  const durum = rol === "baskan" || tg || eskiOnayli ? "onayli" : var_ && var_.rol === rol ? var_.durum : "bekliyor";
   const anahtar = var_?.anahtar ?? anahtarUret();
   const { error } = await db.from("uyeler").upsert({
     cihaz, anahtar, ad, rol, durum, unvan: tg?.unvan ?? null,
-    onay_at: durum === "onayli" ? var_?.onay_at ?? new Date().toISOString() : null,
+    onay_at: durum === "onayli" ? var_?.onay_at ?? eskiOnayli ?? new Date().toISOString() : null,
     son_gorulme: new Date().toISOString(),
   });
   if (error) throw error;
