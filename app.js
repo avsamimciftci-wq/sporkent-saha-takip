@@ -43,8 +43,8 @@
     return j;
   }
 
-  async function fotoYukle(blob) {
-    const { yol, adres } = await api("yukleme_adresi");
+  async function fotoYukle(blob, tur) {
+    const { yol, adres } = await api("yukleme_adresi", tur ? { tur } : {});
     const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": "image/jpeg", "x-upsert": "false" }, body: blob });
     if (!r.ok) throw new Error("Fotoğraf yüklenemedi, tekrar deneyin.");
     return yol;
@@ -56,7 +56,11 @@
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const DURUM = { acik: "Henüz yapılmayan", devam: "Henüz yapılmayan", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "yapilmayan", devam: "yapilmayan", tamam: "tamam" };
-  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Grup üyesi" };
+  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi" };
+  // Yönetici ve yönetim kurulu, TG üyesi / muhasebe kayıtlarını onaylar; bu dört görevin kaydı onaysız düşer
+  const kayitOnaylar = () => ["baskan", "yonetim"].includes(oturum?.rol);
+  const onayBekliyor = (k) => k.onay_durumu === "bekliyor";
+  const programGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
@@ -73,17 +77,17 @@
   }
 
   // Fotoğrafı telefonda küçültür: uzun kenar en fazla 1280 px, JPEG.
-  async function kucult(dosya) {
+  async function kucult(dosya, enUzun = 1280) {
     const img = await new Promise((ok, hata) => {
       const i = new Image(); i.onload = () => ok(i); i.onerror = () => hata(new Error("Fotoğraf okunamadı."));
       i.src = URL.createObjectURL(dosya);
     });
-    const oran = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+    const oran = Math.min(1, enUzun / Math.max(img.naturalWidth, img.naturalHeight));
     const c = document.createElement("canvas");
     c.width = Math.round(img.naturalWidth * oran); c.height = Math.round(img.naturalHeight * oran);
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     URL.revokeObjectURL(img.src);
-    return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.72));
+    return new Promise((ok) => c.toBlob(ok, "image/jpeg", enUzun > 1280 ? 0.85 : 0.72));
   }
 
   // girdi: kamera girdisi; galeri: (isteğe bağlı) galeriden seçme girdisi
@@ -102,8 +106,15 @@
   }
 
   // ---------- Ekranlar ----------
+  // Ekran → modül (alt menüde hangisi seçili)
+  const MODUL = { aidat: "aidat", iletisim: "iletisim" };
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
+    const menulu = !["giris", "bekle"].includes(ad) && onayli();
+    $("#alt-menu").hidden = !menulu;
+    document.body.classList.toggle("menulu", menulu);
+    const modul = MODUL[ad] || "saha";
+    for (const b of document.querySelectorAll("#alt-menu [data-modul]")) b.classList.toggle("secili", b.dataset.modul === modul);
     window.scrollTo(0, 0);
   }
 
@@ -138,7 +149,7 @@
     if (!yeniler.length) return;
     sesCal();
     const en = yeniler.sort((a, b) => (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at))[0];
-    const baslik = en.durum === "tamam" ? `Yapıldı: ${en.yer}` : `Yeni sorun: ${en.yer}`;
+    const baslik = en.durum === "tamam" ? `Yapıldı: ${en.yer}` : onayBekliyor(en) ? `Onay bekleyen kayıt: ${en.yer}` : `Yeni sorun: ${en.yer}`;
     // Yeni kayıt formu doluyken yazılanı kaybettirme, sadece haber ver
     if (!$("#ekran-yeni").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden)) return mesaj(baslik);
     detayGoster(en.id);
@@ -181,12 +192,12 @@
   // ---------- Yapılma süresi ----------
   // son_tarih "YYYY-MM-DD"; o gün bitene kadar süre var, ertesi gün gecikmiş sayılır.
   const gunFarki = (t) => Math.round((Date.parse(t + "T00:00:00") - Date.parse(bugun() + "T00:00:00")) / 864e5);
-  const gecikti = (k) => k.durum !== "tamam" && k.son_tarih && gunFarki(k.son_tarih) < 0;
+  const gecikti = (k) => k.durum !== "tamam" && k.onay_durumu !== "bekliyor" && k.son_tarih && gunFarki(k.son_tarih) < 0;
   // Kaydın açıldığı gün (İstanbul) ile son gün arasındaki gün sayısı
   const acilisGunu = (k) => new Date(Date.parse(k.created_at) + 3 * 3600e3).toISOString().slice(0, 10);
   const sureGun = (k) => k.son_tarih ? Math.round((Date.parse(k.son_tarih) - Date.parse(acilisGunu(k))) / 864e5) : null;
   function sureYazisi(k) {
-    if (k.durum === "tamam" || !k.son_tarih) return "";
+    if (k.durum === "tamam" || !k.son_tarih || onayBekliyor(k)) return "";
     const f = gunFarki(k.son_tarih);
     if (f < 0) return `<span class="sure gecikmis">⚠ ${-f} gün gecikti</span>`;
     if (f === 0) return `<span class="sure son-gun">⏰ Bugün son gün</span>`;
@@ -218,8 +229,21 @@
   };
   const gorulduGonderilen = new Set();
 
+  // Yönetici / yönetim kurulu için onay bekleyenler iş listesinde değil, ayrı düğmede
+  const listede = (k) => !(kayitOnaylar() && onayBekliyor(k));
+
   function listeCiz() {
-    const acik = kayitlar.filter((k) => k.durum !== "tamam").length;
+    const saat = new Date().getHours();
+    const selam = saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
+    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(oturum.ad)}</b><small>${kac(ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
+    const bekleyenKayit = kayitlar.filter(onayBekliyor);
+    const ou = $("#onay-uyari");
+    ou.hidden = !(kayitOnaylar() && bekleyenKayit.length);
+    ou.classList.toggle("secili", filtre === "onay");
+    ou.textContent = filtre === "onay" ? "⏳ Onay bekleyenler gösteriliyor · İş listesine dön" : `⏳ ${bekleyenKayit.length} kayıt onayınızı bekliyor`;
+    if (filtre === "onay" && !(kayitOnaylar() && bekleyenKayit.length)) filtre = "acik";
+    $("#yonetim-isleri").hidden = !programGorur();
+    const acik = kayitlar.filter((k) => k.durum !== "tamam" && listede(k)).length;
     const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
     const geciken = kayitlar.filter(gecikti).length;
     $("#ozet").innerHTML = `
@@ -240,7 +264,7 @@
     yd.classList.toggle("uyari", bekleyenSayisi > 0);
 
     const gorunen = kayitlar
-      .filter((k) => (filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam"))
+      .filter((k) => (filtre === "onay" ? onayBekliyor(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k)))
       // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
       .sort((a, b) => filtre === "tamam"
         ? b.kapanis_at.localeCompare(a.kapanis_at)
@@ -252,7 +276,7 @@
         <span>
           <span class="satir-ust">
             <span>${kac(k.no)}</span>
-            <span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>
+            ${onayBekliyor(k) ? `<span class="rozet bekliyor">⏳ Onay bekliyor</span>` : `<span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>`}
             ${yonetimIsiRozeti(k)}
             ${sureYazisi(k)}
           </span>
@@ -261,7 +285,7 @@
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
-      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
+      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : filtre === "onay" ? "Onay bekleyen kayıt yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
   }
 
   const fotoKutu = (url, yazi, bos) => `<figure>${url
@@ -272,12 +296,22 @@
     const k = kayitlar.find((x) => x.id === id);
     if (!k) return;
     if (location.hash !== "#kayit-" + id) history.replaceState(null, "", "#kayit-" + id);
-    const kapat = kapatabilir() && k.durum !== "tamam";
+    const bekliyor = onayBekliyor(k);
+    const kapat = kapatabilir() && k.durum !== "tamam" && !bekliyor;
     $("#detay").innerHTML = `
       <div class="detay-ust">
         <button class="geri" data-geri>← İş Listesini Gör</button>
         ${k.durum === "tamam" ? `<span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>` : ""}
       </div>
+      ${bekliyor && kayitOnaylar() ? `
+      <div class="onay-kutu">
+        <h2>⏳ Bu kayıt onayınızı bekliyor</h2>
+        <p style="margin:0 0 10px">Onaylarsanız iş listesine düşer ve herkes görür. Reddederseniz silinir.</p>
+        <div class="dugmeler">
+          <button type="button" class="ikincil tehlike" id="kayit-reddet">✖ Reddet</button>
+          <button type="button" class="ana-dugme" id="kayit-onayla">✔ Onayla</button>
+        </div>
+      </div>` : bekliyor ? `<p class="onay-kutu">⏳ Kaydınız yönetimin onayını bekliyor. Onaylanınca iş listesine düşer ve herkes görür.</p>` : ""}
       ${k.gizli ? `<p class="gizli-not">🔒 Yönetim İş Emri: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
@@ -310,7 +344,7 @@
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
       </form>` : ""}
-      ${yonetici() && k.durum !== "tamam" ? `
+      ${yonetici() && k.durum !== "tamam" && !bekliyor ? `
       <div class="islem">
         <h2>Cevap yaz</h2>
         <p class="cevap-cumle">Bu iş <b id="cevap-gun">…</b> gün içinde yapılacaktır.</p>
@@ -365,6 +399,27 @@
         listeCiz(); detayGoster(k.id);
         mesaj(`Yapılma süresi ${b.dataset.gun} gün olarak ayarlandı.`);
       } catch (err) { mesaj(err.message); b.disabled = false; }
+    });
+    $("#kayit-onayla")?.addEventListener("click", async (e) => {
+      e.target.disabled = true; e.target.textContent = "Onaylanıyor…";
+      try {
+        await api("kayit_onayla", { id: k.id });
+        await yenile();
+        if (!kayitlar.some(onayBekliyor)) filtre = "acik";
+        detayGoster(k.id);
+        mesaj("Onaylandı. İş listesine düştü, herkese bildirildi.");
+      } catch (err) { mesaj(err.message); e.target.disabled = false; e.target.textContent = "✔ Onayla"; }
+    });
+    $("#kayit-reddet")?.addEventListener("click", async (e) => {
+      if (!confirm(`"${k.yer}" kaydı reddedilip silinsin mi?`)) return;
+      e.target.disabled = true;
+      try {
+        await api("kayit_reddet", { id: k.id });
+        kayitlar = kayitlar.filter((x) => x.id !== k.id);
+        history.replaceState(null, "", location.pathname);
+        goster("liste"); listeCiz();
+        mesaj("Kayıt reddedildi ve silindi.");
+      } catch (err) { mesaj(err.message); e.target.disabled = false; }
     });
     $("#kayit-sil")?.addEventListener("click", async (e) => {
       if (!confirm(`${k.no} numaralı "${k.yer}" kaydı herkesten silinsin mi? Geri alınamaz.`)) return;
@@ -503,7 +558,7 @@
 
   async function girisYap(ad, kod) {
     const r = await api("giris", { ad, kod });
-    oturum = { ad, rol: r.rol, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
+    oturum = { ad: r.ad || ad, rol: r.rol, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
     sakla.koy("sk_oturum", oturum);
     return r;
   }
@@ -522,7 +577,10 @@
         if (!onayli()) return durumKontrol();
         // Uygulama önündeyken gelen bildirim zaten ekranda açılıyor; çubukta ve simgede birikmesin
         if (!document.hidden) bildirimleriTemizle();
-        if (e.data.sayfa === "uyeler") yonetimAc(); else yenile();
+        if (e.data.sayfa === "uyeler") yonetimAc();
+        else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
+        else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
+        else yenile();
       });
     }
     if (!oturum) return goster("giris");
@@ -538,6 +596,9 @@
     bildirimKutusu();
     await yenile();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
+    if (location.hash === "#aidat") return aidatAc();
+    if (location.hash === "#iletisim") return iletisimAc();
+    if (location.hash === "#program") return programAc();
     if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     const m = location.hash.match(/^#kayit-(\d+)$/);
     if (m) detayGoster(Number(m[1]));
@@ -559,7 +620,7 @@
 
   // ---------- Yönetici paneli (YK başkanı) ----------
   const ROL_SIRASI = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
-  const MAKS_UYE = 50; // sunucudaki sınırla aynı
+  const MAKS_UYE = 400; // sunucudaki sınırla aynı
   const sonGorulme = (t) => t ? "Son görülme: " + tarihSaat(t) : "";
 
   async function yonetimAc() {
@@ -568,8 +629,8 @@
     goster("yonetim");
     $("#yonetim").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     try {
-      const [{ uyeler }, { kodlar, varsayilan_sure }] = await Promise.all([api("uye_listesi"), api("kodlar")]);
-      yonetimCiz(uyeler, kodlar, varsayilan_sure);
+      const [{ uyeler }, { kodlar, varsayilan_sure }, { ortaklar }] = await Promise.all([api("uye_listesi"), api("kodlar"), api("ortak_listesi")]);
+      yonetimCiz(uyeler, kodlar, varsayilan_sure, ortaklar);
     } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
@@ -591,7 +652,7 @@
     </div>`;
   }
 
-  function yonetimCiz(uyeler, kodlar, varsSure) {
+  function yonetimCiz(uyeler, kodlar, varsSure, ortaklar = []) {
     const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
     const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
       .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
@@ -622,7 +683,7 @@
         <label>Sizin yeni göreviniz
           <select id="devret-rol">
             <option value="yonetim">Yönetim Kurulu</option>
-            <option value="uye">Grup üyesi</option>
+            <option value="uye">TG Üyesi</option>
           </select>
         </label>
         <button class="ana-dugme" type="button" data-eylem="yonetici_degistir">Yöneticiyi devret</button>
@@ -631,6 +692,16 @@
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
+
+      <h2>Ortak hesapları (${ortaklar.length})</h2>
+      <p class="ipucu">Her ortak kendi kullanıcı adı (örn. <b>Ortak 12</b>) ve şifresiyle girer; ilk girişte yine sizin onayınıza düşer. Yeni eklenen ortak sıradaki numarayı alır.</p>
+      <button class="ana-dugme" type="button" data-eylem="ortak_ekle">➕ Yeni ortak ekle</button>
+      <details class="ortak-liste">
+        <summary>📋 Kullanıcı adları ve şifreleri göster</summary>
+        <table><thead><tr><th>Kullanıcı adı</th><th>Şifre</th><th>Durum</th></tr></thead><tbody>
+        ${ortaklar.map((o) => `<tr><td>Ortak ${o.no}</td><td><code>${kac(o.sifre)}</code></td><td>${o.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
+        </tbody></table>
+      </details>
 
       <h2>Yeni işlerin yapılma süresi</h2>
       <div class="uye">
@@ -672,6 +743,21 @@
       return;
     }
     if (eylem === "uye_sil" && !confirm(`${ad} listeden silinsin mi?`)) return;
+    if (eylem === "ortak_ekle") {
+      if (!confirm("Sıradaki numarayla yeni bir ortak hesabı oluşturulsun mu?")) return;
+      b.disabled = true;
+      try {
+        const o = await api("ortak_ekle");
+        alert(`Yeni ortak hesabı oluşturuldu:
+
+Kullanıcı adı: Ortak ${o.no}
+Şifre: ${o.sifre}
+
+Bu bilgileri ortağa iletin.`);
+        await yonetimAc();
+      } catch (err) { mesaj(err.message); b.disabled = false; }
+      return;
+    }
     if (eylem === "varsayilan_sure") {
       const gun = prompt("Yeni işler kaç günde yapılsın? (1 ile 60 arası)");
       if (!gun) return;
@@ -782,6 +868,228 @@
     if (e.target.closest("#devret-ac")) $("#devret").hidden = !$("#devret").hidden;
   });
 
+  // ---------- Modüller: alt menü ----------
+  function sahaAc() {
+    history.replaceState(null, "", location.pathname);
+    goster("liste"); listeCiz();
+  }
+  function iletisimAc() {
+    if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
+    goster("iletisim");
+  }
+  $("#alt-menu").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-modul]"); if (!b) return;
+    ({ saha: sahaAc, aidat: aidatAc, iletisim: iletisimAc })[b.dataset.modul]();
+  });
+  $("#onay-uyari").addEventListener("click", () => { filtre = filtre === "onay" ? "acik" : "onay"; listeCiz(); });
+
+  // ---------- Aidat: yıl içindeki parasal yükümlülükler (resim) ----------
+  async function aidatAc() {
+    if (location.hash !== "#aidat") history.replaceState(null, "", "#aidat");
+    goster("aidat");
+    const kutu = $("#aidat");
+    if (!kutu.innerHTML) kutu.innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { aidatCiz(await api("aidat_liste")); }
+    catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+
+  function aidatCiz(v) {
+    $("#aidat").innerHTML = `
+      <h1 class="modul-baslik">💳 Aidat</h1>
+      <p class="modul-alt">Yıl içinde ödenmesi gereken ödemeler. Resme dokunursanız büyük açılır.</p>
+      ${v.ekleyebilir ? `
+      <form class="kart aidat-ekle" id="aidat-form">
+        <label>Başlık (isteğe bağlı)
+          <input name="baslik" maxlength="120" placeholder="Örn. 2027 yılı aidat ve ödemeler">
+        </label>
+        <label class="foto-dugme"><input id="aidat-dosya" type="file" accept="image/*" hidden><span>➕ Resim ekle</span></label>
+        <small class="ipucu">Resmi seçtiğiniz anda eklenir ve herkese bildirilir.</small>
+      </form>` : ""}
+      ${v.resimler.length ? v.resimler.map((x) => `
+      <figure class="aidat-resim">
+        ${x.url ? `<a href="${kac(x.url)}" target="_blank" rel="noopener"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Aidat")}"></a>` : `<div class="foto-bos">Resim açılamadı</div>`}
+        <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b><br>` : ""}${tarihSaat(x.created_at)}</span>
+          ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-aidat-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
+      </figure>`).join("") : `<p class="bos">Henüz aidat bilgisi eklenmedi.</p>`}`;
+  }
+
+  $("#aidat").addEventListener("change", async (e) => {
+    if (e.target.id !== "aidat-dosya") return;
+    const f = e.target.files?.[0]; if (!f) return;
+    const etiket = e.target.nextElementSibling;
+    etiket.textContent = "Yükleniyor…";
+    try {
+      const blob = await kucult(f, 2400);
+      const yol = await fotoYukle(blob, "aidat");
+      await api("aidat_ekle", { yol, baslik: $("#aidat-form").baslik.value });
+      mesaj("Resim eklendi. Herkese bildirildi.");
+      await aidatAc();
+    } catch (err) { mesaj(err.message); etiket.textContent = "➕ Resim ekle"; e.target.value = ""; }
+  });
+  $("#aidat").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-aidat-sil]"); if (!b) return;
+    if (!confirm("Bu resim herkesten silinsin mi?")) return;
+    b.disabled = true;
+    try { await api("aidat_sil", { id: Number(b.dataset.aidatSil) }); mesaj("Resim silindi."); await aidatAc(); }
+    catch (err) { mesaj(err.message); b.disabled = false; }
+  });
+
+  // ---------- Yönetim iş programı (takvim): gün / hafta / ay ----------
+  const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+  const GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+  const TEKRAR = { yok: "", gunluk: "Her gün", haftalik: "Her hafta", aylik: "Her ay" };
+  const tGun = (t) => new Date(t + "T00:00:00Z");
+  const tYaz = (d) => d.toISOString().slice(0, 10);
+  const tEkle = (t, n) => tYaz(new Date(tGun(t).getTime() + n * 864e5));
+  const haftaGunu = (t) => (tGun(t).getUTCDay() + 6) % 7; // pazartesi 0
+  const ayinGunu = (t) => tGun(t).getUTCDate();
+  const ayinSonGunu = (t) => new Date(Date.UTC(tGun(t).getUTCFullYear(), tGun(t).getUTCMonth() + 1, 0)).getUTCDate();
+  const uzunTarih = (t) => `${ayinGunu(t)} ${AYLAR[tGun(t).getUTCMonth()]} ${tGun(t).getUTCFullYear()}, ${GUNLER[haftaGunu(t)]}`;
+  let progGorunum = "gun", progTarih = bugun(), progVeri = [], progFormAcik = false;
+
+  // Bir iş o gün yapılacak mı (tekrarlayanlar başladığı günden itibaren)
+  function oGunMu(x, gun) {
+    if (gun < x.tarih) return false;
+    if (x.tekrar === "yok") return gun === x.tarih;
+    if (x.tekrar === "gunluk") return true;
+    if (x.tekrar === "haftalik") return haftaGunu(gun) === haftaGunu(x.tarih);
+    // Her ay: ayın aynı günü; ay o kadar uzun değilse ayın son günü
+    return ayinGunu(gun) === Math.min(ayinGunu(x.tarih), ayinSonGunu(gun));
+  }
+  const gununIsleri = (gun) => progVeri.filter((x) => oGunMu(x, gun)).sort((a, b) => (a.saat || "99").localeCompare(b.saat || "99"));
+
+  function progAralik() {
+    if (progGorunum === "gun") return [progTarih, progTarih];
+    if (progGorunum === "hafta") { const b = tEkle(progTarih, -haftaGunu(progTarih)); return [b, tEkle(b, 6)]; }
+    const ilk = progTarih.slice(0, 8) + "01";
+    const bas = tEkle(ilk, -haftaGunu(ilk));
+    const son = progTarih.slice(0, 8) + String(ayinSonGunu(progTarih)).padStart(2, "0");
+    return [bas, tEkle(son, 6 - haftaGunu(son))];
+  }
+
+  async function programAc() {
+    if (!programGorur()) return;
+    if (location.hash !== "#program") history.replaceState(null, "", "#program");
+    goster("program");
+    if (!$("#program").innerHTML) $("#program").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    const [bas, bit] = progAralik();
+    try { progVeri = (await api("program_liste", { bas, bit })).kayitlar || []; programCiz(); }
+    catch (e) { $("#program").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+
+  const isKarti = (x) => `<div class="prog-is">
+      <span class="saat">${x.saat ? kac(x.saat) : "—"}</span>
+      <span class="icerik"><b>${kac(x.baslik)}</b>
+        ${x.aciklama ? `<small>${kac(x.aciklama)}</small>` : ""}
+        <small>${TEKRAR[x.tekrar] ? `🔁 ${TEKRAR[x.tekrar]} · ` : ""}Giren: ${kac(x.ekleyen || "")}</small></span>
+      ${x.silebilir ? `<button type="button" class="sil" data-prog-sil="${x.id}" data-tekrar="${x.tekrar}">Sil</button>` : ""}
+    </div>`;
+
+  function programCiz() {
+    const [bas] = progAralik();
+    const bugunT = bugun();
+    let etiket, icerik;
+    if (progGorunum === "gun") {
+      etiket = uzunTarih(progTarih);
+      const isler = gununIsleri(progTarih);
+      icerik = isler.length ? isler.map(isKarti).join("") : `<p class="bos">Bu gün için girilmiş iş yok.</p>`;
+    } else if (progGorunum === "hafta") {
+      etiket = `${ayinGunu(bas)} ${AYLAR[tGun(bas).getUTCMonth()]} – ${ayinGunu(tEkle(bas, 6))} ${AYLAR[tGun(tEkle(bas, 6)).getUTCMonth()]}`;
+      icerik = Array.from({ length: 7 }, (_, i) => tEkle(bas, i)).map((g) => {
+        const isler = gununIsleri(g);
+        return `<div class="prog-gun"><h3 class="${g === bugunT ? "bugun" : ""}">${GUNLER[haftaGunu(g)]}, ${ayinGunu(g)} ${AYLAR[tGun(g).getUTCMonth()]}</h3>
+          ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">İş yok</p>`}</div>`;
+      }).join("");
+    } else {
+      etiket = `${AYLAR[tGun(progTarih).getUTCMonth()]} ${tGun(progTarih).getUTCFullYear()}`;
+      const ay = progTarih.slice(0, 7);
+      icerik = `<div class="prog-ay">${["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((g) => `<span class="gun-adi">${g}</span>`).join("")}
+        ${Array.from({ length: Math.round((tGun(progAralik()[1]) - tGun(bas)) / 864e5) + 1 }, (_, i) => tEkle(bas, i)).map((g) => {
+          const n = gununIsleri(g).length;
+          return `<button type="button" data-prog-gun="${g}" class="${g.slice(0, 7) !== ay ? "disarida" : ""} ${g === bugunT ? "bugun" : ""} ${n ? "dolu" : ""}">${ayinGunu(g)}${n ? `<i>${n}</i>` : ""}</button>`;
+        }).join("")}</div>
+        <p class="ipucu" style="font-size:15px">Bir güne dokunun, o günün işleri açılsın.</p>`;
+    }
+    $("#program").innerHTML = `
+      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
+      <h1>📅 İş Programı</h1>
+      <div class="prog-sekme">
+        ${[["gun", "Günlük"], ["hafta", "Haftalık"], ["ay", "Aylık"]].map(([k, ad]) => `<button type="button" data-prog-gorunum="${k}" class="${progGorunum === k ? "secili" : ""}">${ad}</button>`).join("")}
+      </div>
+      <div class="prog-gezin"><button type="button" data-prog-git="-1" aria-label="Önceki">‹</button><b>${etiket}</b><button type="button" data-prog-git="1" aria-label="Sonraki">›</button></div>
+      ${progAralik()[0] <= bugunT && bugunT <= progAralik()[1] ? "" : `<button type="button" class="ikincil prog-bugun" data-prog-bugun>Bugüne dön</button>`}
+      ${icerik}
+      <button type="button" class="ana-dugme" id="prog-ekle-ac" style="margin-top:8px" ${progFormAcik ? "hidden" : ""}>➕ Yeni iş ekle</button>
+      <form id="prog-form" class="prog-form" ${progFormAcik ? "" : "hidden"}>
+        <h2 style="margin-top:0">Yeni iş</h2>
+        <label>Yapılacak iş
+          <input name="baslik" required maxlength="200" placeholder="Örn. Havuz bakımı kontrolü">
+        </label>
+        <label>Açıklama (isteğe bağlı)
+          <textarea name="aciklama" rows="2" maxlength="2000"></textarea>
+        </label>
+        <label>Tarih
+          <input name="tarih" type="date" required value="${progTarih}">
+        </label>
+        <label>Saat (isteğe bağlı)
+          <input name="saat" type="time">
+        </label>
+        <fieldset class="tekrar-sec">
+          <legend>Ne sıklıkla?</legend>
+          ${[["yok", "Bir kez"], ["gunluk", "Her gün"], ["haftalik", "Her hafta"], ["aylik", "Her ay"]].map(([k, ad], i) => `<label><input type="radio" name="tekrar" value="${k}" ${i ? "" : "checked"}><span>${ad}</span></label>`).join("")}
+        </fieldset>
+        <div class="dugmeler">
+          <button type="button" class="ikincil" id="prog-vazgec">Vazgeç</button>
+          <button class="ana-dugme" type="submit">Kaydet</button>
+        </div>
+      </form>`;
+  }
+
+  $("#program").addEventListener("click", async (e) => {
+    const t = e.target;
+    const gor = t.closest("[data-prog-gorunum]");
+    if (gor) { progGorunum = gor.dataset.progGorunum; return programAc(); }
+    const git = t.closest("[data-prog-git]");
+    if (git) {
+      const n = Number(git.dataset.progGit);
+      if (progGorunum === "gun") progTarih = tEkle(progTarih, n);
+      else if (progGorunum === "hafta") progTarih = tEkle(progTarih, 7 * n);
+      else { const d = tGun(progTarih.slice(0, 8) + "01"); d.setUTCMonth(d.getUTCMonth() + n); progTarih = tYaz(d); }
+      return programAc();
+    }
+    if (t.closest("[data-prog-bugun]")) { progTarih = bugun(); return programAc(); }
+    const gun = t.closest("[data-prog-gun]");
+    if (gun) { progTarih = gun.dataset.progGun; progGorunum = "gun"; return programAc(); }
+    if (t.closest("#prog-ekle-ac")) {
+      progFormAcik = true; $("#prog-form").hidden = false; t.closest("#prog-ekle-ac").hidden = true;
+      $("#prog-form").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (t.closest("#prog-vazgec")) { progFormAcik = false; return programCiz(); }
+    const sil = t.closest("[data-prog-sil]");
+    if (sil) {
+      const tekrarli = sil.dataset.tekrar !== "yok";
+      if (!confirm(tekrarli ? "Bu tekrarlayan iş bütün günlerden silinsin mi?" : "Bu iş programdan silinsin mi?")) return;
+      sil.disabled = true;
+      try { await api("program_sil", { id: Number(sil.dataset.progSil) }); mesaj("Silindi."); await programAc(); }
+      catch (err) { mesaj(err.message); sil.disabled = false; }
+    }
+  });
+  $("#program").addEventListener("submit", async (e) => {
+    if (e.target.id !== "prog-form") return;
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const d = e.target.querySelector("button[type=submit]");
+    d.disabled = true; d.textContent = "Kaydediliyor…";
+    try {
+      await api("program_ekle", { baslik: f.get("baslik"), aciklama: f.get("aciklama"), tarih: f.get("tarih"), saat: f.get("saat"), tekrar: f.get("tekrar") });
+      progFormAcik = false; progTarih = String(f.get("tarih"));
+      mesaj("İş programına eklendi. Yönetim, müdür ve şefe bildirildi.");
+      await programAc();
+    } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Kaydet"; }
+  });
+  $("#program-ac").addEventListener("click", () => { progGorunum = "gun"; progTarih = bugun(); progFormAcik = false; programAc(); });
+
   // Çıkış düğmesi yok (kazara basılıyordu). Gerekirse üst yeşil banda 3 saniye basılı tutunca sorulur.
   // Telefonda resme basılı tutmak tarayıcının kendi menüsünü açıp dokunuşu iptal ediyordu;
   // bu yüzden dokunma olayları ayrı dinleniyor ve onay penceresi sayfanın içinde gösteriliyor.
@@ -846,7 +1154,8 @@
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
         gizli: yonetimIsiGirebilir() && f.get("tur") === "yonetim",
       });
-      mesaj(r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. Yalnızca yönetim, müdür ve şef görür.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
+      mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
+        : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. Yalnızca yönetim, müdür ve şef görür.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       // Kendi açtığımız kayıt için pencere açılmasın
       sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
       goster("liste");
@@ -860,6 +1169,9 @@
   window.addEventListener("hashchange", async () => {
     if (!onayli()) return;
     if (location.hash === "#uyeler") return yonetimAc();
+    if (location.hash === "#aidat") return aidatAc();
+    if (location.hash === "#iletisim") return iletisimAc();
+    if (location.hash === "#program" && $("#ekran-program").hidden) return programAc();
     if (location.hash.startsWith("#gorevler") && $("#ekran-gorevler").hidden) {
       return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     }

@@ -27,11 +27,12 @@
   <main id="ekran-giris" class="ekran" hidden>
     <form id="giris-form" class="kart">
       <h1>Giriş</h1>
-      <label>Adınız
-        <input name="ad" autocomplete="name" required maxlength="80" placeholder="Örn. Ahmet Yılmaz">
+      <label>Kullanıcı adı
+        <input name="ad" autocomplete="username" required maxlength="80" placeholder="Örn. Ortak 12">
+        <small class="ipucu">Ortaklar size verilen adı yazar (örn. <b>Ortak 12</b>). Görevliler kendi adını yazar.</small>
       </label>
-      <label>Giriş kodu
-        <input name="kod" required autocomplete="off" autocapitalize="none" spellcheck="false">
+      <label>Şifre / giriş kodu
+        <input name="kod" required autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text">
       </label>
       <button class="ana-dugme" type="submit">Giriş yap</button>
       <p id="giris-hata" class="hata" hidden></p>
@@ -61,12 +62,52 @@
     <div id="gorevler" class="kart"></div>
   </main>
 
-  <!-- Liste -->
+  <!-- Yönetim iş programı (takvim) -->
+  <main id="ekran-program" class="ekran" hidden>
+    <div id="program" class="kart"></div>
+  </main>
+
+  <!-- Aidat -->
+  <main id="ekran-aidat" class="ekran" hidden>
+    <div id="aidat"></div>
+  </main>
+
+  <!-- İletişim -->
+  <main id="ekran-iletisim" class="ekran" hidden>
+    <h1 class="modul-baslik">☎ İletişim</h1>
+    <p class="modul-alt">Dokunduğunuz satır telefonunuzda hemen açılır.</p>
+    <div class="iletisim">
+      <a class="iletisim-satir" href="tel:+905413253019">
+        <span class="iletisim-ikon ara">📞</span>
+        <span><small>Müdür</small><b>0541 325 30 19</b><em>Aramak için dokunun</em></span>
+      </a>
+      <a class="iletisim-satir" href="tel:+905413253021">
+        <span class="iletisim-ikon ara">📞</span>
+        <span><small>Muhasebe</small><b>0541 325 30 21</b><em>Aramak için dokunun</em></span>
+      </a>
+      <a class="iletisim-satir" href="mailto:kooperatif@sporkentsitesi.com">
+        <span class="iletisim-ikon posta">✉️</span>
+        <span><small>E-posta</small><b>kooperatif@sporkentsitesi.com</b><em>E-posta yazmak için dokunun</em></span>
+      </a>
+      <a class="iletisim-satir" href="https://www.sporkentsitesi.com" target="_blank" rel="noopener">
+        <span class="iletisim-ikon site">🌐</span>
+        <span><small>İnternet sitesi</small><b>www.sporkentsitesi.com</b><em>Siteyi açmak için dokunun</em></span>
+      </a>
+    </div>
+  </main>
+
+  <!-- Saha Takip (ana ekran) -->
   <main id="ekran-liste" class="ekran" hidden>
+    <div id="karsilama" class="karsilama"></div>
+    <button id="onay-uyari" class="onay-uyari" hidden></button>
     <div id="ozet" class="ozet"></div>
     <button id="gecikme-uyari" class="gecikme-uyari" hidden></button>
     <p id="gorunurluk" class="ipucu" style="margin:-4px 0 12px"></p>
-    <button id="gorevler-ac" class="ikincil gorev-dugme" hidden>📋 Müdür/Şef Görev Takibi</button>
+    <section id="yonetim-isleri" class="yonetim-isleri" hidden>
+      <h2>Yönetim işleri</h2>
+      <button id="program-ac" class="ikincil program-dugme">📅 İş Programı (Takvim)</button>
+      <button id="gorevler-ac" class="ikincil gorev-dugme" hidden>📋 Müdür/Şef Görev Takibi</button>
+    </section>
     <div id="bildirim-kutu" class="bilgi" hidden>
       <span id="bildirim-metin">Bildirimleri açın, yeni kayıt ve “yapıldı” haberleri telefonunuza gelsin.</span>
       <button id="bildirim-ac" class="kucuk-dugme">Bildirimleri aç</button>
@@ -123,6 +164,13 @@
   <main id="ekran-detay" class="ekran" hidden>
     <div id="detay" class="kart"></div>
   </main>
+
+  <!-- Alt menü: üç modül -->
+  <nav id="alt-menu" class="alt-menu" hidden aria-label="Bölümler">
+    <button type="button" data-modul="saha"><span>🛠️</span>Saha Takip</button>
+    <button type="button" data-modul="aidat"><span>💳</span>Aidat</button>
+    <button type="button" data-modul="iletisim"><span>☎️</span>İletişim</button>
+  </nav>
 
   <div id="mesaj" class="mesaj" hidden></div>
 
