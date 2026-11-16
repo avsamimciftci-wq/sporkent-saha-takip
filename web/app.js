@@ -632,8 +632,11 @@
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); kurulumIstegi = e; });
   window.addEventListener("appinstalled", () => kurAdim(`✅ <b>Eklendi.</b> Şimdi bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun.`));
 
+  // Telefonda ana ekrana eklenmemiş (tarayıcıda açılmış) uygulama kullanılamaz: ortak, görevli, yönetici herkes için
+  const kurulumGerekli = () => (iosCihaz || androidCihaz) && !anaEkranda();
+
   function girisEkrani(kodla = false) {
-    const kurulmali = (iosCihaz || androidCihaz) && !anaEkranda();
+    const kurulmali = kurulumGerekli();
     $("#kurulum").hidden = !kurulmali;
     $("#kayit-form").hidden = kurulmali || kodla;
     $("#giris-form").hidden = kurulmali || !kodla;
@@ -728,7 +731,7 @@
         else yenile();
       });
     }
-    if (!oturum) { girisEkrani(); return goster("giris"); }
+    if (!oturum || kurulumGerekli()) { girisEkrani(); return goster("giris"); }
     // Eski sürümden kalan oturum (kodla çalışıyordu): bir kez kodla katılım isteği gönder
     if (!oturum.anahtar) {
       if (!oturum.kod) return cikisYap();
