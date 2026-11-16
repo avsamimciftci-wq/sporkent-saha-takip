@@ -336,17 +336,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "kapat": {
       if (!KAPATABILIR.includes(rol)) throw new Hata("Bu işlemi yalnızca yönetici, müdür veya şef yapabilir.", 403);
-      if (!g.foto) throw new Hata("Yapılan işin fotoğrafını çekin.");
       const { data, error } = await db.from("kayitlar").update({
         durum: "tamam",
         sonuc: temiz(g.sonuc) || null,
-        foto_sonra: temiz(g.foto, 200),
+        foto_sonra: temiz(g.foto, 200) || null, // fotoğraf isteğe bağlı
         kapatan: u.ad,
         kapanis_at: new Date().toISOString(),
       }).eq("id", g.id).neq("durum", "tamam").eq("onay_durumu", "onayli").select().single();
       if (error) throw new Hata("Kayıt bulunamadı, onay bekliyor ya da zaten kapatılmış.");
-      // Yapılan iş görenlere: bildirimde yapılan işin fotoğrafı da görünsün
-      const { data: url } = await db.storage.from(BUCKET).createSignedUrl(data.foto_sonra, 60 * 60 * 24 * 7);
+      // Yapılan iş görenlere: fotoğraf varsa bildirimde de görünsün
+      const { data: url } = data.foto_sonra
+        ? await db.storage.from(BUCKET).createSignedUrl(data.foto_sonra, 60 * 60 * 24 * 7)
+        : { data: null };
       await duyur(kimeBildir(data), `Yapıldı • ${data.yer}`.slice(0, 80), (data.sonuc || data.sorun || "").slice(0, 180),
         { kayitId: data.id, resim: url?.signedUrl });
       return { tamam: true };

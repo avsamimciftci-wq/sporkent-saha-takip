@@ -318,6 +318,13 @@ body.menulu .ekran { padding-bottom: calc(150px + env(safe-area-inset-bottom)); 
   display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 68px;
 }
 .alt-menu button span { font-size: 28px; line-height: 1.1; }
+.alt-menu button { position: relative; }
+/* Yönetim Kurulu düğmesinde yapılmayan iş emri sayısı */
+.menu-rozet {
+  position: absolute; top: 2px; right: 6px; min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 99px; background: #d32f2f; color: #fff; font-size: 15px; font-weight: 800; line-height: 26px;
+  text-align: center; box-shadow: 0 0 0 2px #fff;
+}
 /* Her bölümün kendi rengi: seçili değilken açık zemin, seçiliyken dolu renk */
 .alt-menu [data-modul="saha"] { --renk: #1f6b4f; --renk-acik: #e3f4ea; }
 .alt-menu [data-modul="yonetim"] { --renk: #6a1b9a; --renk-acik: #f3e5f5; }
