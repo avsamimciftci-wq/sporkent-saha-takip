@@ -66,9 +66,20 @@
   <main id="ekran-yonetimisleri" class="ekran" hidden>
     <div class="baslik-cift"><button class="geri" type="button" data-geri>← Geri</button><h1 class="sayfa-bant bant-yonetim">🗂️ Yönetim Kurulu</h1></div>
     <div class="yonetim-kutular">
+      <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span>📅</span>İş Programı</button>
       <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>📋</span>Müdür/Şef Görev Takibi</button>
     </div>
+  </main>
+
+  <!-- YK Saha Takip: yönetici ve yönetim kurulunun verdiği iş emirleri -->
+  <main id="ekran-yksaha" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-yksaha">🛠️ YK Saha Takip</h1></div>
+    <p class="modul-alt">Yönetici ve yönetim kurulunun verdiği iş emirleri. Yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>
+    <div id="yk-ozet" class="ozet"></div>
+    <button id="yk-gecikme" class="gecikme-uyari" hidden></button>
+    <button id="yk-yeni" class="ana-dugme" type="button" style="margin-bottom:12px" hidden>➕ Yeni iş emri ver</button>
+    <div id="yk-liste" class="liste"></div>
   </main>
 
   <!-- Yönetim iş programı (takvim) -->

@@ -408,6 +408,10 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 }
 .yonetim-kutu span { font-size: 48px; line-height: 1; }
 .kutu-program { background: linear-gradient(145deg, #00897b, #00574b); }
+.kutu-yksaha { grid-column: 1 / -1; min-height: 130px; background: linear-gradient(145deg, #d84315, #8d2a0b); }
+.yonetim-kutu small { font-size: 15px; font-weight: 700; background: rgba(255,255,255,.22); border-radius: 99px; padding: 2px 10px; }
+.yonetim-kutu small:empty { display: none; }
+.bant-yksaha { background: #bf360c; }
 .kutu-gorev { background: linear-gradient(145deg, #3949ab, #1a237e); }
 .yonetim-kutu:active { transform: scale(.98); }
 

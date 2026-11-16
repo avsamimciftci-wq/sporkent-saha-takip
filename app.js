@@ -107,7 +107,7 @@
 
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
-  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim" };
+  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim" };
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     const menulu = !["giris", "bekle"].includes(ad) && onayli();
@@ -232,6 +232,8 @@
 
   // Yönetici / yönetim kurulu için onay bekleyenler iş listesinde değil, ayrı düğmede
   const listede = (k) => !(kayitOnaylar() && onayBekliyor(k));
+  // Yönetici ve yönetim kurulunun verdiği iş emirleri (Yönetim İş Emri) genel listede değil, YK Saha Takip'te
+  const genelde = (k) => !k.gizli;
 
   function listeCiz() {
     const saat = new Date().getHours();
@@ -243,9 +245,10 @@
     ou.classList.toggle("secili", filtre === "onay");
     ou.textContent = filtre === "onay" ? "⏳ Onay bekleyenler gösteriliyor · İş listesine dön" : `⏳ ${bekleyenKayit.length} kayıt onayınızı bekliyor`;
     if (filtre === "onay" && !(kayitOnaylar() && bekleyenKayit.length)) filtre = "acik";
-    const acik = kayitlar.filter((k) => k.durum !== "tamam" && listede(k)).length;
-    const yapilan = kayitlar.filter((k) => k.durum === "tamam").length;
-    const geciken = kayitlar.filter(gecikti).length;
+    const genel = kayitlar.filter(genelde);
+    const acik = genel.filter((k) => k.durum !== "tamam" && listede(k)).length;
+    const yapilan = genel.filter((k) => k.durum === "tamam").length;
+    const geciken = genel.filter(gecikti).length;
     $("#ozet").innerHTML = `
       <button data-filtre="acik" class="ozet-yapilmayan ${filtre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Henüz yapılmayanlar</span></button>
       <button data-filtre="tamam" class="ozet-yapilan ${filtre === "tamam" ? "secili" : ""}"><b>${yapilan}</b><span>Yapılanlar</span></button>`;
@@ -262,14 +265,21 @@
     yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
     yd.classList.toggle("uyari", bekleyenSayisi > 0);
 
-    const gorunen = kayitlar
-      .filter((k) => (filtre === "onay" ? onayBekliyor(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k)))
-      // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
-      .sort((a, b) => filtre === "tamam"
-        ? b.kapanis_at.localeCompare(a.kapanis_at)
-        : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at));
+    const gorunen = siraya(genel
+      .filter((k) => (filtre === "onay" ? onayBekliyor(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k))), filtre);
 
-    $("#liste").innerHTML = gorunen.length ? gorunen.map((k) => `
+    $("#liste").innerHTML = gorunen.length ? gorunen.map(satirHtml).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : filtre === "onay" ? "Onay bekleyen kayıt yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
+    if (!$("#ekran-yksaha").hidden) ykSahaCiz();
+    const ykAcik = kayitlar.filter((k) => k.gizli && k.durum !== "tamam").length;
+    $("#yksaha-sayi").textContent = ykAcik ? `${ykAcik} iş yapılmadı` : "";
+  }
+
+  // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
+  const siraya = (liste, f) => liste.sort((a, b) => f === "tamam"
+    ? b.kapanis_at.localeCompare(a.kapanis_at)
+    : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at));
+
+  const satirHtml = (k) => `
       <button class="satir ${gecikti(k) ? "gecikti" : ""}" data-id="${k.id}">
         ${(k.foto_sonra_url || k.foto_once_url) ? `<img src="${kac(k.foto_sonra_url || k.foto_once_url)}" alt="" loading="lazy">` : `<span class="bos-foto">📝</span>`}
         <span>
@@ -284,8 +294,37 @@
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
-      </button>`).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : filtre === "onay" ? "Onay bekleyen kayıt yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
+      </button>`;
+
+  // ---------- YK Saha Takip ----------
+  let ykFiltre = "acik";
+  function ykSahaAc() {
+    if (!programGorur()) return;
+    if (location.hash !== "#yk-saha") history.replaceState(history.state, "", "#yk-saha");
+    goster("yksaha");
+    ykSahaCiz();
   }
+  function ykSahaCiz() {
+    const yk = kayitlar.filter((k) => k.gizli);
+    const acik = yk.filter((k) => k.durum !== "tamam").length;
+    const geciken = yk.filter(gecikti).length;
+    $("#yk-ozet").innerHTML = `
+      <button data-yk-filtre="acik" class="ozet-yapilmayan ${ykFiltre === "acik" ? "secili" : ""}"><b>${acik}</b><span>Henüz yapılmayanlar</span></button>
+      <button data-yk-filtre="tamam" class="ozet-yapilan ${ykFiltre === "tamam" ? "secili" : ""}"><b>${yk.length - acik}</b><span>Yapılanlar</span></button>`;
+    $("#yk-gecikme").hidden = !geciken;
+    $("#yk-gecikme").textContent = `⚠ ${geciken} iş süresi içinde yapılmadı`;
+    $("#yk-yeni").hidden = !yonetimIsiGirebilir();
+    const gorunen = siraya(yk.filter((k) => (ykFiltre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam")), ykFiltre);
+    $("#yk-liste").innerHTML = gorunen.length ? gorunen.map(satirHtml).join("")
+      : `<p class="bos">${ykFiltre === "tamam" ? "Henüz yapılan iş emri yok." : "Yapılmayan iş emri yok. 👍"}</p>`;
+  }
+  $("#ekran-yksaha").addEventListener("click", (e) => {
+    const f = e.target.closest("[data-yk-filtre]");
+    if (f) { ykFiltre = f.dataset.ykFiltre; return ykSahaCiz(); }
+    if (e.target.closest("#yk-gecikme")) { ykFiltre = "acik"; return ykSahaCiz(); }
+    const s = e.target.closest(".satir"); if (s) detayGoster(Number(s.dataset.id));
+  });
+  $("#yksaha-ac").addEventListener("click", () => { ykFiltre = "acik"; history.pushState({ yk: 1 }, "", "#yk-saha"); ykSahaAc(); });
 
   const fotoKutu = (url, yazi, bos) => `<figure>${url
     ? `<a href="${kac(url)}" target="_blank" rel="noopener"><img src="${kac(url)}" alt="${yazi}"></a>`
@@ -299,7 +338,7 @@
     const kapat = kapatabilir() && k.durum !== "tamam" && !bekliyor;
     $("#detay").innerHTML = `
       <div class="detay-ust">
-        <button class="geri" data-geri>← İş Listesini Gör</button>
+        ${k.gizli && programGorur() ? `<button class="geri" data-geri-yksaha>← Geri</button>` : `<button class="geri" data-geri>← İş Listesini Gör</button>`}
         ${k.durum === "tamam" ? `<span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>` : ""}
       </div>
       ${bekliyor && kayitOnaylar() ? `
@@ -598,6 +637,7 @@
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
+    if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program") return programAc();
     if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     const m = location.hash.match(/^#kayit-(\d+)$/);
@@ -864,6 +904,7 @@ Bu bilgileri ortağa iletin.`);
   // Yönetim Kurulu ekranından açılan sayfalar geçmişe eklenir: telefonun geri tuşu da Yönetim Kurulu'na döner
   $("#gorevler-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler"); gorevlerAc("gunluk"); });
   document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-geri-yksaha]")) return ykSahaAc();
     if (!e.target.closest("[data-geri-yk]")) return;
     if (history.state?.yk) history.back(); else yonetimIsleriAc();
   });
@@ -1172,6 +1213,8 @@ Bu bilgileri ortağa iletin.`);
       : "Genel yapılacak işi gruptaki herkes görür.";
   });
   $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); $("#gizli-alan").hidden = !yonetimIsiGirebilir(); $("#gizli-alan").dispatchEvent(new Event("change")); goster("yeni"); });
+  // YK Saha Takip'ten yeni iş emri: tür "Yönetim İş Emri" seçili gelir
+  $("#yk-yeni").addEventListener("click", () => { $("#yeni-ac").click(); yeniForm.tur.value = "yonetim"; $("#gizli-alan").dispatchEvent(new Event("change")); });
 
   yeniForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1186,10 +1229,10 @@ Bu bilgileri ortağa iletin.`);
         gizli: yonetimIsiGirebilir() && f.get("tur") === "yonetim",
       });
       mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
-        : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. Yalnızca yönetim, müdür ve şef görür.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
+        : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       // Kendi açtığımız kayıt için pencere açılmasın
       sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
-      goster("liste");
+      if (r.kayit.gizli) { ykFiltre = "acik"; ykSahaAc(); } else goster("liste");
       await yenile();
     } catch (err) {
       hata.textContent = err.message; hata.hidden = false;
@@ -1203,6 +1246,7 @@ Bu bilgileri ortağa iletin.`);
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
+    if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program" && $("#ekran-program").hidden) return programAc();
     if (location.hash.startsWith("#gorevler") && $("#ekran-gorevler").hidden) {
       return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
