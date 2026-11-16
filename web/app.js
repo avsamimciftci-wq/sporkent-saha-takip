@@ -637,6 +637,26 @@
     $("#kurulum").hidden = !kurulmali;
     $("#kayit-form").hidden = kurulmali || kodla;
     $("#giris-form").hidden = kurulmali || !kodla;
+    // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
+    if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
+  }
+
+  function iosAdimlari() {
+    if (uygulamaIci) return `<ol class="ios-adim">
+        <li>Bu sayfa WhatsApp gibi bir uygulamanın içinde açıldı. Sağ alttaki <b>pusula 🧭</b> ya da <b>⋯</b> simgesine dokunup <b>“Safari'de Aç”</b>ı seçin.</li>
+        <li>Safari'de açılınca buradaki adımlar çıkar.</li></ol>`;
+    if (/CriOS/i.test(ua)) return `<p class="kur-not">iPhone'da Chrome ile 3 adım:</p><ol class="ios-adim">
+        <li>Sağ üstte, adres çubuğundaki <b>Paylaş</b> <span class="paylas-simge">⬆</span> simgesine dokunun.</li>
+        <li>Açılan listede <b>“Ana Ekrana Ekle”</b>ye dokunun.</li>
+        <li>Sağ üstteki <b>“Ekle”</b>ye dokunun.</li></ol>`;
+    return `<p class="kur-not">iPhone'da ekleme, telefonun kendi menüsünden yapılır. <b>4 adım:</b></p>
+      <ol class="ios-adim">
+        <li>Ekranın en altında, sağdaki <b class="ios-uc">⋯</b> (üç nokta) simgesine dokunun.<br><small>Eski iPhone'larda altta ortadaki <span class="paylas-simge">⬆</span> Paylaş simgesine dokunun ve 3. adıma geçin.</small></li>
+        <li>Açılan menüde <b>“Paylaş”</b>a dokunun.</li>
+        <li>Listeyi biraz yukarı kaydırıp <b>“Ana Ekrana Ekle”</b>ye dokunun.</li>
+        <li>Sağ üstteki <b>“Ekle”</b>ye dokunun. Sporkent simgesi ana ekranınıza gelir.</li>
+      </ol>
+      <div class="ios-ok">↘</div>`;
   }
   $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
   $("#kayda-don").addEventListener("click", () => girisEkrani(false));
@@ -653,20 +673,7 @@
       else kurAdim(`Eklemediniz. Uygulamayı kullanmak için <b>📲 Ana Ekrana Ekle</b> tuşuna tekrar basıp <b>Yükle</b>'yi seçin.`);
       return;
     }
-    if (iosCihaz && uygulamaIci) {
-      return kurAdim(`<ol>
-        <li>Bu sayfa başka bir uygulamanın içinde açıldı. Önce <b>Safari'de açın</b>: sağ alttaki <b>pusula 🧭</b> ya da <b>⋯</b> simgesine dokunup <b>“Safari'de Aç”</b>ı seçin.</li>
-        <li>Safari'de açılınca bu tuşa yeniden basın.</li></ol>`);
-    }
-    if (iosCihaz) {
-      return kurAdim(`<p class="kur-not">iPhone'da ekleme işini telefonun kendi menüsü yapar. 3 adım:</p>
-        <ol>
-          <li>Ekranın altındaki <b>Paylaş</b> simgesine dokunun <span class="paylas-simge">⬆︎</span><br><small>(kare ve yukarı ok; görünmüyorsa sayfayı biraz aşağı kaydırın ya da <b>⋯</b> simgesine dokunun)</small></li>
-          <li>Açılan listede aşağı kaydırıp <b>“Ana Ekrana Ekle”</b>yi seçin.</li>
-          <li>Sağ üstteki <b>“Ekle”</b>ye dokunun.</li>
-        </ol>
-        <div class="asagi-ok">⬇︎</div>`);
-    }
+    if (iosCihaz) return kurAdim(iosAdimlari());
     // Android: Chrome ekleme penceresini açmadıysa (başka tarayıcı, uygulama içi ya da zaten ekli)
     const chrome = `intent://${adres.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
     kurAdim(`<ol>
@@ -789,8 +796,8 @@
     return `<div class="uye">
       <div><b>${kac(u.ad)}</b>${u.ben ? " (siz)" : ""}<br><small>${kac(u.unvan || ROL_ADI[u.rol] || u.rol)}${tel} · ${kac(sonGorulme(u.son_gorulme) || "Başvuru: " + tarihSaat(u.created_at))}</small>
         ${u.durum === "onayli" ? bildirimDurumu(u) : ""}</div>
-      <div class="uye-dugmeler">${u.ben ? "" : dugmeler}</div>
       ${uyari ? `<div class="uye-uyari">${uyari}</div>` : ""}
+      <div class="uye-dugmeler${uyari ? " altta" : ""}">${u.ben ? "" : dugmeler}</div>
     </div>`;
   }
 
@@ -892,7 +899,7 @@
   }
 
   // ---------- Ortağa davet (yönetici) ----------
-  const UYGULAMA_ADRESI = "https://avsamimciftci-wq.github.io/sporkent-saha-takip/";
+  const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-takip";
   const basHarf = (ad) => ad.toLocaleLowerCase("tr").replace(/(^|\s)(\S)/g, (_, b, h) => b + h.toLocaleUpperCase("tr"));
   // Listede telefonlar uluslararası biçimde (90532…, 49…); 10 haneliyse Türkiye kabul edilir
   const uluslararasi = (t) => { const d = String(t).replace(/\D/g, ""); return d.length === 10 ? "90" + d : d; };

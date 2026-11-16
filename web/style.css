@@ -521,3 +521,12 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .davet-durum { font-size: 13px; font-weight: 700; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 .davet-durum.katildi { background: #e3f4ea; color: #1f6b4f; }
 .davet-durum.bekliyor { background: #fff4d6; color: #8a5a00; }
+
+.uye-dugmeler.altta { flex-basis: 100%; }
+.uye-dugmeler.altta .kucuk-dugme { flex: 1; padding: 12px; font-size: 17px; }
+/* Ana ekrana ekleme adımları: koyu temada da okunur */
+.kur-adim, .kur-adim .kur-not, .kur-adim small { color: #1b2421; }
+.kur-adim small { color: #4a5753; }
+.ios-adim li { margin-bottom: 14px; font-size: 19px; }
+.ios-uc { display: inline-block; background: #1b2421; color: #fff; border-radius: 50%; width: 34px; height: 34px; line-height: 30px; text-align: center; font-size: 22px; vertical-align: middle; }
+.ios-ok { text-align: right; font-size: 64px; line-height: 1; color: #1a73e8; font-weight: 700; animation: zipla 1s infinite; padding-right: 6px; }
