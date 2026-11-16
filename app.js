@@ -819,6 +819,11 @@
       <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
+      <h2>📨 Ortağa davet gönder</h2>
+      <p class="ipucu">Ortak numarasını ya da adını yazın. Çıkan kişiye uygulama bağlantısını WhatsApp ya da SMS ile gönderin.</p>
+      <input id="davet-ara" class="davet-ara" type="search" inputmode="search" placeholder="Örn. 12 ya da Yılmaz" autocomplete="off">
+      <div id="davet-sonuc"></div>
+
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
       ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"), ayniNo(u))).join("")
         : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
@@ -885,6 +890,56 @@
       <p class="ipucu">Bütün sorunlar ve fotoğraflar kalıcı olarak silinir, numaralar 001'den başlar. Üyeler silinmez. Geri alınamaz.</p>
       <button class="ikincil tehlike" style="width:100%" data-eylem="hepsini_sil">Tüm kayıtları sil</button>`;
   }
+
+  // ---------- Ortağa davet (yönetici) ----------
+  const UYGULAMA_ADRESI = "https://avsamimciftci-wq.github.io/sporkent-saha-takip/";
+  const basHarf = (ad) => ad.toLocaleLowerCase("tr").replace(/(^|\s)(\S)/g, (_, b, h) => b + h.toLocaleUpperCase("tr"));
+  // Listede telefonlar uluslararası biçimde (90532…, 49…); 10 haneliyse Türkiye kabul edilir
+  const uluslararasi = (t) => { const d = String(t).replace(/\D/g, ""); return d.length === 10 ? "90" + d : d; };
+  const telGoster = (t) => { const d = uluslararasi(t); return d.startsWith("90") && d.length === 12 ? `0${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8, 10)} ${d.slice(10)}` : "+" + d; };
+  const cepMi = (t) => { const d = uluslararasi(t); return !d.startsWith("90") || d[2] === "5"; };
+  const davetMetni = (r) => `Sayın ${basHarf(r.ad)},
+
+Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
+
+${UYGULAMA_ADRESI}
+
+1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
+3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}) ve bu cep telefonu numaranızı yazıp "Kayıt ol"a basın.
+
+Bilgileriniz onaylandığında uygulama kendiliğinden açılır. Şifre gerekmez.
+
+Sporkent İşletme Kooperatifi Yönetim Kurulu`;
+
+  let davetZamani = null;
+  $("#yonetim").addEventListener("input", (e) => {
+    if (e.target.id !== "davet-ara") return;
+    clearTimeout(davetZamani);
+    const q = e.target.value.trim();
+    const kutu = $("#davet-sonuc");
+    if (!q) { kutu.innerHTML = ""; return; }
+    davetZamani = setTimeout(async () => {
+      kutu.innerHTML = `<p class="ipucu">Aranıyor…</p>`;
+      try {
+        const { sonuc } = await api("rehber_ara", { q });
+        if ($("#davet-ara")?.value.trim() !== q) return;
+        kutu.innerHTML = sonuc.length ? sonuc.map((r) => {
+          const durum = r.durum === "onayli" ? `<span class="davet-durum katildi">✔ Uygulamada</span>`
+            : r.durum === "bekliyor" ? `<span class="davet-durum bekliyor">⏳ Onay bekliyor</span>` : "";
+          const metin = encodeURIComponent(davetMetni(r));
+          const teller = r.telefonlar.filter(cepMi);
+          return `<div class="davet-kisi">
+            <div><b>${kac(r.no)} · ${kac(basHarf(r.ad))}</b> ${durum}</div>
+            ${teller.length ? teller.map((t) => `<div class="davet-tel"><span>📞 ${kac(telGoster(t))}</span>
+              <a class="davet-dugme wa" href="https://wa.me/${uluslararasi(t)}?text=${metin}" target="_blank" rel="noopener">WhatsApp</a>
+              <a class="davet-dugme sms" href="sms:+${uluslararasi(t)}?&body=${metin}">SMS</a></div>`).join("")
+              : `<p class="ipucu">Listede cep telefonu yok.</p>`}
+          </div>`;
+        }).join("") : `<p class="ipucu">Listede bulunamadı.</p>`;
+      } catch (err) { kutu.innerHTML = `<p class="hata">${kac(err.message)}</p>`; }
+    }, 350);
+  });
 
   $("#yonetim").addEventListener("click", async (e) => {
     const b = e.target.closest("[data-eylem]"); if (!b) return;
