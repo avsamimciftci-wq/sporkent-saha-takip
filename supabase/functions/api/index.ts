@@ -632,6 +632,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { uyeler: (data ?? []).map((x: any) => ({ ...x, eslesme: eslesme(x), bildirim: aboneler.has(x.cihaz), ben: x.cihaz === u.cihaz })) };
     }
 
+    case "rehber_ara": {
+      // Yönetici davet göndermek için resmi ortak listesinde numara ya da adla arar
+      yonetici();
+      const q = temiz(g.q, 60);
+      if (!q) return { sonuc: [] };
+      let sorgu = db.from("ortak_rehberi").select("no, ad, telefonlar").order("no").limit(20);
+      sorgu = /^\d+$/.test(q) ? sorgu.eq("no", Number(q)) : sorgu.ilike("ad", `%${q.replace(/[%_\\]/g, "").toLocaleUpperCase("tr")}%`);
+      const { data, error } = await sorgu;
+      if (error) throw error;
+      const nolar = (data ?? []).map((r: any) => r.no);
+      const { data: kayitli } = nolar.length
+        ? await db.from("uyeler").select("ortak_no, durum").in("ortak_no", nolar).neq("durum", "cikarildi")
+        : { data: [] };
+      const durum = new Map((kayitli ?? []).map((k: any) => [k.ortak_no, k.durum]));
+      return { sonuc: (data ?? []).map((r: any) => ({ ...r, durum: durum.get(r.no) ?? null })) };
+    }
+
     case "uye_onayla":
     case "uye_cikar":
     case "uye_geri_al": {
