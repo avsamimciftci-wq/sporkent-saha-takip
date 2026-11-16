@@ -846,8 +846,8 @@
 
       <section class="davet-bolum">
         <h2>📨 Ortağa davet gönder</h2>
-        <p>Ortaklık numarasını (örn. 12) ya da ortağın telefon numarasını yazın. Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
-        <input id="davet-ara" class="davet-ara" type="search" inputmode="numeric" placeholder="Ortak no ya da telefon" autocomplete="off">
+        <p>Ortaklık numarasını (örn. 12), telefon numarasını ya da ortağın adını / soyadını yazın. İsimde kelimenin tamamını yazın (örn. “Yılmaz”). Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
+        <input id="davet-ara" class="davet-ara" type="search" placeholder="Ortak no, telefon ya da isim" autocomplete="off">
         <div id="davet-sonuc"></div>
       </section>
 
@@ -987,7 +987,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
             <button type="button" class="ikincil davet-hazirla" style="width:100%">🔑 Davet kodu hazırla</button>
             <div class="davet-gonder"></div>
           </div>`;
-        }).join("") : `<p class="ipucu">${q.replace(/\D/g, "").length >= 7 ? "Bu telefon numarası ortak listesinde kayıtlı değil." : "Bu ortaklık numarası listede yok."}</p>`;
+        }).join("") : `<p class="ipucu">${/\p{L}/u.test(q) ? "Bu isimde ortak bulunamadı. Adın ya da soyadın tamamını, listedeki gibi yazın." : q.replace(/\D/g, "").length >= 7 ? "Bu telefon numarası ortak listesinde kayıtlı değil." : "Bu ortaklık numarası listede yok."}</p>`;
       } catch (err) { kutu.innerHTML = `<p class="hata">${kac(err.message)}</p>`; }
     }, 350);
   });

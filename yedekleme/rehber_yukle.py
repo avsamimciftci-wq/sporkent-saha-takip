@@ -1,4 +1,4 @@
-# Resmi ortak listesini (Excel) veritabanına yükler. KVKK gereği ad ve telefonlar okunabilir biçimde
+# Resmi ortak listesini (Excel) veritabanına yükler. İsimle arama için her kelimenin özeti de saklanır. KVKK gereği ad ve telefonlar okunabilir biçimde
 # gönderilmez: her biri gizli anahtarlı özete (HMAC-SHA256) çevrilir. Anahtar supabase/functions.env
 # içindeki REHBER_ANAHTARI'dır; sunucu da aynı anahtarla özet çıkarıp karşılaştırır.
 #
@@ -32,9 +32,11 @@ for r in ws.iter_rows(min_row=2, values_only=True):
         n = tel_norm(t)
         if len(n) >= 7 and ozet(n) not in teller:
             teller.append(ozet(n))
-    satirlar.append(f"({int(r[3])}, '{ozet(ad)}', array[{','.join(repr(t) for t in teller)}]::text[])")
+    kelimeler = list(dict.fromkeys(ozet(k) for k in ad.split(" ") if k))
+    satirlar.append(f"({int(r[3])}, '{ozet(ad)}', array[{','.join(repr(t) for t in teller)}]::text[], "
+                    f"array[{','.join(repr(k) for k in kelimeler)}]::text[])")
 
-sql = ("begin; delete from ortak_rehberi;\ninsert into ortak_rehberi(no, ad_ozet, tel_ozetleri) values\n"
+sql = ("begin; delete from ortak_rehberi;\ninsert into ortak_rehberi(no, ad_ozet, tel_ozetleri, kelime_ozetleri) values\n"
        + ",\n".join(satirlar) + ";\ncommit;\n"
        "select json_build_object('yuklenen', count(*)) r from ortak_rehberi;\n")
 fd, yol = tempfile.mkstemp(suffix=".sql")
