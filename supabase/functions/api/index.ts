@@ -182,10 +182,8 @@ async function giris(g: any) {
   // "Ortak 12" + kendi şifresi: TG üyesi olarak katılır (onay kuralı aynı)
   const m = ad.match(/^ortak\s*-?\s*(\d{1,4})$/i);
   const sifre = temiz(g.kod, 60);
-  if (m && sifre) {
-    const { data: o } = await db.from("ortaklar").select("no").eq("no", Number(m[1])).eq("sifre", sifre).maybeSingle();
-    if (o) { rol = "uye"; ad = `Ortak ${o.no}`; }
-  }
+  // Eski "Ortak N + şifre" girişi kapandı: ortaklar artık yöneticinin gönderdiği davet koduyla kayıt olur
+  if (m) throw new Hata("Ortak girişi artık şifreyle yapılmıyor. Ortak kaydı ekranında, yönetimin size gönderdiği davet koduyla kayıt olun.", 401);
   // TG Başkanı, TG üyeleri ve YK üyeleri: kişiye özel kod; ad, unvan ve görev listeden gelir, onay beklemez
   let tg: { ad: string; unvan: string; rol: Rol } | null = null;
   if (!rol && sifre) {
@@ -817,27 +815,6 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tg: (data ?? []).map((t: any) => ({ ...t, kullaniliyor: giren.has(t.ad) })) };
     }
 
-    case "ortak_listesi": {
-      yonetici();
-      const { data, error } = await db.from("ortaklar").select("no, sifre").order("no");
-      if (error) throw error;
-      const { data: k } = await db.from("uyeler").select("ad").like("ad", "Ortak %");
-      const kullanan = new Set((k ?? []).map((x: any) => x.ad));
-      return { ortaklar: (data ?? []).map((o: any) => ({ ...o, kullaniliyor: kullanan.has(`Ortak ${o.no}`) })) };
-    }
-
-    case "ortak_ekle": {
-      // Sıradaki numarayla yeni ortak hesabı ve 6 haneli şifre
-      yonetici();
-      const { data: son } = await db.from("ortaklar").select("no").order("no", { ascending: false }).limit(1).maybeSingle();
-      const no = (son?.no ?? 0) + 1;
-      for (let i = 0; i < 5; i++) {
-        const sifre = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
-        const { error } = await db.from("ortaklar").insert({ no, sifre });
-        if (!error) return { no, sifre };
-      }
-      throw new Hata("Şifre üretilemedi, tekrar deneyin.");
-    }
 
     case "kodlar": {
       yonetici();
