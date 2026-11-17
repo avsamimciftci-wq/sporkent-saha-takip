@@ -555,11 +555,10 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .davet-onizle pre { white-space: pre-wrap; font: 14px/1.45 system-ui, sans-serif; background: #f4f6f4; border-radius: 8px; padding: 10px; margin: 6px 0 0; }
 .tg-giris-dugme { width: 100%; background: #fff4d6; border: 2px solid #e0a800; color: #3b2a00; border-radius: 12px; padding: 12px 14px; font-size: 16px; line-height: 1.4; margin: 0 0 14px; cursor: pointer; text-align: center; }
 .tg-giris-dugme b { font-size: 18px; }
-/* Davet sekmeleri */
-.davet-sekme { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.davet-sekme button { border: 2px solid rgba(255,255,255,.6); background: rgba(255,255,255,.12); color: #fff; border-radius: 12px; padding: 12px 8px; font: inherit; font-size: 16px; font-weight: 800; line-height: 1.25; cursor: pointer; }
-.davet-sekme button.secili { background: #fff; color: #0b4fa8; border-color: #fff; }
-[data-davet-icerik] > p { color: #e3efff; font-size: 16px; margin: 0 0 12px; line-height: 1.45; }
-.tg-kisi small { color: #5d6b66; }
 .davet-dugme.kopya { background: #5d6b66; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
 .yeni-tur-not { background: #e8eaf6; border: 2px solid #283593; color: #1a237e; border-radius: 10px; padding: 8px 12px; font-weight: 600; margin: 0 0 12px; }
+.tg-link-kutu { background: #fff4d6; border: 2px solid #e0a800; border-radius: 14px; padding: 12px 14px; margin: 8px 0 12px; color: #3b2a00; }
+.tg-link-kutu > b { font-size: 18px; display: block; }
+.tg-link { font-size: 22px; font-weight: 800; color: #8a5a00; margin: 6px 0; word-break: break-all; }
+.tg-link-kutu small { display: block; font-size: 14px; line-height: 1.4; }
+.davet-bolum > div > p { color: #e3efff; font-size: 16px; margin: 0 0 12px; line-height: 1.45; }

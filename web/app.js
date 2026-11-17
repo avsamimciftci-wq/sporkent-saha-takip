@@ -846,26 +846,11 @@
       <h1>Üyeler ve ayarlar</h1>
 
       <section class="davet-bolum">
-        <div class="davet-sekme">
-          <button type="button" class="secili" data-davet-sekme="ortak">📨 Ortağa davet gönder</button>
-          <button type="button" data-davet-sekme="tg">🏅 TG / YK üyesine davet gönder</button>
-        </div>
-        <div data-davet-icerik="ortak">
+        <h2>📨 Ortağa davet gönder</h2>
+        <div>
         <p>Ortaklık numarasını (örn. 12), telefon numarasını ya da ortağın adını / soyadını yazın. İsimde kelimenin tamamını yazın (örn. “Yılmaz”). Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
         <input id="davet-ara" class="davet-ara" type="search" placeholder="Ortak no, telefon ya da isim" autocomplete="off">
         <div id="davet-sonuc"></div>
-        </div>
-        <div data-davet-icerik="tg" hidden>
-          <p>TG ve YK üyeleri ortak kaydı yapmaz; kendi adı ve şahsi koduyla girer. Kişiyi seçin, mesajda TG giriş linki ve şahsi kodu birlikte gider.</p>
-          ${tg.map((t, i) => `<div class="davet-kisi tg-kisi">
-            <div><b>${kac(t.ad)}</b> <small>${kac(t.unvan)}</small> ${t.kullaniliyor ? `<span class="davet-durum katildi">✔ Giriş yaptı</span>` : ""}</div>
-            <div class="davet-satir"><span>Şahsi kod</span><b class="davet-kod-sayi">${kac(t.kod)}</b></div>
-            <pre hidden>${kac(tgDavetMetni(t))}</pre>
-            <div class="davet-tel">
-              <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(tgDavetMetni(t))}" target="_blank" rel="noopener">WhatsApp</a>
-              <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(tgDavetMetni(t))}">SMS</a>
-              <button type="button" class="davet-dugme kopya tg-kopyala">📋 Kopyala</button></div>
-          </div>`).join("")}
         </div>
       </section>
 
@@ -898,6 +883,25 @@
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
+
+      <h2>Kişisel kodlar: YK ve TG (${tg.length})</h2>
+      <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Yönetim kurulu ve TG üyesi için ortak kod kapalıdır.</p>
+      <div class="tg-link-kutu">
+        <b>🏅 TG ve YK üyelerine özel davet linki</b>
+        <div class="tg-link">${kac(TG_ADRESI.replace(/^https:\/\//, ""))}</div>
+        <small>Bu link açılınca ortak kaydı yerine doğrudan <b>şahsi kodla giriş</b> ekranı gelir. Linki gönderin; kişi adını ve aşağıdaki şahsi kodunu yazarak girer.</small>
+        <pre hidden>${kac(tgLinkMetni)}</pre>
+        <div class="davet-tel">
+          <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(tgLinkMetni)}" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(tgLinkMetni)}">SMS</a>
+          <button type="button" class="davet-dugme kopya tg-link-kopyala">📋 Kopyala</button></div>
+      </div>
+      <details class="ortak-liste" open>
+        <summary>📋 Kişisel kodları göster</summary>
+        <table><thead><tr><th>Ad</th><th>Kod</th><th>Durum</th></tr></thead><tbody>
+        ${tg.map((t) => `<tr><td>${kac(t.ad)}<br><small>${kac(t.unvan)}</small></td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
+        </tbody></table>
+      </details>
 
       <h2>Yeni işlerin yapılma süresi</h2>
       <div class="uye">
@@ -967,31 +971,23 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   // TG / YK üyesine davet: TG giriş linki + şahsi kod
   const TG_ADRESI = "https://tinyurl.com/sporkent-tg";
-  const tgDavetMetni = (t) => `Sayın ${t.ad},
+  const tgLinkMetni = `Sayın TG / YK Üyemiz,
 
-Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına ${t.unvan} olarak aşağıdaki bağlantıdan katılabilirsiniz:
+Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına size özel giriş bağlantısı:
 
 ${TG_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. "Şahsi kodla giriş" ekranında adınızı ve şahsi kodunuzu yazıp "Giriş yap"a basın.
+3. "Şahsi kodla giriş" ekranında adınızı ve size verilen şahsi kodunuzu yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
 
-Şahsi kodunuz: ${t.kod}
-(Kod yalnızca size özeldir, kimseyle paylaşmayın. Onay beklemeden girersiniz.)
+Ekranda ortak kaydı görünürse en üstteki sarı "Şahsi kodunuzla buradan girin" düğmesine dokunun.
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   $("#yonetim").addEventListener("click", async (e) => {
-    const sekme = e.target.closest("[data-davet-sekme]");
-    if (sekme) {
-      const ad = sekme.dataset.davetSekme;
-      document.querySelectorAll("[data-davet-sekme]").forEach((b) => b.classList.toggle("secili", b === sekme));
-      document.querySelectorAll("[data-davet-icerik]").forEach((d) => { d.hidden = d.dataset.davetIcerik !== ad; });
-      return;
-    }
-    const k = e.target.closest(".tg-kopyala"); if (!k) return;
-    try { await navigator.clipboard.writeText(k.closest(".tg-kisi").querySelector("pre").textContent); mesaj("Mesaj kopyalandı."); }
+    if (!e.target.closest(".tg-link-kopyala")) return;
+    try { await navigator.clipboard.writeText(tgLinkMetni); mesaj("TG davet mesajı kopyalandı."); }
     catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
   });
 
