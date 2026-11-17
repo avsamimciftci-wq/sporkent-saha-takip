@@ -846,10 +846,27 @@
       <h1>Üyeler ve ayarlar</h1>
 
       <section class="davet-bolum">
-        <h2>📨 Ortağa davet gönder</h2>
+        <div class="davet-sekme">
+          <button type="button" class="secili" data-davet-sekme="ortak">📨 Ortağa davet gönder</button>
+          <button type="button" data-davet-sekme="tg">🏅 TG / YK üyesine davet gönder</button>
+        </div>
+        <div data-davet-icerik="ortak">
         <p>Ortaklık numarasını (örn. 12), telefon numarasını ya da ortağın adını / soyadını yazın. İsimde kelimenin tamamını yazın (örn. “Yılmaz”). Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
         <input id="davet-ara" class="davet-ara" type="search" placeholder="Ortak no, telefon ya da isim" autocomplete="off">
         <div id="davet-sonuc"></div>
+        </div>
+        <div data-davet-icerik="tg" hidden>
+          <p>TG ve YK üyeleri ortak kaydı yapmaz; kendi adı ve şahsi koduyla girer. Kişiyi seçin, mesajda TG giriş linki ve şahsi kodu birlikte gider.</p>
+          ${tg.map((t, i) => `<div class="davet-kisi tg-kisi">
+            <div><b>${kac(t.ad)}</b> <small>${kac(t.unvan)}</small> ${t.kullaniliyor ? `<span class="davet-durum katildi">✔ Giriş yaptı</span>` : ""}</div>
+            <div class="davet-satir"><span>Şahsi kod</span><b class="davet-kod-sayi">${kac(t.kod)}</b></div>
+            <pre hidden>${kac(tgDavetMetni(t))}</pre>
+            <div class="davet-tel">
+              <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(tgDavetMetni(t))}" target="_blank" rel="noopener">WhatsApp</a>
+              <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(tgDavetMetni(t))}">SMS</a>
+              <button type="button" class="davet-dugme kopya tg-kopyala">📋 Kopyala</button></div>
+          </div>`).join("")}
+        </div>
       </section>
 
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
@@ -881,15 +898,6 @@
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
-
-      <h2>Kişisel kodlar: YK ve TG (${tg.length})</h2>
-      <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Yönetim kurulu ve TG üyesi için ortak kod kapalıdır.</p>
-      <details class="ortak-liste" open>
-        <summary>📋 Kişisel kodları göster</summary>
-        <table><thead><tr><th>Ad</th><th>Kod</th><th>Durum</th></tr></thead><tbody>
-        ${tg.map((t) => `<tr><td>${kac(t.ad)}<br><small>${kac(t.unvan)}</small></td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
-        </tbody></table>
-      </details>
 
       <h2>Ortak hesapları (${ortaklar.length})</h2>
       <p class="ipucu">Her ortak kendi kullanıcı adı (örn. <b>Ortak 12</b>) ve şifresiyle girer; ilk girişte yine sizin onayınıza düşer. Yeni eklenen ortak sıradaki numarayı alır.</p>
@@ -964,6 +972,36 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const b = e.target.closest(".davet-kopyala"); if (!b) return;
     const metin = b.closest(".davet-kisi").querySelector(".davet-onizle pre").textContent;
     try { await navigator.clipboard.writeText(metin); mesaj("Mesaj kopyalandı. WhatsApp'ta sohbete yapıştırabilirsiniz."); }
+    catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
+  });
+
+  // TG / YK üyesine davet: TG giriş linki + şahsi kod
+  const TG_ADRESI = "https://tinyurl.com/sporkent-tg";
+  const tgDavetMetni = (t) => `Sayın ${t.ad},
+
+Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına ${t.unvan} olarak aşağıdaki bağlantıdan katılabilirsiniz:
+
+${TG_ADRESI}
+
+1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
+3. "Şahsi kodla giriş" ekranında adınızı ve şahsi kodunuzu yazıp "Giriş yap"a basın.
+
+Şahsi kodunuz: ${t.kod}
+(Kod yalnızca size özeldir, kimseyle paylaşmayın. Onay beklemeden girersiniz.)
+
+Sporkent İşletme Kooperatifi Yönetim Kurulu`;
+
+  $("#yonetim").addEventListener("click", async (e) => {
+    const sekme = e.target.closest("[data-davet-sekme]");
+    if (sekme) {
+      const ad = sekme.dataset.davetSekme;
+      document.querySelectorAll("[data-davet-sekme]").forEach((b) => b.classList.toggle("secili", b === sekme));
+      document.querySelectorAll("[data-davet-icerik]").forEach((d) => { d.hidden = d.dataset.davetIcerik !== ad; });
+      return;
+    }
+    const k = e.target.closest(".tg-kopyala"); if (!k) return;
+    try { await navigator.clipboard.writeText(k.closest(".tg-kisi").querySelector("pre").textContent); mesaj("Mesaj kopyalandı."); }
     catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
   });
 
@@ -1450,15 +1488,18 @@ Bu bilgileri ortağa iletin.`);
   const yeniForm = $("#yeni-form");
   const yeniFoto = fotoSecici($("#yeni-foto"), $("#yeni-foto-onizleme"), $("#yeni-foto-yazi"), $("#yeni-galeri"));
 
-  // Yönetim İş Emri / Genel yapılacak işler seçimine göre açıklama
-  $("#gizli-alan").addEventListener("change", () => {
-    $("#tur-ipucu").textContent = yeniForm.tur.value === "yonetim"
-      ? "Yönetim İş Emri'ni yalnızca yönetici, yönetim kurulu, müdür ve şef görür. Diğer üyeler görmez."
-      : "Genel yapılacak işi gruptaki herkes görür.";
-  });
-  $("#yeni-ac").addEventListener("click", () => { if (!yeniGirebilir()) return; yeniForm.reset(); yeniFoto.sifirla(); $("#gizli-alan").hidden = !yonetimIsiGirebilir(); $("#gizli-alan").dispatchEvent(new Event("change")); goster("yeni"); });
-  // YK Saha Takip'ten yeni iş emri: tür "Yönetim İş Emri" seçili gelir
-  $("#yk-yeni").addEventListener("click", () => { $("#yeni-ac").click(); yeniForm.tur.value = "yonetim"; $("#gizli-alan").dispatchEvent(new Event("change")); });
+  // Kaydın türü seçilmez, girildiği yere göre belirlenir:
+  // Saha Takip "+ Yeni kayıt" → genel yapılacak iş; Yönetim Kurulu › YK Saha Takip "Yeni iş emri ver" → Yönetim İş Emri
+  let yeniTur = "genel";
+  function yeniFormAc(tur) {
+    yeniTur = tur === "yonetim" && yonetimIsiGirebilir() ? "yonetim" : "genel";
+    yeniForm.reset(); yeniFoto.sifirla();
+    $("#yeni-baslik").textContent = yeniTur === "yonetim" ? "Yeni YK iş emri" : "Yeni kayıt";
+    $("#yeni-tur-not").hidden = yeniTur !== "yonetim";
+    goster("yeni");
+  }
+  $("#yeni-ac").addEventListener("click", () => { if (yeniGirebilir()) yeniFormAc("genel"); });
+  $("#yk-yeni").addEventListener("click", () => yeniFormAc("yonetim"));
 
   yeniForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1470,7 +1511,7 @@ Bu bilgileri ortağa iletin.`);
       const foto = yeniFoto.al() ? await fotoYukle(yeniFoto.al()) : null;
       const r = await api("yeni", {
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
-        gizli: yonetimIsiGirebilir() && f.get("tur") === "yonetim",
+        gizli: yonetimIsiGirebilir() && yeniTur === "yonetim",
       });
       mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
