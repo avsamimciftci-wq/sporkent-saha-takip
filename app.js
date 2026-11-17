@@ -790,8 +790,8 @@
     goster("yonetim");
     $("#yonetim").innerHTML = `<p class="bos">Yükleniyor…</p>`;
     try {
-      const [{ uyeler }, { kodlar, varsayilan_sure }, { ortaklar }, { tg }] = await Promise.all([api("uye_listesi"), api("kodlar"), api("ortak_listesi"), api("tg_listesi")]);
-      yonetimCiz(uyeler, kodlar, varsayilan_sure, ortaklar, tg);
+      const [{ uyeler }, { kodlar, varsayilan_sure }, { tg }] = await Promise.all([api("uye_listesi"), api("kodlar"), api("tg_listesi")]);
+      yonetimCiz(uyeler, kodlar, varsayilan_sure, tg);
     } catch (e) { $("#yonetim").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
@@ -815,7 +815,7 @@
     </div>`;
   }
 
-  function yonetimCiz(uyeler, kodlar, varsSure, ortaklar = [], tg = []) {
+  function yonetimCiz(uyeler, kodlar, varsSure, tg = []) {
     const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
     const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
       .sort((a, b) => ROL_SIRASI.indexOf(a.rol) - ROL_SIRASI.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"));
@@ -898,16 +898,6 @@
       ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
       <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
       ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
-
-      <h2>Ortak hesapları (${ortaklar.length})</h2>
-      <p class="ipucu">Her ortak kendi kullanıcı adı (örn. <b>Ortak 12</b>) ve şifresiyle girer; ilk girişte yine sizin onayınıza düşer. Yeni eklenen ortak sıradaki numarayı alır.</p>
-      <button class="ana-dugme" type="button" data-eylem="ortak_ekle">➕ Yeni ortak ekle</button>
-      <details class="ortak-liste">
-        <summary>📋 Kullanıcı adları ve şifreleri göster</summary>
-        <table><thead><tr><th>Kullanıcı adı</th><th>Şifre</th><th>Durum</th></tr></thead><tbody>
-        ${ortaklar.map((o) => `<tr><td>Ortak ${o.no}</td><td><code>${kac(o.sifre)}</code></td><td>${o.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
-        </tbody></table>
-      </details>
 
       <h2>Yeni işlerin yapılma süresi</h2>
       <div class="uye">
@@ -1053,21 +1043,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       return;
     }
     if (eylem === "uye_sil" && !confirm(`${ad} listeden silinsin mi?`)) return;
-    if (eylem === "ortak_ekle") {
-      if (!confirm("Sıradaki numarayla yeni bir ortak hesabı oluşturulsun mu?")) return;
-      b.disabled = true;
-      try {
-        const o = await api("ortak_ekle");
-        alert(`Yeni ortak hesabı oluşturuldu:
-
-Kullanıcı adı: Ortak ${o.no}
-Şifre: ${o.sifre}
-
-Bu bilgileri ortağa iletin.`);
-        await yonetimAc();
-      } catch (err) { mesaj(err.message); b.disabled = false; }
-      return;
-    }
     if (eylem === "varsayilan_sure") {
       const gun = prompt("Yeni işler kaç günde yapılsın? (1 ile 60 arası)");
       if (!gun) return;
