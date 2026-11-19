@@ -13,6 +13,12 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Açılış: Sporkent logosu -->
+  <div id="acilis" class="acilis" aria-hidden="true">
+    <img src="logo.png" alt="">
+    <b>Sporkent İşletme Kooperatifi</b>
+    <span>SAHA TAKİP</span>
+  </div>
   <header class="ust">
     <div class="ust-sol">
       <img class="ust-logo" src="logo.png" alt="Sporkent Yönetim Kurulu">
@@ -21,7 +27,21 @@
         <div class="ust-baslik">SAHA TAKİP</div>
       </div>
     </div>
+    <button id="ana-don" class="ust-ana" type="button" data-ana hidden aria-label="Ana sayfa"><span>🏠</span>Ana Sayfa</button>
   </header>
+
+  <!-- Ana sayfa: bölümler -->
+  <main id="ekran-ana" class="ekran" hidden>
+    <p class="ana-karsilama">Hoş geldiniz <b id="ana-ad"></b></p>
+    <div id="ana-kutular" class="ana-kutular">
+      <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
+      <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
+      <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
+      <button type="button" data-ac="iletisim" class="ana-kutu ak-iletisim"><span>☎️</span>İletişim</button>
+      <button type="button" data-ac="sokaklar" class="ana-kutu ak-sokak"><span>🗺️</span>Sokak Numaraları</button>
+      <button type="button" data-ac="servis" class="ana-kutu ak-servis"><span>🚐</span>Servis</button>
+    </div>
+  </main>
 
   <!-- Giriş -->
   <main id="ekran-giris" class="ekran" hidden>
@@ -100,7 +120,7 @@
 
   <!-- Yönetim işleri: iş programı ve müdür/şef görev takibi -->
   <main id="ekran-yonetimisleri" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-geri>← Geri</button></div>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button></div>
     <div class="yonetim-kutular">
       <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span>📅</span>İş Programı</button>
@@ -232,12 +252,19 @@
     <div id="numarator" class="numarator" aria-label="Sporkent sokak numaratörü"></div>
   </main>
 
+  <!-- Servis aracı güzergahı: yönetici servisle bir tur atarken kaydeder -->
+  <main id="ekran-servis" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-servis">🚐 Servis Güzergahı</h1></div>
+    <div id="servis" class="kart"></div>
+  </main>
+
   <nav id="alt-menu" class="alt-menu" hidden aria-label="Bölümler">
     <button type="button" data-modul="saha"><span>🛠️</span>Saha Takip<b id="saha-rozet" class="menu-rozet" hidden></b></button>
     <button type="button" data-modul="yonetim" hidden><span>🗂️</span>Yönetim Kurulu<b id="yk-rozet" class="menu-rozet" hidden></b></button>
     <button type="button" data-modul="aidat"><span>💳</span>Aidat</button>
     <button type="button" data-modul="iletisim"><span>☎️</span>İletişim</button>
     <button type="button" data-modul="sokaklar"><span>🗺️</span>Sokak Numaraları</button>
+    <button type="button" data-modul="servis"><span>🚐</span>Servis</button>
   </nav>
 
   <div id="mesaj" class="mesaj" hidden></div>

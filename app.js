@@ -107,7 +107,7 @@
 
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
-  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim", sokaklar: "sokaklar" };
+  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim", sokaklar: "sokaklar", servis: "servis", ana: "" };
   // Alt menünün gerçek yüksekliği (iPhone çentiği ve iki satırlık yazılar dahil): "+ Yeni kayıt" hep menünün üstünde kalsın
   if ("ResizeObserver" in window) new ResizeObserver(() => {
     const m = $("#alt-menu"); if (!m.hidden) document.documentElement.style.setProperty("--menu-h", m.offsetHeight + "px");
@@ -115,11 +115,14 @@
 
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
+    if (ad !== "servis" && typeof servisHaritaKapat === "function") servisHaritaKapat();
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
-    const menulu = !["giris", "bekle"].includes(ad) && onayli();
+    // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
+    const menulu = !["giris", "bekle", "ana"].includes(ad) && onayli();
+    $("#ana-don").hidden = !menulu;
     $("#alt-menu").hidden = !menulu;
     document.body.classList.toggle("menulu", menulu);
-    const modul = MODUL[ad] || "saha";
+    const modul = MODUL[ad] ?? "saha";
     $("#alt-menu [data-modul=yonetim]").hidden = !programGorur();
     for (const b of document.querySelectorAll("#alt-menu [data-modul]")) b.classList.toggle("secili", b.dataset.modul === modul);
     window.scrollTo(0, 0);
@@ -760,9 +763,11 @@
     if (oturum.durum !== "onayli") return bekleEkrani();
     clearInterval(bekleZamani);
     bildirimleriTemizle();
-    goster("liste");
+    if (!location.hash || location.hash === "#ana") anaAc(); else goster("liste");
     bildirimKutusu();
     await yenile();
+    if (!location.hash || location.hash === "#ana") return anaAc();
+    if (location.hash === "#servis") return servisAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -1409,6 +1414,241 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     if (e.target.closest("#devret-ac")) $("#devret").hidden = !$("#devret").hidden;
   });
 
+  // ---------- Servis Güzergahı: yönetici servisle bir tur atarken telefon güzergahı ve durakları kaydeder ----------
+  // Ham konumlar yalnızca bu telefonda tutulur; "Kaydet"te sadeleştirilmiş çizgi ve duraklar gönderilir.
+  var SERVIS_ANAHTAR = "sk_servis_kayit";
+  var DURAK_SN = 20, DURAK_M = 15, NOKTA_M = 4, DOGRULUK_M = 40;
+  var servisKayit = sakla.al(SERVIS_ANAHTAR);   // { bas, noktalar: [[lat,lng,ms]], duraklar: [{ad,lat,lng,sn}], bitti }
+  var servisIzle = null, servisHarita = null, servisCizgi = null, servisBen = null, servisSaat = null, ekranKilidi = null;
+  var durgun = null; // { lat, lng, bas, isaretli }
+  var servisVeri = null;
+
+  var metreArasi = (a, b) => {
+    const kx = 111320 * Math.cos((a[0] * Math.PI) / 180);
+    return Math.hypot((b[1] - a[1]) * kx, (b[0] - a[0]) * 110540);
+  };
+  var dkYazisi = (sn) => sn < 60 ? `${sn} sn` : `${Math.round(sn / 60)} dk`;
+  function sadelestir(ns, tol = NOKTA_M) {   // Douglas-Peucker
+    if (ns.length < 3) return ns.slice();
+    const kx = 111320 * Math.cos((ns[0][0] * Math.PI) / 180), xy = (p) => [p[1] * kx, p[0] * 110540];
+    const tut = new Array(ns.length).fill(false); tut[0] = tut[ns.length - 1] = true;
+    const yigin = [[0, ns.length - 1]];
+    while (yigin.length) {
+      const [i, j] = yigin.pop(); const [ax, ay] = xy(ns[i]), [bx, by] = xy(ns[j]);
+      const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy; let en = -1, k = -1;
+      for (let m = i + 1; m < j; m++) {
+        const [px, py] = xy(ns[m]); const t = L2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L2)) : 0;
+        const d = Math.hypot(px - ax - t * dx, py - ay - t * dy); if (d > en) { en = d; k = m; }
+      }
+      if (en > tol) { tut[k] = true; yigin.push([i, k], [k, j]); }
+    }
+    return ns.filter((_, i) => tut[i]);
+  }
+  var toplamMesafe = (ns) => ns.reduce((t, p, i) => i ? t + metreArasi(ns[i - 1], p) : 0, 0);
+  async function durakAdi(lat, lng, sira) {
+    const sk = await sokaklariAl(); let en = 35, ad = "";
+    for (const [no, v] of Object.entries(sk || {})) for (const c of v.c) {
+      const d = alanaUzaklik(lat, lng, c.map(([a, b]) => ({ lat: a, lng: b })));
+      if (d < en) { en = d; ad = `${no}. Sokak`; }
+    }
+    return ad || `Durak ${sira}`;
+  }
+  var servisSakla = () => sakla.koy(SERVIS_ANAHTAR, servisKayit);
+
+  async function ekranAcikTut() {
+    try { if ("wakeLock" in navigator && !ekranKilidi) { ekranKilidi = await navigator.wakeLock.request("screen"); ekranKilidi.addEventListener("release", () => { ekranKilidi = null; }); } } catch {}
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && servisIzle != null) ekranAcikTut(); });
+
+  function servisKonum(p) {
+    if (!servisKayit || servisKayit.bitti) return;
+    const { latitude: lat, longitude: lng, accuracy } = p.coords;
+    if (accuracy > DOGRULUK_M) { servisDurumYaz(`Konum zayıf (±${Math.round(accuracy)} m), bekleniyor…`); return; }
+    const t = Date.now(), yer = [lat, lng], ns = servisKayit.noktalar, son = ns[ns.length - 1];
+    if (!son) {
+      ns.push([lat, lng, t]);
+      durakAdi(lat, lng, 1).then((ad) => { servisKayit.duraklar.unshift({ ad, lat, lng, sn: 0, kalkis: true }); servisSakla(); servisListeYaz(); });
+    } else if (metreArasi(son, yer) >= NOKTA_M) { ns.push([lat, lng, t]); servisCizgi?.addLatLng(yer); }
+    // Durak: aynı yerde (15 m içinde) 20 saniyeden uzun beklenirse kendiliğinden işaretlenir
+    if (durgun && metreArasi([durgun.lat, durgun.lng], yer) <= DURAK_M) {
+      if (!durgun.isaretli && t - durgun.bas >= DURAK_SN * 1000) { durgun.isaretli = true; durakEkle(durgun.lat, durgun.lng, durgun.bas); }
+    } else durgun = { lat, lng, bas: t, isaretli: false };
+    if (servisBen) servisBen.setLatLng(yer); else if (servisHarita) servisBen = window.L.circleMarker(yer, { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(servisHarita);
+    servisHarita?.panTo(yer, { animate: true });
+    servisSakla(); servisDurumYaz();
+  }
+  async function durakEkle(lat, lng, zaman) {
+    const sn = Math.round((zaman - servisKayit.bas) / 1000);
+    // Az önce (30 m / 60 sn içinde) işaretlenmiş durağı ikinci kez ekleme
+    if (servisKayit.duraklar.some((d) => metreArasi([d.lat, d.lng], [lat, lng]) < 30 && Math.abs(d.sn - sn) < 60)) return false;
+    const d = { ad: await durakAdi(lat, lng, servisKayit.duraklar.length + 1), lat, lng, sn };
+    servisKayit.duraklar.push(d); servisKayit.duraklar.sort((a, b) => a.sn - b.sn);
+    servisSakla(); servisListeYaz();
+    if (servisHarita) durakIsareti(d, servisKayit.duraklar.indexOf(d)).addTo(servisHarita);
+    return true;
+  }
+  var durakIsareti = (d, i) => window.L.marker([d.lat, d.lng], { icon: window.L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15],
+    html: `<div class="hn hn-servis">${i + 1}</div>` }) }).bindPopup(`<b>${i + 1}. ${kac(d.ad)}</b><br>${d.sn ? `Kalkıştan ${dkYazisi(d.sn)} sonra` : "Kalkış"}`);
+
+  function servisBaslat() {
+    if (!navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
+    servisKayit = { bas: Date.now(), noktalar: [], duraklar: [], bitti: false }; durgun = null;
+    servisSakla(); servisIzlemeyiAc(); servisCiz();
+  }
+  function servisIzlemeyiAc() {
+    if (servisIzle != null) return;
+    ekranAcikTut();
+    servisIzle = navigator.geolocation.watchPosition(servisKonum, (e) => {
+      mesaj(e.code === 1 ? "Konum izni verilmedi. Telefonun ayarlarından bu uygulamaya konum izni verin." : "Konum alınamadı; açık alanda bekleyin.");
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    clearInterval(servisSaat); servisSaat = setInterval(() => servisDurumYaz(), 1000);
+  }
+  function servisIzlemeyiKapat() {
+    if (servisIzle != null) navigator.geolocation.clearWatch(servisIzle);
+    servisIzle = null; clearInterval(servisSaat); servisSaat = null;
+    try { ekranKilidi?.release(); } catch {} ekranKilidi = null;
+  }
+  function servisBitir() {
+    if (!servisKayit) return;
+    if (servisKayit.noktalar.length < 2) return mesaj("Henüz yol kaydedilmedi. Servis hareket edince çizgi oluşur.");
+    servisIzlemeyiKapat();
+    servisKayit.bitti = true; servisKayit.son = servisKayit.noktalar[servisKayit.noktalar.length - 1][2];
+    servisSakla(); servisCiz();
+  }
+  function servisKayitSil() { servisIzlemeyiKapat(); servisKayit = null; sakla.sil(SERVIS_ANAHTAR); servisCiz(); }
+  async function servisGonder(d) {
+    const ns = servisKayit.noktalar.map(([a, b]) => [a, b]);
+    const cizgi = sadelestir(ns);
+    d.disabled = true;
+    try {
+      await api("servis_kaydet", { cizgi, duraklar: servisKayit.duraklar.map(({ ad, lat, lng, sn }) => ({ ad, lat, lng, sn })),
+        sure_sn: Math.round((servisKayit.son - servisKayit.bas) / 1000), mesafe_m: Math.round(toplamMesafe(ns)) });
+      servisKayit = null; sakla.sil(SERVIS_ANAHTAR); servisVeri = null;
+      mesaj("Servis güzergahı kaydedildi."); servisAc();
+    } catch (e) { mesaj(e.message); d.disabled = false; }
+  }
+
+  function servisDurumYaz(not) {
+    const k = $("#servis-durum"); if (!k || !servisKayit) return;
+    const sn = Math.round(((servisKayit.bitti ? servisKayit.son : Date.now()) - servisKayit.bas) / 1000);
+    const m = toplamMesafe(servisKayit.noktalar);
+    k.innerHTML = `<b>${String(Math.floor(sn / 60)).padStart(2, "0")}:${String(sn % 60).padStart(2, "0")}</b>
+      <span>${m >= 1000 ? (m / 1000).toFixed(2).replace(".", ",") + " km" : Math.round(m) + " m"} · ${servisKayit.duraklar.length} durak</span>
+      ${not ? `<small>${kac(not)}</small>` : servisKayit.noktalar.length ? "" : `<small>Konum bekleniyor…</small>`}`;
+  }
+  function servisListeYaz() {
+    const k = $("#servis-duraklar"); if (!k || !servisKayit) return;
+    const duzen = servisKayit.bitti;
+    k.innerHTML = servisKayit.duraklar.length ? servisKayit.duraklar.map((d, i) => `
+      <li><span class="sd-no">${i + 1}</span>
+        ${duzen ? `<input data-durak-ad="${i}" value="${kac(d.ad)}" maxlength="60" aria-label="Durak adı">` : `<b>${kac(d.ad)}</b>`}
+        <small>${d.sn ? "+" + dkYazisi(d.sn) : "kalkış"}</small>
+        ${duzen && i ? `<button type="button" class="sd-sil" data-durak-sil="${i}" aria-label="Durağı sil">✕</button>` : ""}</li>`).join("")
+      : `<li class="bos">Henüz durak yok. Servis bir yerde 20 saniyeden uzun durunca kendiliğinden eklenir.</li>`;
+  }
+
+  async function servisHaritaKur(cizgi, duraklar, takip) {
+    servisHaritaKapat();
+    const kutu = $("#servis-harita"); if (!kutu) return;
+    let L; try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
+    if (!document.body.contains(kutu)) return;
+    const h = L.map(kutu, { zoomControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5 });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
+    servisCizgi = L.polyline(cizgi, { color: "#ef6c00", weight: 6, opacity: .9 }).addTo(h);
+    duraklar.forEach((d, i) => durakIsareti(d, i).addTo(h));
+    const yer = cizgi.length ? cizgi : [[37.1335, 27.3235]];
+    const sigdir = () => { h.invalidateSize(); if (yer.length > 1 && !takip) h.fitBounds(yer, { padding: [26, 26] }); else h.setView(yer[yer.length - 1], 17); };
+    sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
+    servisHarita = h; servisBen = null;
+  }
+  function servisHaritaKapat() { if (servisHarita) { servisHarita.remove(); servisHarita = null; servisCizgi = null; servisBen = null; } }
+
+  async function servisAc() {
+    if (location.hash !== "#servis") history.replaceState(history.state, "", "#servis");
+    goster("servis");
+    if (servisKayit) return servisCiz();
+    $("#servis").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { servisVeri = (await api("servis")).guzergah; } catch (e) { $("#servis").innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
+    servisCiz();
+  }
+  function servisCiz() {
+    const k = $("#servis"); if (!k) return;
+    if (servisKayit && !servisKayit.bitti) {
+      // Kayıt sürüyor (sayfa yenilendiyse kaldığı yerden devam eder)
+      k.innerHTML = `
+        <div class="servis-kayit-bant"><span class="kayit-nokta"></span> KAYIT SÜRÜYOR</div>
+        <div id="servis-durum" class="servis-durum"></div>
+        <div id="servis-harita" class="servis-harita"></div>
+        <button id="servis-durak" class="ana-dugme servis-durak-dugme" type="button">📍 Burada durak var</button>
+        <button id="servis-bitir" class="ana-dugme servis-bitir" type="button">⏹ Turu bitir</button>
+        <p class="servis-not">Ekran açık kalsın, uygulamadan çıkmayın. Servis 20 saniyeden uzun durunca durak kendiliğinden eklenir; isterseniz düğmeyle de ekleyebilirsiniz.</p>
+        <h3 class="servis-baslik">Duraklar</h3><ol id="servis-duraklar" class="servis-duraklar"></ol>`;
+      servisDurumYaz(); servisListeYaz();
+      servisHaritaKur(servisKayit.noktalar.map(([a, b]) => [a, b]), servisKayit.duraklar, true);
+      servisIzlemeyiAc();
+      return;
+    }
+    if (servisKayit && servisKayit.bitti) {
+      // Tur bitti: durak adları düzeltilir, gereksiz durak silinir, sonra kaydedilir
+      k.innerHTML = `
+        <div class="devriye-ozet tam"><b>✅ Tur tamamlandı</b><span id="servis-durum" class="servis-durum-ic"></span></div>
+        <div id="servis-harita" class="servis-harita"></div>
+        <h3 class="servis-baslik">Durakları kontrol edin</h3>
+        <p class="servis-not">Durak adlarını düzeltebilir, gereksiz olanları ✕ ile silebilirsiniz.</p>
+        <ol id="servis-duraklar" class="servis-duraklar"></ol>
+        <button id="servis-kaydet" class="ana-dugme" type="button">💾 Güzergahı kaydet</button>
+        <button id="servis-yeniden" class="ikincil servis-ikincil" type="button">🔁 Kaydı sil, yeniden kaydet</button>`;
+      servisDurumYaz(); servisListeYaz();
+      servisHaritaKur(sadelestir(servisKayit.noktalar.map(([a, b]) => [a, b])), servisKayit.duraklar, false);
+      return;
+    }
+    const v = servisVeri;
+    k.innerHTML = v ? `
+      <div class="devriye-ozet tam"><b>🚐 Bir tur ${dkYazisi(v.sure_sn)} · ${(v.mesafe_m / 1000).toFixed(1).replace(".", ",")} km</b>
+        <span>${v.duraklar.length} durak · ${kac(v.kaydeden)} · ${gunYazisi(v.created_at.slice(0, 10))}</span></div>
+      <div id="servis-harita" class="servis-harita"></div>
+      <h3 class="servis-baslik">Duraklar ve kalkıştan sonraki süre</h3>
+      <ol class="servis-duraklar">${v.duraklar.map((d, i) => `<li><span class="sd-no">${i + 1}</span><b>${kac(d.ad)}</b><small>${d.sn ? "+" + dkYazisi(d.sn) : "kalkış"}</small></li>`).join("")}</ol>
+      ${yonetici() ? `<p class="servis-not">Ring saatlerini girdiğimizde bu süreler, her sokak için "servis ne zaman geçer" tarifesine dönüşecek.</p>` : ""}
+      ${yonetici() ? `<button id="servis-basla" class="ikincil servis-ikincil" type="button">🔴 Yeni tur kaydet (bunun yerine geçer)</button>` : ""}`
+      : !yonetici() ? `<div class="servis-bos"><div class="servis-ikon">🚐</div><h2>Servis güzergahı yakında</h2>
+        <p class="servis-not">Yönetim servis güzergahını kaydettiğinde burada haritada görünecek.</p></div>`
+      : `
+      <div class="servis-bos">
+        <div class="servis-ikon">🚐</div>
+        <h2>Güzergah henüz kaydedilmedi</h2>
+        <ol class="servis-adimlar">
+          <li>Servise binin, kalkış noktasında <b>Kaydı başlat</b>'a basın.</li>
+          <li>Tur boyunca ekran açık kalsın; telefon geçilen yolu çizer.</li>
+          <li>Servis 20 saniyeden uzun durduğunda durak kendiliğinden eklenir. İsterseniz <b>Burada durak var</b> düğmesine de basabilirsiniz.</li>
+          <li>Kalkış noktasına dönünce <b>Turu bitir</b>, durak adlarını kontrol edip <b>Kaydet</b>.</li>
+        </ol>
+        <p class="servis-not">Konum yalnızca kayıt sırasında, bu telefonda alınır. Sunucuya sadece güzergah çizgisi ve duraklar gider.</p>
+      </div>
+      <button id="servis-basla" class="ana-dugme servis-basla" type="button">🔴 Kaydı başlat</button>`;
+    if (v) servisHaritaKur(v.cizgi, v.duraklar, false);
+  }
+  $("#servis").addEventListener("click", async (e) => {
+    const d = e.target.closest("button"); if (!d) return;
+    if (d.id === "servis-basla") {
+      if (servisVeri && !confirm("Yeni kayıt, kayıtlı güzergahın yerine geçecek. Başlatılsın mı?")) return;
+      return servisBaslat();
+    }
+    if (d.id === "servis-durak") {
+      const son = servisKayit?.noktalar[servisKayit.noktalar.length - 1];
+      if (!son) return mesaj("Konum bekleniyor…");
+      return mesaj(await durakEkle(son[0], son[1], Date.now()) ? "Durak eklendi." : "Bu durak az önce eklendi.");
+    }
+    if (d.id === "servis-bitir") { if (confirm("Tur bitirilsin mi?")) servisBitir(); return; }
+    if (d.id === "servis-yeniden") { if (confirm("Bu tur silinsin mi?")) servisKayitSil(); return; }
+    if (d.id === "servis-kaydet") return servisGonder(d);
+    if (d.dataset.durakSil) { servisKayit.duraklar.splice(Number(d.dataset.durakSil), 1); servisSakla(); servisCiz(); }
+  });
+  $("#servis").addEventListener("input", (e) => {
+    const i = e.target.dataset.durakAd; if (i == null || !servisKayit) return;
+    servisKayit.duraklar[Number(i)].ad = e.target.value; servisSakla();
+  });
+
   // ---------- Modüller: alt menü ----------
   function sahaAc() {
     history.replaceState(null, "", location.pathname);
@@ -1435,10 +1675,35 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
+  const MODUL_AC = { saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
-    ({ saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc })[b.dataset.modul]();
+    MODUL_AC[b.dataset.modul]();
   });
+  // ---------- Ana sayfa: bölümler büyük düğmeler halinde ----------
+  function anaAc() {
+    if (location.hash !== "#ana") history.replaceState(null, "", "#ana");
+    goster("ana");
+    $("#ana-ad").textContent = oturum?.ad || "";
+    $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    // Görünen kutu sayısı tekse son kutu tam genişlik olsun
+    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu")].filter((k) => !k.hidden);
+    gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
+    for (const [kutu, rozet] of [["saha", "#saha-rozet"], ["yonetim", "#yk-rozet"]]) {
+      const r = $(rozet), k = $(`#ana-kutular [data-ac=${kutu}] small`);
+      k.textContent = r && !r.hidden && r.textContent ? r.textContent : "";
+    }
+  }
+  // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
+  const MODUL_ADRES = { saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis" };
+  $("#ana-kutular").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ac]"); if (!b) return;
+    history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
+    MODUL_AC[b.dataset.ac]();
+  });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-ana]")) anaAc(); });
+  // Açılış logosu bir an görünür, sonra kaybolur
+  setTimeout(() => { const a = $("#acilis"); if (!a) return; a.classList.add("bitti"); setTimeout(() => a.remove(), 450); }, 1200);
   $("#onay-uyari").addEventListener("click", () => { filtre = filtre === "onay" ? "acik" : "onay"; listeCiz(); });
 
   // ---------- Sokak Numaraları: numaratör resmi, iki parmakla büyütülür ----------
@@ -1787,6 +2052,10 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   // Bildirime dokununca ilgili kayıt açılsın (uygulama zaten açıkken de)
   window.addEventListener("hashchange", async () => {
     if (!onayli()) return;
+    if (location.hash === "#ana") return anaAc();
+    if (location.hash === "#saha" || (location.hash === "" && $("#ekran-liste").hidden)) return sahaAc();
+    if (location.hash === "#servis" && $("#ekran-servis").hidden) return servisAc();
+    if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();
     if (location.hash === "#uyeler") return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
