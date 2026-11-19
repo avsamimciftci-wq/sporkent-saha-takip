@@ -615,3 +615,6 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 #ekran-gorevler .devriye-ozet b { display: inline; font-size: 18px; }
 #ekran-gorevler .devriye-ozet span { font-size: 14px; }
 #ekran-gorevler .devriye-harita { height: min(calc(100vh - 360px), 760px); min-height: 340px; }
+.levha { display: inline-block; position: relative; background: #1252a8; color: #fff; font: 800 13px/18px system-ui, sans-serif; padding: 1px 10px 1px 6px;
+  border: 2px solid #fff; border-right: 0; border-radius: 3px 0 0 3px; box-shadow: 0 1px 4px rgba(0,0,0,.5); white-space: nowrap; }
+.levha::after { content: ""; position: absolute; right: -10px; top: -2px; border-style: solid; border-width: 12px 0 12px 10px; border-color: transparent transparent transparent #1252a8; filter: drop-shadow(2px 0 0 #fff); }
