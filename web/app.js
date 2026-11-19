@@ -1163,6 +1163,15 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       + (ns.length > 2 ? `&waypoints=${ns.slice(1, -1).map(gmNokta).join("%7C")}` : "") + "&travelmode=driving";
   const yolTarifi = (n) => `https://www.google.com/maps/dir/?api=1&destination=${gmNokta(n)}&travelmode=driving`;
 
+  // Google Maps tek yol tarifinde en fazla 11 nokta alır (başlangıç + 9 ara durak + bitiş): uzun rota bölünür
+  const GM_EN_FAZLA = 11;
+  function rotaDugmeleri(ns) {
+    if (ns.length <= GM_EN_FAZLA) return `<a class="ana-dugme rota-dugme" href="${rotaLinki(ns)}" target="_blank" rel="noopener">🧭 Rotayı Google Maps'te başlat</a>`;
+    const parcalar = [];
+    for (let i = 0; i < ns.length - 1; i += GM_EN_FAZLA - 1) parcalar.push([i, Math.min(i + GM_EN_FAZLA - 1, ns.length - 1)]);
+    return parcalar.map(([a, b], k) => `<a class="ana-dugme rota-dugme" href="${rotaLinki(ns.slice(a, b + 1))}" target="_blank" rel="noopener">🧭 Rota ${k + 1}. bölüm: ${a + 1}–${b + 1}. noktalar</a>`).join("");
+  }
+
   function devriyeHaritaHtml(v) {
     if (!v.noktalar.length) return "";
     const ugrandi = (n) => v.kayitlar.some((k) => k.nokta_id === n.id && (!v.isaretleyebilir || k.benim));
@@ -1170,7 +1179,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     return `
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
       <div class="harita-dugmeler">
-        <a class="ana-dugme rota-dugme" href="${rotaLinki(v.noktalar)}" target="_blank" rel="noopener">🧭 Rotayı Google Maps'te başlat</a>
+        ${rotaDugmeleri(v.noktalar)}
         ${v.isaretleyebilir && siradaki ? `<a class="ikincil siradaki-dugme" href="${yolTarifi(siradaki)}" target="_blank" rel="noopener">➡️ Sıradaki nokta: <b>${kac(siradaki.ad)}</b> · yol tarifi</a>` : ""}
         <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
         ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
