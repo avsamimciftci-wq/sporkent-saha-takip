@@ -346,7 +346,8 @@
     if (!k) return;
     if (location.hash !== "#kayit-" + id) history.replaceState(null, "", "#kayit-" + id);
     const bekliyor = onayBekliyor(k);
-    const kapat = kapatabilir() && k.durum !== "tamam" && !bekliyor;
+    // YK iş emrini yalnızca müdür ve şef "Yapıldı" yapar; yönetici yalnızca genel işleri kapatabilir
+    const kapat = kapatabilir() && k.durum !== "tamam" && !bekliyor && !(k.gizli && !["mudur", "sef"].includes(oturum.rol));
     $("#detay").innerHTML = `
       <div class="detay-ust">
         ${k.gizli && programGorur() ? `<button class="geri" data-geri-yksaha>← Geri</button>` : `<button class="geri" data-geri>← İş Listesini Gör</button>`}
