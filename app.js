@@ -109,6 +109,7 @@
   // Ekran → modül (alt menüde hangisi seçili)
   const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim" };
   function goster(ad) {
+    if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     const menulu = !["giris", "bekle"].includes(ad) && onayli();
     $("#alt-menu").hidden = !menulu;
@@ -1132,6 +1133,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         ${(gunluk ? v.gecmis.gunler : v.gecmis.haftalar).map((x) => `<button type="button" data-gun="${x.donem}" class="${x.donem === donem ? "secili" : ""} ${x.yapilan === toplam ? "tam" : x.yapilan ? "" : "bos-gun"}">
           ${gunluk ? gunYazisi(x.donem).slice(0, 5) : gunYazisi(x.donem).slice(0, 5) + "–" + haftaSonu(x.donem).slice(0, 5)}<br><b>${x.yapilan}/${toplam}</b></button>`).join("")}
       </div>` : ""}`;
+    devriyeHaritaKur(gunluk ? dv : null);
   }
 
   $("#gorevler").addEventListener("click", async (e) => {
@@ -1155,6 +1157,89 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // Eski "#devriye" adresi: Görev Takibi › Günlük sekmesine gider
   const devriyeAc = (gun) => gorevlerAc("gunluk", gun);
 
+  // ---------- Devriye haritası (Google Maps ile rota) ----------
+  // Rota Google Maps'te: başlangıç Nizamiye, ara duraklar sırayla, bitiş son nokta. Uygulama içi harita OpenStreetMap.
+  const gmNokta = (n) => `${n.lat},${n.lng}`;
+  const rotaLinki = (ns) => ns.length < 2 ? haritaLink(ns[0].lat, ns[0].lng)
+    : `https://www.google.com/maps/dir/?api=1&origin=${gmNokta(ns[0])}&destination=${gmNokta(ns[ns.length - 1])}`
+      + (ns.length > 2 ? `&waypoints=${ns.slice(1, -1).map(gmNokta).join("%7C")}` : "") + "&travelmode=driving";
+  const yolTarifi = (n) => `https://www.google.com/maps/dir/?api=1&destination=${gmNokta(n)}&travelmode=driving`;
+
+  function devriyeHaritaHtml(v) {
+    if (!v.noktalar.length) return "";
+    const ugrandi = (n) => v.kayitlar.some((k) => k.nokta_id === n.id && (!v.isaretleyebilir || k.benim));
+    const siradaki = v.noktalar.find((n) => !ugrandi(n));
+    return `
+      <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
+      <div class="harita-dugmeler">
+        <a class="ana-dugme rota-dugme" href="${rotaLinki(v.noktalar)}" target="_blank" rel="noopener">🧭 Rotayı Google Maps'te başlat</a>
+        ${v.isaretleyebilir && siradaki ? `<a class="ikincil siradaki-dugme" href="${yolTarifi(siradaki)}" target="_blank" rel="noopener">➡️ Sıradaki nokta: <b>${kac(siradaki.ad)}</b> · yol tarifi</a>` : ""}
+        <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
+        ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
+      </div>
+      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar. Konumunuz yalnızca bu ekranda gösterilir, kaydedilmez.</p>`;
+  }
+
+  let leafletYukle = null;
+  const leaflet = () => leafletYukle ??= new Promise((ok, red) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "vendor/leaflet/leaflet.css"; document.head.appendChild(css);
+    const js = document.createElement("script"); js.src = "vendor/leaflet/leaflet.js"; js.onload = () => ok(window.L); js.onerror = () => { leafletYukle = null; red(new Error("Harita yüklenemedi.")); };
+    document.head.appendChild(js);
+  });
+  let devHarita = null, konumIzle = null, konumIsaret = null;
+  function haritaKapat() {
+    if (konumIzle != null) { navigator.geolocation.clearWatch(konumIzle); konumIzle = null; }
+    konumIsaret = null;
+    if (devHarita) { devHarita.remove(); devHarita = null; }
+  }
+  async function devriyeHaritaKur(v) {
+    haritaKapat();
+    const kutu = document.getElementById("devriye-harita");
+    if (!v || !kutu || !v.noktalar.length) return;
+    let L;
+    try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
+    if (!document.body.contains(kutu)) return;
+    const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
+    const ns = v.noktalar;
+    L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#1565c0", weight: 4, dashArray: "8 8", opacity: .85 }).addTo(h);
+    ns.forEach((n, i) => {
+      const ks = v.kayitlar.filter((k) => k.nokta_id === n.id);
+      const tamam = ks.length > 0;
+      const ikon = L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17],
+        html: `<div class="hn ${tamam ? "hn-tamam" : ""} ${i === 0 ? "hn-ilk" : ""}">${tamam ? "✓" : i + 1}</div>` });
+      L.marker([n.lat, n.lng], { icon: ikon, title: n.ad }).addTo(h).bindPopup(`<b>${i + 1}. ${kac(n.ad)}</b><br>
+        ${tamam ? ks.map((k) => `✓ ${saatYazisi(k.zaman)} · ${kac(k.ad)}`).join("<br>") : "Henüz uğranmadı"}<br>
+        <a href="${yolTarifi(n)}" target="_blank" rel="noopener">🧭 Yol tarifi</a> · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">Google Maps</a>`);
+    });
+    h.fitBounds(ns.map((n) => [n.lat, n.lng]), { padding: [28, 28] });
+    devHarita = h;
+  }
+  function konumumuGoster() {
+    if (!devHarita || !navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
+    if (konumIzle != null) return;
+    konumIzle = navigator.geolocation.watchPosition((p) => {
+      const yer = [p.coords.latitude, p.coords.longitude];
+      if (!konumIsaret) {
+        konumIsaret = window.L.circleMarker(yer, { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(devHarita).bindPopup("Buradasınız");
+        devHarita.setView(yer, Math.max(devHarita.getZoom(), 17));
+      } else konumIsaret.setLatLng(yer);
+    }, (e) => { mesaj(e.code === 1 ? "Konum izni verilmedi. Telefonun ayarlarından izin verin." : "Konum alınamadı."); konumIzle = null; },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }
+  function kmlIndir(v) {
+    const x = (t) => String(t).replace(/[<&>]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;" })[c]);
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sporkent Devriye Kontrol Noktaları</name>
+${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point><coordinates>${n.lng},${n.lat},0</coordinates></Point></Placemark>`).join("\n")}
+<Placemark><name>Devriye rotası</name><LineString><coordinates>${v.noktalar.map((n) => `${n.lng},${n.lat},0`).join(" ")}</coordinates></LineString></Placemark>
+</Document></kml>`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
+    a.download = "Devriye_Kontrol_Noktalari.kml"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
   function devriyeGovde(v) {
     if (!v) return `<p class="bos">Yükleniyor…</p>`;
     const kayitlar = (nid) => v.kayitlar.filter((k) => k.nokta_id === nid);
@@ -1166,6 +1251,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <b>📍 Devriye: ${ugranan} / ${v.noktalar.length} kontrol noktası</b>
         <span>${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : (v.gun === v.bugun ? "Henüz hiçbir noktaya uğranmadı" : "Bu gün hiçbir noktaya uğranmadı")}</span>
       </div>
+      ${devriyeHaritaHtml(v)}
       ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“✔ Kontrol edildi”</b>e basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
         : `<p class="ipucu">Müdür ve şef her noktada “Kontrol edildi”ye basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
       ${v.noktalar.map((n, i) => {
@@ -1213,6 +1299,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
 
   $("#gorevler").addEventListener("click", async (e) => {
+    if (e.target.closest("#konumum")) return konumumuGoster();
+    if (e.target.closest("#kml-indir")) return kmlIndir(gorevVeri.devriye);
     const yeniAd = e.target.closest("[data-nokta-ad]");
     if (yeniAd) {
       const ad = prompt("Noktanın yeni adı:", yeniAd.dataset.ad);

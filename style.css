@@ -591,3 +591,14 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .nokta-yonet { margin-top: 16px; border: 2px solid var(--cizgi); border-radius: 12px; padding: 10px 12px; }
 .nokta-yonet summary { font-weight: 800; cursor: pointer; font-size: 17px; }
 .nokta-yonet .nokta-ekle { margin-top: 10px; }
+/* Devriye haritası */
+.devriye-harita { height: 340px; border-radius: 14px; overflow: hidden; margin: 0 0 10px; border: 2px solid var(--cizgi); background: #e8eef0; position: relative; z-index: 0; }
+.hn { width: 34px; height: 34px; border-radius: 50%; background: #c62828; color: #fff; border: 3px solid #fff; display: grid; place-items: center;
+  font: 800 16px/1 system-ui, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,.45); box-sizing: border-box; }
+.hn.hn-tamam { background: #1f6b4f; }
+.hn.hn-ilk:not(.hn-tamam) { background: #0b3c91; }
+.harita-dugmeler { display: grid; gap: 8px; margin-bottom: 6px; }
+.harita-dugmeler a, .harita-dugmeler button { display: block; text-align: center; text-decoration: none; width: 100%; box-sizing: border-box; }
+.rota-dugme { background: linear-gradient(135deg, #1e6fe0, #0b3c91) !important; font-size: 19px; padding: 14px; }
+.siradaki-dugme { font-size: 17px; padding: 12px; }
+.harita-not { font-size: 14px; }
