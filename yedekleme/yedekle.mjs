@@ -12,8 +12,8 @@ const REF = "inhqkwuvlxhabkiulyrd";
 const URL = `https://${REF}.supabase.co`;
 const KOK = path.join(process.env.USERPROFILE || "C:/Users/HP", "OneDrive", "SPORKENT İŞLETME KOOPERATİFİ", "SAHA TAKİP PROGRAMI YEDEĞİ");
 const TABLOLAR = ["ayarlar", "uyeler", "abonelikler", "kayitlar", "goruntulemeler", "gorev_isaretleri",
-  "ortaklar", "tg_uyeleri", "aidat_resimleri", "is_programi", "bildirim_gunlugu", "ortak_rehberi", "davet_kodlari", "devriye_noktalari", "devriye_kayitlari"];
-const SAYACLI = ["kayitlar", "aidat_resimleri", "is_programi", "tg_uyeleri", "bildirim_gunlugu", "davet_kodlari", "devriye_noktalari", "devriye_kayitlari"];
+  "ortaklar", "tg_uyeleri", "aidat_resimleri", "is_programi", "bildirim_gunlugu", "ortak_rehberi", "davet_kodlari", "devriye_noktalari", "devriye_kayitlari", "servis_guzergah"];
+const SAYACLI = ["kayitlar", "aidat_resimleri", "is_programi", "tg_uyeleri", "bildirim_gunlugu", "davet_kodlari", "devriye_noktalari", "devriye_kayitlari", "servis_guzergah"];
 
 const tarih = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye günü
 const HEDEF = path.join(KOK, tarih);
