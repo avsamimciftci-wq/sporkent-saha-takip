@@ -725,3 +725,18 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
   .alt-menu button span, .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button span { font-size: 20px; }
   .menu-rozet { min-width: 20px; height: 20px; line-height: 20px; font-size: 12px; padding: 0 5px; right: 2px; }
 }
+
+/* Giriş: önce seçim */
+.giris-secim h1 { text-align: center; margin-bottom: 16px; }
+.secim-dugme { width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center; text-align: left;
+  border: 0; border-radius: 16px; padding: 16px; margin-bottom: 12px; font: inherit; cursor: pointer; color: #fff; box-shadow: 0 5px 14px rgba(0,0,0,.18); }
+.secim-dugme span { grid-row: 1 / 3; font-size: 40px; }
+.secim-dugme b { font-size: 20px; line-height: 1.2; }
+.secim-dugme small { font-size: 15px; opacity: .92; }
+.secim-ortak { background: linear-gradient(145deg, #2e7d6b, #1f4e45); }
+.secim-tg { background: linear-gradient(145deg, #6a1b9a, #3e0f63); }
+.secim-dugme:active { transform: scale(.98); }
+/* Ana sayfa kutuları hiçbir telefonda ekrandan taşmasın */
+.ana-kutular { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ana-kutu { min-width: 0; overflow-wrap: break-word; }
+html, body { max-width: 100%; overflow-x: hidden; }
