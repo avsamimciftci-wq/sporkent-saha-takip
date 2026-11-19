@@ -257,6 +257,40 @@ async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
   };
 }
 
+// ---------- Devriye kontrol noktaları ----------
+const DEVRIYE_ISARETLEYEN: Rol[] = ["mudur", "sef"];
+const DEVRIYE_SAKLAMA_GUN = 365;
+// İki konum arası mesafe (metre)
+function mesafeM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371000, r = (x: number) => (x * Math.PI) / 180;
+  const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+const koordinatBul = (m: string) => {
+  const kal = [/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&](?:q|query|ll|destination)=(-?\d+\.\d+)(?:,|%2C)\s*\+?(-?\d+\.\d+)/i,
+    /(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/];
+  for (const k of kal) { const x = m.match(k); if (x) return { lat: Number(x[1]), lng: Number(x[2]) }; }
+  return null;
+};
+// Google Maps bağlantısı (kısa bağlantı dahil) ya da "41.1, 29.1" biçiminden koordinat çıkarır
+async function konumCoz(metin: string) {
+  let m = temiz(metin, 2000);
+  const coz = (x: string) => { try { return decodeURIComponent(x); } catch { return x; } };
+  let k = koordinatBul(coz(m));
+  for (let i = 0; !k && i < 4 && /^https?:\/\//i.test(m); i++) {
+    const r = await fetch(m, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0" } });
+    const yer = r.headers.get("location");
+    if (yer) { m = new URL(yer, m).toString(); k = koordinatBul(coz(m)); continue; }
+    k = koordinatBul(coz((await r.text()).slice(0, 300000)));
+    break;
+  }
+  if (!k || Math.abs(k.lat) > 90 || Math.abs(k.lng) > 180) {
+    throw new Hata("Bağlantıdan konum çıkarılamadı. Google Haritalar'da noktaya basılı tutup çıkan koordinatı (örn. 40.97, 29.05) yapıştırın.");
+  }
+  return k;
+}
+
 // ---------- Davet kodu ----------
 const DAVET_GUN = 14, DAVET_DENEME = 5;
 const davetOzeti = (no: number, kod: string) => rehberOzeti(`davet:${no}:${kod}`);
@@ -364,7 +398,7 @@ async function kimlik(g: any) {
 async function tumFotograflariSil() {
   const { data: klasorler } = await db.storage.from(BUCKET).list("", { limit: 1000 });
   for (const k of klasorler ?? []) {
-    if (k.name === "aidat") continue; // aidat resimleri iş kayıtlarından ayrı, silinmez
+    if (k.name === "aidat" || k.name === "devriye") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
     for (;;) {
       const { data: dosyalar } = await db.storage.from(BUCKET).list(k.name, { limit: 1000 });
       if (!dosyalar?.length) break;
@@ -433,7 +467,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yukleme_adresi": {
-      const yol = `${g.tur === "aidat" ? "aidat" : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -738,6 +772,69 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { sonuc: (data ?? []).map((r: any) => ({ ...r, durum: durum.get(r.no) ?? null })) };
     }
 
+    case "devriye": {
+      // Noktalar ve seçilen günün "Buradayım" kayıtları (yönetici, YK, müdür, şef)
+      if (!GOREV_GOREN.includes(rol)) throw new Hata("Bu bölümü yalnızca yönetim, müdür ve şef görür.", 403);
+      const bugun = sonGun(new Date(), 0);
+      const gun = /^\d{4}-\d{2}-\d{2}$/.test(temiz(g.gun, 10)) ? temiz(g.gun, 10) : bugun;
+      const { data: noktalar, error: e1 } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap, sira").eq("aktif", true).order("sira").order("id");
+      if (e1) throw e1;
+      const { data: kayitlar, error: e2 } = await db.from("devriye_kayitlari").select("id, nokta_id, ad, rol, zaman, lat, lng, dogruluk, mesafe, foto, cihaz").eq("gun", gun).order("zaman");
+      if (e2) throw e2;
+      const yollar = (kayitlar ?? []).map((k: any) => k.foto).filter(Boolean);
+      const { data: imzali } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+      const foto = new Map((imzali ?? []).map((d: any) => [d.path, d.signedUrl]));
+      return {
+        gun, bugun, noktalar: noktalar ?? [],
+        kayitlar: (kayitlar ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz, foto_url: k.foto ? foto.get(k.foto) ?? null : null })),
+        isaretleyebilir: DEVRIYE_ISARETLEYEN.includes(rol) && gun === bugun,
+        noktaYonetir: rol === "baskan",
+      };
+    }
+
+    case "devriye_isaretle": {
+      if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("\"Buradayım\" işaretini yalnızca müdür ve şef verir.", 403);
+      const lat = Number(g.lat), lng = Number(g.lng), dogruluk = Math.round(Number(g.dogruluk) || 0);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Hata("Konum alınamadı. Telefonun konum iznini açıp tekrar deneyin.");
+      if (dogruluk > 150) throw new Hata(`Konum net alınamadı (±${dogruluk} m). Açık alanda birkaç saniye bekleyip tekrar deneyin.`);
+      const { data: n } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap").eq("id", g.nokta_id).eq("aktif", true).maybeSingle();
+      if (!n) throw new Hata("Kontrol noktası bulunamadı.");
+      const mesafe = mesafeM({ lat, lng }, n);
+      if (mesafe > n.yaricap + Math.min(dogruluk, 50)) {
+        throw new Hata(`${n.ad} noktasına yaklaşık ${mesafe} m uzaktasınız. Noktaya gidip tekrar deneyin.`, 403);
+      }
+      const gun = sonGun(new Date(), 0);
+      const { data: var_ } = await db.from("devriye_kayitlari").select("id").eq("gun", gun).eq("nokta_id", n.id).eq("cihaz", u.cihaz).maybeSingle();
+      if (var_) throw new Hata(`${n.ad} noktası bugün zaten işaretlendi.`);
+      const { error } = await db.from("devriye_kayitlari").insert({
+        nokta_id: n.id, gun, cihaz: u.cihaz, ad: u.ad, rol, lat, lng, dogruluk: dogruluk || null, mesafe,
+        foto: temiz(g.foto, 200) || null,
+      });
+      if (error) throw error;
+      return { tamam: true, mesafe, ad: n.ad };
+    }
+
+    case "nokta_ekle": {
+      yonetici();
+      const ad = temiz(g.ad, 80);
+      if (!ad) throw new Hata("Noktanın adını yazın.");
+      const k = g.lat != null && g.lng != null ? { lat: Number(g.lat), lng: Number(g.lng) } : await konumCoz(g.konum);
+      if (!Number.isFinite(k.lat) || !Number.isFinite(k.lng)) throw new Hata("Konum geçersiz.");
+      const yaricap = Math.min(300, Math.max(25, Math.round(Number(g.yaricap) || 75)));
+      const { data: son } = await db.from("devriye_noktalari").select("sira").order("sira", { ascending: false }).limit(1).maybeSingle();
+      const { error } = await db.from("devriye_noktalari").insert({ ad, lat: k.lat, lng: k.lng, yaricap, sira: (son?.sira ?? 0) + 1 });
+      if (error) throw error;
+      return { tamam: true, ...k };
+    }
+
+    case "nokta_sil": {
+      // Geçmiş kayıtlar bozulmasın diye nokta silinmez, pasif yapılır
+      yonetici();
+      const { error } = await db.from("devriye_noktalari").update({ aktif: false }).eq("id", g.id);
+      if (error) throw error;
+      return { tamam: true };
+    }
+
     case "davet_kodu": {
       yonetici();
       const no = Number(temiz(g.ortak_no, 6));
@@ -877,8 +974,19 @@ async function eskiUyeleriSil() {
   return cihazlar.length;
 }
 
+async function eskiDevriyeSil() {
+  const sinir = sonGun(new Date(Date.now() - DEVRIYE_SAKLAMA_GUN * 864e5), 0);
+  const { data } = await db.from("devriye_kayitlari").select("id, foto").lt("gun", sinir);
+  if (!data?.length) return 0;
+  const fotolar = data.map((x: any) => x.foto).filter(Boolean);
+  if (fotolar.length) await db.storage.from(BUCKET).remove(fotolar);
+  await db.from("devriye_kayitlari").delete().in("id", data.map((x: any) => x.id));
+  return data.length;
+}
+
 async function gunlukGecikme() {
   await eskiUyeleriSil().catch(() => {});
+  await eskiDevriyeSil().catch(() => {});
   const bugun = sonGun(new Date(), 0);
   const { data, error } = await db.from("kayitlar").select("id, no, yer, son_tarih")
     .neq("durum", "tamam").eq("onay_durumu", "onayli").lt("son_tarih", bugun).order("son_tarih");
