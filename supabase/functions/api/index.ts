@@ -833,11 +833,6 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const n = (tum ?? []).find((x: any) => x.id === Number(g.nokta_id));
       if (!n) throw new Hata("Kontrol noktası bulunamadı.");
       const mesafe = mesafeM({ lat, lng }, n);
-      // Noktalar birbirine yakın olabilir: müdür hangi noktanın yanındaysa yalnızca o işaretlenir
-      const enYakin = (tum ?? []).reduce((en: any, x: any) => { const d = mesafeM({ lat, lng }, x); return !en || d < en.d ? { x, d } : en; }, null);
-      if (enYakin && enYakin.x.id !== n.id && enYakin.d + 5 < mesafe) {
-        throw new Hata(`Şu an ${enYakin.x.ad} noktasındasınız (${Math.round(enYakin.d)} m). ${n.ad} için o noktaya gidin.`, 403);
-      }
       if (mesafe > n.yaricap + Math.min(dogruluk, 25)) {
         throw new Hata(`${n.ad} noktasına yaklaşık ${mesafe} m uzaktasınız. Noktaya gidip tekrar deneyin.`, 403);
       }
