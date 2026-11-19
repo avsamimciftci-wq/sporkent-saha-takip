@@ -1702,8 +1702,6 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     MODUL_AC[b.dataset.ac]();
   });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-ana]")) anaAc(); });
-  // Açılış logosu bir an görünür, sonra kaybolur
-  setTimeout(() => { const a = $("#acilis"); if (!a) return; a.classList.add("bitti"); setTimeout(() => a.remove(), 450); }, 1200);
   $("#onay-uyari").addEventListener("click", () => { filtre = filtre === "onay" ? "acik" : "onay"; listeCiz(); });
 
   // ---------- Sokak Numaraları: numaratör resmi, iki parmakla büyütülür ----------
