@@ -1462,11 +1462,24 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // Kaydın türü seçilmez, girildiği yere göre belirlenir:
   // Saha Takip "+ Yeni kayıt" → genel yapılacak iş; Yönetim Kurulu › YK Saha Takip "Yeni iş emri ver" → Yönetim İş Emri
   let yeniTur = "genel";
+  // YK iş emri: süre baştan seçilir (varsayılan 2 gün)
+  const EMIR_VARSAYILAN_GUN = 2;
+  let emirGun = EMIR_VARSAYILAN_GUN;
+  function emirSureCiz() {
+    $("#emir-sure-sec").innerHTML = [1, 2, 3, 5, 7, 10, 15, 30]
+      .map((g) => `<button type="button" data-gun="${g}" class="${g === emirGun ? "secili" : ""}">${g} gün</button>`).join("");
+  }
+  $("#emir-sure-sec").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-gun]"); if (!b) return;
+    emirGun = Number(b.dataset.gun); emirSureCiz();
+  });
   function yeniFormAc(tur) {
     yeniTur = tur === "yonetim" && yonetimIsiGirebilir() ? "yonetim" : "genel";
     yeniForm.reset(); yeniFoto.sifirla();
     $("#yeni-baslik").textContent = yeniTur === "yonetim" ? "Yeni YK iş emri" : "Yeni kayıt";
     $("#yeni-tur-not").hidden = yeniTur !== "yonetim";
+    $("#emir-sure").hidden = yeniTur !== "yonetim";
+    emirGun = EMIR_VARSAYILAN_GUN; emirSureCiz();
     goster("yeni");
   }
   $("#yeni-ac").addEventListener("click", () => { if (yeniGirebilir()) yeniFormAc("genel"); });
@@ -1483,6 +1496,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       const r = await api("yeni", {
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
         gizli: yonetimIsiGirebilir() && yeniTur === "yonetim",
+        sure: yonetimIsiGirebilir() && yeniTur === "yonetim" ? emirGun : undefined,
       });
       mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);

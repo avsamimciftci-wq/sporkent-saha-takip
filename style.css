@@ -562,3 +562,5 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .tg-link { font-size: 22px; font-weight: 800; color: #8a5a00; margin: 6px 0; word-break: break-all; }
 .tg-link-kutu small { display: block; font-size: 14px; line-height: 1.4; }
 .davet-bolum > div > p { color: #e3efff; font-size: 16px; margin: 0 0 12px; line-height: 1.45; }
+.emir-sure { background: #e8eaf6; border: 2px solid #283593; border-radius: 12px; padding: 10px 12px; margin: 4px 0 14px; }
+.emir-sure > b { display: block; color: #1a237e; font-size: 17px; margin-bottom: 8px; }
