@@ -1176,7 +1176,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
         ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
       </div>
-      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar. Sarı çizgiler sokaklar; yakınlaştırınca sokak başında mavi <b>yön levhası</b> görünür.</p>
+      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar.</p>
       <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`;
   }
 
@@ -1226,22 +1226,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     let L;
     try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
     if (!document.body.contains(kutu)) return;
-    const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true });
+    const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5 });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
     const ns = v.noktalar;
-    // Sokaklar: sarı çizgi; sokak başında yön levhası (yaklaşınca görünür)
-    const sokaklar = await sokaklariAl();
-    for (const v of Object.values(sokaklar)) {
-      L.polyline(v.c, { color: "#3a2f00", weight: 7, opacity: .55, interactive: false }).addTo(h);
-      L.polyline(v.c, { color: "#ffd600", weight: 4, opacity: .95, interactive: false }).addTo(h);
-    }
-    const sokakKatmani = L.layerGroup();
-    for (const [no, v] of Object.entries(sokaklar)) {
-      L.marker(v.b, { interactive: false, keyboard: false,
-        icon: L.divIcon({ className: "", iconSize: [44, 22], iconAnchor: [0, 11], html: `<span class="levha">${kac(no)}</span>` }) }).addTo(sokakKatmani);
-    }
-    const sokakGoster = () => { if (h.getZoom() >= 16) sokakKatmani.addTo(h); else sokakKatmani.remove(); };
-    h.on("zoomend", sokakGoster);
     L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#1565c0", weight: 4, dashArray: "8 8", opacity: .85 }).addTo(h);
     ns.forEach((n, i) => {
       const ks = v.kayitlar.filter((k) => k.nokta_id === n.id);
@@ -1252,8 +1239,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         ${tamam ? ks.map((k) => `✓ ${saatYazisi(k.zaman)} · ${kac(k.ad)}`).join("<br>") : "Henüz uğranmadı"}<br>
         <a href="${yolTarifi(n)}" target="_blank" rel="noopener">🧭 Yol tarifi</a> · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">Google Maps</a>`);
     });
-    h.fitBounds(ns.map((n) => [n.lat, n.lng]), { padding: [28, 28] });
-    sokakGoster();
+    const sigdir = () => { h.invalidateSize(); h.fitBounds(ns.map((n) => [n.lat, n.lng]), { padding: [28, 28] }); };
+    sigdir();
+    // Kutunun yüksekliği sayfa yerleşince kesinleşir: noktaları ekrana yeniden sığdır
+    requestAnimationFrame(() => setTimeout(sigdir, 60));
     devHarita = h;
   }
   function konumumuGoster() {
