@@ -107,7 +107,7 @@
 
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
-  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim" };
+  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim", sokaklar: "sokaklar" };
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
@@ -764,6 +764,7 @@
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program") return programAc();
+    if (location.hash === "#sokak-numaralari") return sokaklarAc();
     if (location.hash === "#devriye") return devriyeAc();
     if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     const m = location.hash.match(/^#kayit-(\d+)$/);
@@ -1432,9 +1433,29 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   }
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
-    ({ saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc })[b.dataset.modul]();
+    ({ saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc })[b.dataset.modul]();
   });
   $("#onay-uyari").addEventListener("click", () => { filtre = filtre === "onay" ? "acik" : "onay"; listeCiz(); });
+
+  // ---------- Sokak Numaraları: numaratör resmi, iki parmakla büyütülür ----------
+  const NUMARATOR = { genislik: 3685, yukseklik: 5392 };
+  let numHarita = null;
+  async function sokaklarAc() {
+    if (location.hash !== "#sokak-numaralari") history.replaceState(null, "", "#sokak-numaralari");
+    goster("sokaklar");
+    if (numHarita) { numHarita.invalidateSize(); return; }
+    let L;
+    try { L = await leaflet(); } catch (e) { $("#numarator").innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
+    const sinir = [[0, 0], [NUMARATOR.yukseklik, NUMARATOR.genislik]];
+    const h = L.map($("#numarator"), { crs: L.CRS.Simple, minZoom: -4, maxZoom: 2, zoomSnap: 0.25, zoomDelta: 0.5,
+      attributionControl: false, maxBounds: [[-400, -400], [NUMARATOR.yukseklik + 400, NUMARATOR.genislik + 400]], maxBoundsViscosity: 0.9 });
+    // Önce küçük resim anında görünür, büyük resim yüklenince üstüne gelir
+    L.imageOverlay("veri/sokak_numarator_kucuk.jpg", sinir).addTo(h);
+    L.imageOverlay("veri/sokak_numarator.jpg", sinir).addTo(h);
+    const sigdir = () => { h.invalidateSize(); h.fitBounds(sinir); h.setMinZoom(h.getZoom() - 0.5); };
+    sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
+    numHarita = h;
+  }
 
   // ---------- Aidat: yıl içindeki parasal yükümlülükler (resim) ----------
   async function aidatAc() {

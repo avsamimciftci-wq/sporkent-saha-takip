@@ -354,6 +354,7 @@ body.menulu .ekran { padding-bottom: calc(150px + env(safe-area-inset-bottom)); 
 .alt-menu [data-modul="yonetim"] { --renk: #6a1b9a; --renk-acik: #f3e5f5; }
 .alt-menu [data-modul="aidat"] { --renk: #b26a00; --renk-acik: #fff3e0; }
 .alt-menu [data-modul="iletisim"] { --renk: #ad1457; --renk-acik: #fce4ec; }
+.alt-menu [data-modul="sokaklar"] { --renk: #00695c; --renk-acik: #e0f2f1; }
 .alt-menu button { background: var(--renk-acik); color: var(--renk); border: 2px solid transparent; }
 .alt-menu button.secili { background: var(--renk); color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,.2); }
 @media (prefers-color-scheme: dark) {
@@ -614,3 +615,13 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 #ekran-gorevler .devriye-ozet b { display: inline; font-size: 18px; }
 #ekran-gorevler .devriye-ozet span { font-size: 14px; }
 #ekran-gorevler .devriye-harita { height: min(calc(100vh - 360px), 760px); min-height: 340px; }
+/* Beş düğme olunca (Yönetim Kurulu görünürken) yazılar sığsın */
+.alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 13px; line-height: 1.1; padding-left: 2px; padding-right: 2px; }
+.alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button span { font-size: 24px; }
+.alt-menu button { word-break: normal; overflow-wrap: anywhere; text-align: center; }
+/* Sokak Numaraları ekranı: resim ekranın tamamını kaplar */
+#ekran-sokaklar { padding: 0; max-width: none; }
+.numarator-ust { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 14px; background: #00695c; color: #fff; }
+.numarator-ust b { font-size: 18px; }
+.numarator-ust span { font-size: 13px; opacity: .9; }
+.numarator { height: calc(100vh - 205px); height: calc(100dvh - 205px); background: #dfe6e3; position: relative; z-index: 0; }
