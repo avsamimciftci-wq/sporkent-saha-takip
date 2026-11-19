@@ -701,3 +701,27 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 
 /* Kaldırılan açılış ekranı: telefonda eski sayfa önbellekte kalmışsa da görünmesin */
 .acilis { display: none !important; }
+
+/* Dar telefonlar: üst bant ve alt menü sığsın (iPhone SE, küçük Android) */
+.alt-menu em { font-style: normal; }
+.alt-menu .ad-kisa { display: none; }
+@media (max-width: 430px) {
+  .ust { padding: calc(8px + env(safe-area-inset-top)) 12px 8px; gap: 8px; }
+  .ust-sol { gap: 9px; }
+  .ust-logo { width: 46px; height: 46px; }
+  .ust-kurum { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ust-baslik { font-size: 22px; white-space: nowrap; }
+  .ust-ana { padding: 3px 8px; font-size: 11px; border-radius: 10px; }
+  .ust-ana span { font-size: 18px; }
+}
+@media (max-width: 360px) {
+  .alt-menu .ad-uzun { display: none; }
+  .alt-menu .ad-kisa { display: inline; }
+  .ust-logo { width: 40px; height: 40px; }
+  .ust-kurum { font-size: 12px; }
+  .ust-baslik { font-size: 19px; }
+  .alt-menu { gap: 2px; padding-left: 3px; padding-right: 3px; }
+  .alt-menu button, .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 10.5px; padding: 5px 1px 6px; border-radius: 10px; min-height: 60px; }
+  .alt-menu button span, .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button span { font-size: 20px; }
+  .menu-rozet { min-width: 20px; height: 20px; line-height: 20px; font-size: 12px; padding: 0 5px; right: 2px; }
+}
