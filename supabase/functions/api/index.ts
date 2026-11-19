@@ -516,8 +516,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const yanitMetni = `Bu iş ${gun} gün içinde yapılacaktır.`;
       const { data, error } = await db.from("kayitlar").update({
         yanit: yanitMetni, yanit_veren: u.ad, yanit_at: new Date().toISOString(), son_tarih: sonGun(new Date(), gun),
-      }).eq("id", g.id).neq("durum", "tamam").select().single();
-      if (error) throw new Hata("Kayıt bulunamadı ya da iş zaten yapıldı.");
+      }).eq("id", g.id).neq("durum", "tamam").eq("gizli", false).select().single(); // YK iş emrine cevap yazılmaz
+      if (error) throw new Hata("Kayıt bulunamadı, iş zaten yapıldı ya da bu bir YK iş emri.");
       await duyur(kimeBildir(data), `Cevap • ${data.yer}`.slice(0, 80), yanitMetni, { kayitId: data.id });
       return { yanit: data.yanit, yanit_veren: data.yanit_veren, yanit_at: data.yanit_at, son_tarih: data.son_tarih };
     }

@@ -394,7 +394,7 @@
         </label>
         <button class="ana-dugme" type="submit">✔ Yapıldı</button>
       </form>` : ""}
-      ${kayitOnaylar() && k.durum !== "tamam" && !bekliyor ? `
+      ${kayitOnaylar() && k.durum !== "tamam" && !bekliyor ? `${k.gizli ? "" /* YK iş emrinde cevap yazılmaz: emri zaten yönetim verdi */ : `
       <div class="islem">
         <h2>Cevap yaz</h2>
         <p class="cevap-cumle">Bu iş <b id="cevap-gun">…</b> gün içinde yapılacaktır.</p>
@@ -403,7 +403,7 @@
         </div>
         <button type="button" class="ana-dugme" id="cevap-gonder" disabled>💬 Cevabı gönder</button>
         <small class="ipucu">İş "Yapıldı" olmadan herkese bildirilir. Son gün bugünden itibaren bu süreye göre değişir.</small>
-      </div>
+      </div>`}
       <div class="islem">
         <h2>Yapılma süresi</h2>
         <div class="sure-sec" id="sure-sec">
