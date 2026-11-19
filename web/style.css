@@ -364,7 +364,7 @@ body.menulu .ekran { padding-bottom: calc(150px + env(safe-area-inset-bottom)); 
   :root:not([data-theme="light"]) .alt-menu [data-modul="iletisim"] { --renk: #f48fb1; --renk-acik: #3b1426; }
   :root:not([data-theme="light"]) .alt-menu button.secili { color: #111; }
 }
-body.menulu .yuzen { bottom: calc(96px + env(safe-area-inset-bottom)); }
+body.menulu .yuzen { bottom: calc(var(--menu-h, 96px) + 14px); }
 body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 
 .modul-baslik { font-size: 26px; margin: 4px 0 4px; color: var(--yesil); }
@@ -618,7 +618,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* Beş düğme olunca (Yönetim Kurulu görünürken) yazılar sığsın */
 .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 13px; line-height: 1.1; padding-left: 2px; padding-right: 2px; }
 .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button span { font-size: 24px; }
-.alt-menu button { word-break: normal; overflow-wrap: anywhere; text-align: center; }
+.alt-menu button { word-break: normal; overflow-wrap: normal; hyphens: none; text-align: center; }
 /* Sokak Numaraları ekranı: resim ekranın tamamını kaplar */
 #ekran-sokaklar { padding: 0; max-width: none; }
 .numarator-ust { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 14px; background: #00695c; color: #fff; }
@@ -628,3 +628,9 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* Haftalık Kontrol kutusu ve başlığı */
 .kutu-haftalik { grid-column: 1 / -1; min-height: 110px; background: linear-gradient(145deg, #3949ab, #1a237e); }
 .bant-haftalik { background: #283593; }
+/* Dar telefonlarda (iPhone) alt menü yazıları kelime ortasından bölünmesin */
+@media (max-width: 430px) {
+  .alt-menu button { font-size: 14px; line-height: 1.15; }
+  .alt-menu button span { font-size: 24px; }
+  .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 12px; }
+}
