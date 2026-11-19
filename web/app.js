@@ -1177,7 +1177,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
         ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
       </div>
-      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar.</p>
+      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar. Haritayı yakınlaştırınca sarı <b>sokak numaraları</b> görünür.</p>
       <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`;
   }
 
@@ -1212,6 +1212,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     document.head.appendChild(js);
   });
   let devHarita = null, konumIzle = null, konumIsaret = null;
+  let sokakEtiketleri = null;
+  const sokaklariAl = async () => sokakEtiketleri ??= await fetch("veri/sokak_etiketleri.json").then((r) => r.json()).catch(() => { sokakEtiketleri = null; return []; });
   function haritaKapat() {
     if (konumIzle != null) { navigator.geolocation.clearWatch(konumIzle); konumIzle = null; }
     konumIsaret = null;
@@ -1227,6 +1229,14 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
     const ns = v.noktalar;
+    // Sokak numaraları: yaklaşınca görünür (sarı, numaratördeki gibi)
+    const sokakKatmani = L.layerGroup();
+    for (const e of await sokaklariAl()) {
+      L.marker([e.lat, e.lng], { interactive: false, keyboard: false,
+        icon: L.divIcon({ className: "", iconSize: [30, 18], iconAnchor: [15, 9], html: `<span class="sokak-no">${kac(e.s)}</span>` }) }).addTo(sokakKatmani);
+    }
+    const sokakGoster = () => { if (h.getZoom() >= 17) sokakKatmani.addTo(h); else sokakKatmani.remove(); };
+    h.on("zoomend", sokakGoster);
     L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#1565c0", weight: 4, dashArray: "8 8", opacity: .85 }).addTo(h);
     ns.forEach((n, i) => {
       const ks = v.kayitlar.filter((k) => k.nokta_id === n.id);
@@ -1238,6 +1248,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <a href="${yolTarifi(n)}" target="_blank" rel="noopener">🧭 Yol tarifi</a> · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">Google Maps</a>`);
     });
     h.fitBounds(ns.map((n) => [n.lat, n.lng]), { padding: [28, 28] });
+    sokakGoster();
     devHarita = h;
   }
   function konumumuGoster() {
@@ -1259,12 +1270,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }, (e) => { mesaj(e.code === 1 ? "Konum izni verilmedi. Telefonun ayarlarından izin verin." : "Konum alınamadı."); konumIzle = null; },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
   }
-  function kmlIndir(v) {
+  async function kmlIndir(v) {
+    const sokaklar = await sokaklariAl();
     const x = (t) => String(t).replace(/[<&>]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;" })[c]);
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sporkent Devriye Kontrol Noktaları</name>
 ${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point><coordinates>${n.lng},${n.lat},0</coordinates></Point></Placemark>`).join("\n")}
 <Placemark><name>Devriye rotası</name><LineString><coordinates>${v.noktalar.map((n) => `${n.lng},${n.lat},0`).join(" ")}</coordinates></LineString></Placemark>
+<Folder><name>Sokak numaraları</name>
+${sokaklar.map((e) => `<Placemark><name>${x(e.s)}. Sokak</name><Point><coordinates>${e.lng},${e.lat},0</coordinates></Point></Placemark>`).join(String.fromCharCode(10))}
+</Folder>
 </Document></kml>`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
