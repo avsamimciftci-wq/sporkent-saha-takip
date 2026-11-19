@@ -1680,6 +1680,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
   });
+  document.getElementById("acilis")?.remove(); // eski sürümden kalan açılış ekranı
   // ---------- Ana sayfa: bölümler büyük düğmeler halinde ----------
   function anaAc() {
     if (location.hash !== "#ana") history.replaceState(null, "", "#ana");
