@@ -1107,7 +1107,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     let no = 0;
     $("#gorevler").innerHTML = `
       <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button>${gunluk
-        ? `<h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1>`
+        ? `<h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Günlük Kontrol</h1>`
         : `<h1 class="sayfa-bant bant-haftalik">🗓️ Haftalık Kontrol</h1>`}</div>
       ${gunluk ? "" : `<p class="gorev-donem">Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
       <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>`}
