@@ -108,6 +108,11 @@
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
   const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim", sokaklar: "sokaklar" };
+  // Alt menünün gerçek yüksekliği (iPhone çentiği ve iki satırlık yazılar dahil): "+ Yeni kayıt" hep menünün üstünde kalsın
+  if ("ResizeObserver" in window) new ResizeObserver(() => {
+    const m = $("#alt-menu"); if (!m.hidden) document.documentElement.style.setProperty("--menu-h", m.offsetHeight + "px");
+  }).observe($("#alt-menu"));
+
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
