@@ -470,6 +470,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "kapat": {
       if (!KAPATABILIR.includes(rol)) throw new Hata("Bu işlemi yalnızca yönetici, müdür veya şef yapabilir.", 403);
+      if (rol === "baskan") {
+        const { data: kk } = await db.from("kayitlar").select("gizli").eq("id", g.id).maybeSingle();
+        if (kk?.gizli) throw new Hata("YK iş emrini yalnızca müdür ya da şef \"Yapıldı\" olarak kapatabilir.", 403);
+      }
       const { data, error } = await db.from("kayitlar").update({
         durum: "tamam",
         sonuc: temiz(g.sonuc) || null,
