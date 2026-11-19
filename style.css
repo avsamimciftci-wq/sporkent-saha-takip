@@ -640,19 +640,21 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* ---------- Açılış logosu ---------- */
 .acilis {
   position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  background: radial-gradient(circle at 50% 40%, #2c6b5f, #1f4e45 60%, #163a33); color: #fff; text-align: center; padding: 24px;
+  background: #fff; color: #1f4e45; text-align: center; padding: 24px;
   transition: opacity .45s ease;
 }
-.acilis img { width: 168px; height: 168px; border-radius: 50%; background: #fff; padding: 8px; object-fit: contain;
-  box-shadow: 0 10px 30px rgba(0,0,0,.35); animation: acilis-gir .7s ease-out both; }
-.acilis b { font-size: 22px; margin-top: 14px; animation: acilis-gir .7s .15s ease-out both; }
-.acilis span { font-size: 30px; font-weight: 800; letter-spacing: .08em; animation: acilis-gir .7s .25s ease-out both; }
+/* Telefonun kendi açılış ekranı da beyaz: logo yerinde kalır, yazı altına gelir */
+.acilis img { width: 168px; height: 168px; object-fit: contain; }
+.acilis b { font-size: 22px; margin-top: 14px; animation: acilis-gir .6s .1s ease-out both; }
+.acilis span { font-size: 30px; font-weight: 800; letter-spacing: .08em; animation: acilis-gir .6s .2s ease-out both; }
 .acilis.bitti { opacity: 0; pointer-events: none; }
 @keyframes acilis-gir { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
 
 /* ---------- Ana sayfa ---------- */
-.ust-ana { flex: none; display: flex; flex-direction: column; align-items: center; gap: 0; background: rgba(255,255,255,.14);
-  color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 12px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ust-ana { flex: none; display: flex; flex-direction: column; align-items: center; gap: 0; background: #ffc107;
+  color: #1b2421; border: 2px solid #fff; border-radius: 12px; padding: 4px 10px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+.ust-ana:active { transform: scale(.96); }
 .ust-ana span { font-size: 22px; line-height: 1.1; }
 .ust-ana[hidden] { display: none; }
 .ana-karsilama { margin: 0 0 12px; font-size: 18px; color: var(--soluk); }
