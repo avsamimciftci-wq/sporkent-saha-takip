@@ -26,7 +26,7 @@
 
   <!-- Ana sayfa: bölümler -->
   <main id="ekran-ana" class="ekran" hidden>
-    <p class="ana-karsilama">Hoş geldiniz <b id="ana-ad"></b></p>
+    <p class="ana-karsilama"><span id="ana-hitap"></span> <b id="ana-ad"></b></p>
     <div id="ana-kutular" class="ana-kutular">
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
@@ -49,6 +49,13 @@
       <p class="ipucu kurulum-alt">Ekledikten sonra bu sayfayı kapatın ve ana ekrandaki <b>Sporkent</b> simgesine dokunun. Kaydınızı oradan yaparsınız.</p>
     </section>
 
+    <!-- Önce kim olduğunu seçer: ortak (davet koduyla kayıt) ya da TG / YK / görevli (şahsi kodla giriş) -->
+    <section id="giris-secim" class="kart giris-secim" hidden>
+      <h1>Nasıl giriş yapacaksınız?</h1>
+      <button id="sec-ortak" class="secim-dugme secim-ortak" type="button"><span>🏠</span><b>Ortağım</b><small>Yönetimden gelen 6 rakamlı davet kodum var</small></button>
+      <button id="sec-tg" class="secim-dugme secim-tg" type="button"><span>🏅</span><b>TG / YK üyesiyim ya da görevliyim</b><small>Bana verilen şahsi kodum var (örn. TG1234)</small></button>
+    </section>
+
     <form id="kayit-form" class="kart" hidden>
       <button id="kodla-gir-ust" class="tg-giris-dugme" type="button">👤 TG / YK üyesi ya da görevliyseniz<br><b>Şahsi kodunuzla buradan girin →</b></button>
       <h1>Ortak kaydı</h1>
@@ -60,8 +67,8 @@
         <input name="ortak_no" required inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Örn. 12">
       </label>
       <label>Davet kodu
-        <input name="davet_kodu" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6 haneli kod">
-        <small class="ipucu">Kooperatif yönetiminin size gönderdiği davet mesajındaki 6 haneli kod. TG / YK şahsi kodu buraya yazılmaz; en üstteki düğmeyi kullanın.</small>
+        <input name="davet_kodu" required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="6 haneli kod">
+        <small class="ipucu">Kooperatif yönetiminin size gönderdiği davet mesajındaki 6 haneli kod. Harfli bir şahsi kod (TG / YK) yazarsanız şahsi kodla girişe geçilir.</small>
       </label>
       <label>Cep telefonunuz
         <input name="telefon" type="tel" autocomplete="tel" required maxlength="20" placeholder="0532 123 45 67">
@@ -87,7 +94,7 @@
       <button class="ana-dugme" type="submit">Giriş yap</button>
       <p id="giris-hata" class="hata" hidden></p>
       <p class="kvkk"><a href="aydinlatma.html">🔒 Kişisel veriler hakkında aydınlatma metni</a></p>
-      <button id="kayda-don" class="metin-dugme" type="button">← Ortak kaydına dön</button>
+      <button id="kayda-don" class="metin-dugme" type="button">← Geri</button>
     </form>
   </main>
 

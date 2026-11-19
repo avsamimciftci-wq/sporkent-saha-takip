@@ -56,7 +56,16 @@
   const bugun = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const DURUM = { acik: "Henüz yapılmayan", devam: "Henüz yapılmayan", tamam: "Yapıldı" };
   const DURUM_ROZET = { acik: "yapilmayan", devam: "yapilmayan", tamam: "tamam" };
-  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi" };
+  // Ekranda hitap: "Temsilciler Grubu Üyesi Sayın", "Yönetim Kurulu Üyesi Sayın", "Ortağımız Sayın" …
+  function hitap(o = oturum) {
+    const un = String(o?.unvan || "");
+    if (o?.rol === "baskan") return "Yönetim Kurulu Başkanı Sayın";
+    if (o?.rol === "yonetim") return "Yönetim Kurulu Üyesi Sayın";
+    if (o?.rol === "uye" && /^TG/i.test(un)) return /başkan/i.test(un) ? "Temsilciler Grubu Başkanı Sayın" : "Temsilciler Grubu Üyesi Sayın";
+    if (o?.rol === "uye") return "Ortağımız Sayın";
+    return "Sayın";
+  }
+  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Ortak" };
   // Yönetici ve yönetim kurulu, TG üyesi / muhasebe kayıtlarını onaylar; bu dört görevin kaydı onaysız düşer
   const kayitOnaylar = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const onayBekliyor = (k) => k.onay_durumu === "bekliyor";
@@ -250,7 +259,7 @@
   function listeCiz() {
     const saat = new Date().getHours();
     const selam = saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
-    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
+    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(hitap())} ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
     const bekleyenKayit = kayitlar.filter(onayBekliyor);
     const ou = $("#onay-uyari");
     ou.hidden = !(kayitOnaylar() && bekleyenKayit.length);
@@ -649,13 +658,17 @@
   const masaustu = !(iosCihaz || androidCihaz);
   const kurulumGerekli = () => masaustu || !anaEkranda();
 
-  // TG üyelerine özel link (…?tg=1): giriş ekranı doğrudan kişisel kod formuyla açılır
-  if (/[?&]tg/.test(location.search)) sakla.koy("sk_tg", 1);
-  function girisEkrani(kodla = !!sakla.al("sk_tg")) {
+  // Linkten gelen seçim (…?giris=ortak / ?giris=tg, eski TG linki …?tg=1).
+  // iPhone ana ekran uygulaması Safari'nin hafızasını görmez; orada seçim ekranı çıkar.
+  if (/[?&](tg|giris=tg)/.test(location.search)) sakla.koy("sk_tg", 1);
+  if (/[?&]giris=ortak/.test(location.search)) sakla.koy("sk_tg", 0);
+  // kodla: true = şahsi kodla giriş, false = ortak kaydı, null = önce seçim ekranı
+  function girisEkrani(kodla = ({ 1: true, 0: false })[sakla.al("sk_tg")] ?? null) {
     const kurulmali = kurulumGerekli();
     $("#kurulum").hidden = !kurulmali;
-    $("#kayit-form").hidden = kurulmali || kodla;
-    $("#giris-form").hidden = kurulmali || !kodla;
+    $("#giris-secim").hidden = kurulmali || kodla !== null;
+    $("#kayit-form").hidden = kurulmali || kodla !== false;
+    $("#giris-form").hidden = kurulmali || kodla !== true;
     // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
     if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
     if (kurulmali && masaustu) {
@@ -685,7 +698,21 @@
   }
   $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
   $("#kodla-gir-ust").addEventListener("click", () => { girisEkrani(true); window.scrollTo(0, 0); });
-  $("#kayda-don").addEventListener("click", () => girisEkrani(false));
+  $("#kayda-don").addEventListener("click", () => { sakla.sil("sk_tg"); girisEkrani(null); window.scrollTo(0, 0); });
+  $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); girisEkrani(false); window.scrollTo(0, 0); });
+  $("#sec-tg").addEventListener("click", () => { sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0); });
+  // Davet kodu kutusuna harfli şahsi kod yazılırsa (TG / YK üyesi yanlış forma geldi): şahsi kodla girişe geç
+  $("#kayit-form [name=davet_kodu]").addEventListener("input", (e) => {
+    const v = e.target.value.trim();
+    if (!/\p{L}/u.test(v)) return;
+    const ad = $("#kayit-form [name=ad_soyad]").value.trim();
+    e.target.value = "";
+    sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0);
+    const f = $("#giris-form");
+    if (ad && !f.ad.value) f.ad.value = ad;
+    f.kod.value = v; (f.ad.value ? f.kod : f.ad).focus();
+    mesaj("Harfli kod şahsi koddur: şahsi kodla giriş ekranına geçildi.");
+  });
 
   function kurAdim(html) { const k = $("#kur-adim"); k.innerHTML = html; k.hidden = false; }
 
@@ -763,6 +790,14 @@
     if (oturum.durum !== "onayli") return bekleEkrani();
     clearInterval(bekleZamani);
     bildirimleriTemizle();
+    api("durum").then((r) => {
+      if (!r || r.durum !== "onayli") return;
+      const once = JSON.stringify([oturum.ad, oturum.rol, oturum.unvan]);
+      Object.assign(oturum, { ad: r.ad || oturum.ad, rol: r.rol || oturum.rol, unvan: r.unvan ?? null });
+      if (once === JSON.stringify([oturum.ad, oturum.rol, oturum.unvan])) return;
+      sakla.koy("sk_oturum", oturum);
+      if (!$("#ekran-ana").hidden) anaAc();
+    }).catch(() => {});
     if (!location.hash || location.hash === "#ana") anaAc(); else goster("liste");
     bildirimKutusu();
     await yenile();
@@ -938,7 +973,7 @@
   }
 
   // ---------- Ortağa davet (yönetici) ----------
-  const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-takip";
+  const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-ortak";
   const davetMetni = (r) => `Sayın Ortağımız,
 
 Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
@@ -947,7 +982,7 @@ ${UYGULAMA_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
+3. "Ortağım" seçeneğine dokunun. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
 
 Davet kodunuz: ${r.kod.slice(0, 3)} ${r.kod.slice(3)}
 (Bu kod yalnızca size özeldir, ${r.gun} gün geçerlidir. Kimseyle paylaşmayın.)
@@ -986,7 +1021,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
 
   // TG / YK üyesine davet: TG giriş linki + şahsi kod
-  const TG_ADRESI = "https://tinyurl.com/sporkent-tg";
+  const TG_ADRESI = "https://tinyurl.com/sporkent-tgyk";
   const tgLinkMetni = `Sayın TG / YK Üyemiz,
 
 Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına size özel giriş bağlantısı:
@@ -995,9 +1030,7 @@ ${TG_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. "Şahsi kodla giriş" ekranında adınızı ve size verilen şahsi kodunuzu yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
-
-Ekranda ortak kaydı görünürse en üstteki sarı "Şahsi kodunuzla buradan girin" düğmesine dokunun.
+3. "TG / YK üyesiyim ya da görevliyim" seçeneğine dokunun. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
@@ -1685,6 +1718,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   function anaAc() {
     if (location.hash !== "#ana") history.replaceState(null, "", "#ana");
     goster("ana");
+    $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun
