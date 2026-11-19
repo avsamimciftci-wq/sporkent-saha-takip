@@ -267,6 +267,25 @@ async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
 // ---------- Devriye kontrol noktaları ----------
 const DEVRIYE_ISARETLEYEN: Rol[] = ["mudur", "sef"];
 const DEVRIYE_SAKLAMA_GUN = 365;
+// Konum yalnızca mesai saatinde (08:00-17:00, Türkiye) ve devriye alanında (noktalar + rota çevresi 200 m) işlenir
+const MESAI_BAS = 8, MESAI_BIT = 17, ALAN_PAYI_M = 200;
+const trSaati = () => { const d = new Date(Date.now() + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
+const mesaideMi = () => { const h = trSaati(); return h >= MESAI_BAS && h < MESAI_BIT; };
+function alanaUzaklik(lat: number, lng: number, ns: { lat: number; lng: number }[]) {
+  const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
+  const xy = (n: { lat: number; lng: number }) => [(n.lng - lng) * kx, (n.lat - lat) * ky];
+  let en = Infinity;
+  for (let i = 0; i < ns.length; i++) {
+    const [ax, ay] = xy(ns[i]);
+    en = Math.min(en, Math.hypot(ax, ay));
+    if (i + 1 < ns.length) {
+      const [bx, by] = xy(ns[i + 1]); const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+      en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
+    }
+  }
+  return en;
+}
 // İki konum arası mesafe (metre)
 function mesafeM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000, r = (x: number) => (x * Math.PI) / 180;
@@ -805,10 +824,13 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "devriye_isaretle": {
       if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("\"Kontrol edildi\" işaretini yalnızca müdür ve şef verir.", 403);
+      if (!mesaideMi()) throw new Hata("Mesai saatleri (08:00–17:00) dışında konum işlenmez; kontrol yapılamaz.", 403);
       const lat = Number(g.lat), lng = Number(g.lng), dogruluk = Math.round(Number(g.dogruluk) || 0);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Hata("Konum alınamadı. Telefonun konum iznini açıp tekrar deneyin.");
       if (dogruluk > 150) throw new Hata(`Konum net alınamadı (±${dogruluk} m). Açık alanda birkaç saniye bekleyip tekrar deneyin.`);
-      const { data: n } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap").eq("id", g.nokta_id).eq("aktif", true).maybeSingle();
+      const { data: tum } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap").eq("aktif", true).order("sira").order("id");
+      if (alanaUzaklik(lat, lng, tum ?? []) > ALAN_PAYI_M) throw new Hata("Devriye alanının dışındasınız. Konumunuz kaydedilmedi.", 403);
+      const n = (tum ?? []).find((x: any) => x.id === Number(g.nokta_id));
       if (!n) throw new Hata("Kontrol noktası bulunamadı.");
       const mesafe = mesafeM({ lat, lng }, n);
       if (mesafe > n.yaricap + Math.min(dogruluk, 25)) {

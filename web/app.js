@@ -1177,8 +1177,33 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
         ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
       </div>
-      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar. Konumunuz yalnızca bu ekranda gösterilir, kaydedilmez.</p>`;
+      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar.</p>
+      <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`;
   }
+
+  // Konum yalnızca mesai saatinde (08:00-17:00, Türkiye) ve devriye alanında kullanılır
+  const MESAI_BAS = 8, MESAI_BIT = 17, ALAN_PAYI_M = 200;
+  const trSaat = () => { const p = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+    return Number(p.find((x) => x.type === "hour").value) + Number(p.find((x) => x.type === "minute").value) / 60; };
+  const mesaideMi = () => { const h = trSaat(); return h >= MESAI_BAS && h < MESAI_BIT; };
+  // Noktaya / rota çizgisine en kısa uzaklık (metre); alan = noktalar ve aralarındaki rota çevresinde 200 m
+  function alanaUzaklik(lat, lng, ns) {
+    const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
+    const xy = (n) => [(n.lng - lng) * kx, (n.lat - lat) * ky];
+    let en = Infinity;
+    for (let i = 0; i < ns.length; i++) {
+      const [ax, ay] = xy(ns[i]);
+      en = Math.min(en, Math.hypot(ax, ay));
+      if (i + 1 < ns.length) {
+        const [bx, by] = xy(ns[i + 1]); const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy;
+        const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+        en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
+      }
+    }
+    return en;
+  }
+  const alanIcinde = (lat, lng, ns) => ns.length > 0 && alanaUzaklik(lat, lng, ns) <= ALAN_PAYI_M;
+  const MESAI_DISI = "Mesai saatleri (08:00–17:00) dışında konum kullanılmaz; kontrol yapılamaz.";
 
   let leafletYukle = null;
   const leaflet = () => leafletYukle ??= new Promise((ok, red) => {
@@ -1217,9 +1242,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
   function konumumuGoster() {
     if (!devHarita || !navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
+    if (!mesaideMi()) return mesaj(MESAI_DISI);
     if (konumIzle != null) return;
+    const ns = gorevVeri?.devriye?.noktalar ?? [];
     konumIzle = navigator.geolocation.watchPosition((p) => {
       const yer = [p.coords.latitude, p.coords.longitude];
+      if (!mesaideMi() || !alanIcinde(yer[0], yer[1], ns)) {
+        navigator.geolocation.clearWatch(konumIzle); konumIzle = null;
+        if (konumIsaret) { konumIsaret.remove(); konumIsaret = null; }
+        return mesaj(mesaideMi() ? "Devriye alanının dışındasınız; konum gösterimi durduruldu." : "Mesai saati bitti; konum gösterimi durduruldu.");
+      }
       if (!konumIsaret) {
         konumIsaret = window.L.circleMarker(yer, { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(devHarita).bindPopup("Buradasınız");
         devHarita.setView(yer, Math.max(devHarita.getZoom(), 17));
@@ -1264,9 +1296,10 @@ ${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point>
             · <a href="${haritaLink(k.lat, k.lng)}" target="_blank" rel="noopener">konum</a>
             ${k.foto_url ? `<a href="${kac(k.foto_url)}" target="_blank" rel="noopener"><img class="dn-foto" src="${kac(k.foto_url)}" alt="Fotoğraf"></a>` : ""}</div>`).join("")}
           ${!ks.length && !v.isaretleyebilir ? `<div class="dn-kayit dn-yok">${v.gun === v.bugun ? "Henüz uğranmadı" : "Uğranmadı"}</div>` : ""}
-          ${v.isaretleyebilir && !benim ? `
+          ${v.isaretleyebilir && !benim ? (mesaideMi() ? `
           <label class="dn-foto-sec"><input type="file" accept="image/*" capture="environment" hidden data-dfoto="${n.id}"><span>📷 Fotoğraf ekle (isteğe bağlı)</span></label>
-          <button type="button" class="ana-dugme dn-buradayim" data-buradayim="${n.id}">✔ Kontrol edildi</button>` : ""}
+          <button type="button" class="ana-dugme dn-buradayim" data-buradayim="${n.id}">✔ Kontrol edildi</button>`
+            : `<button type="button" class="ana-dugme dn-buradayim" disabled>🔒 Mesai dışı (08:00–17:00)</button>`) : ""}
         </div>`;
       }).join("")}` : `<p class="bos">Henüz kontrol noktası tanımlanmadı.${v.noktaYonetir ? " Aşağıdan ekleyin." : ""}</p>`}
       ${v.noktaYonetir ? `
@@ -1312,7 +1345,11 @@ ${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point>
     if (b) {
       b.disabled = true; const eski = b.textContent; b.textContent = "Konum alınıyor…";
       try {
+        if (!mesaideMi()) throw new Error(MESAI_DISI);
         const k = await konumAl();
+        if (!alanIcinde(k.coords.latitude, k.coords.longitude, gorevVeri?.devriye?.noktalar ?? [])) {
+          throw new Error("Devriye alanının dışındasınız. Konumunuz kaydedilmedi ve gönderilmedi.");
+        }
         const blob = devriyeFoto.get(b.dataset.buradayim);
         const foto = blob ? await fotoYukle(blob, "devriye") : null;
         const r = await api("devriye_isaretle", { nokta_id: Number(b.dataset.buradayim), lat: k.coords.latitude, lng: k.coords.longitude, dogruluk: k.coords.accuracy, foto });
