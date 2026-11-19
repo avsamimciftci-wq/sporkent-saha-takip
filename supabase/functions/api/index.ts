@@ -449,7 +449,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         sorun: temiz(g.sorun),
         foto_once: temiz(g.foto, 200) || null,
         gizli: !!g.gizli && YONETIM_ISI_GIREN.includes(rol),
-        son_tarih: sonGun(new Date(), await varsayilanSure()),
+        // YK iş emrinde süre emri veren tarafından seçilir (1-60 gün); diğer kayıtlarda varsayılan süre
+        son_tarih: sonGun(new Date(), !!g.gizli && YONETIM_ISI_GIREN.includes(rol) && Number.isInteger(Number(g.sure)) && Number(g.sure) >= 1 && Number(g.sure) <= 60
+          ? Number(g.sure) : await varsayilanSure()),
         onay_durumu: onaysizGirer(u) ? "onayli" : "bekliyor",
       };
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
