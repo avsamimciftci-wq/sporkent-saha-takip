@@ -406,10 +406,12 @@
       </div>`}
       <div class="islem">
         <h2>Yapılma süresi</h2>
+        ${!k.gizli || k.benim || k.bildiren === oturum.ad ? `
         <div class="sure-sec" id="sure-sec">
           ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}" class="${sureGun(k) === g ? "secili" : ""}">${g} gün</button>`).join("")}
         </div>
-        <small class="ipucu">Kaydın açıldığı günden itibaren sayılır. Süre dolunca iş listede yanıp söner.</small>
+        <small class="ipucu">Kaydın açıldığı günden itibaren sayılır. Süre dolunca iş listede yanıp söner.</small>` : `
+        <p class="sure-kilit"><b>${sureGun(k) ?? "—"} gün</b> · 🔒 Bu YK iş emrinin süresini yalnızca emri veren <b>${kac(k.bildiren)}</b> değiştirebilir.</p>`}
         <div class="uye">
           <div><b>Yeni işlerin süresi: ${varsSure ?? "—"} gün</b><br><small>Her yeni kayda kendiliğinden verilir.</small></div>
           <div class="uye-dugmeler"><button type="button" class="kucuk-dugme" id="vars-sure">Değiştir</button></div>
