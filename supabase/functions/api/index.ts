@@ -130,7 +130,7 @@ async function gorevHatirlat() {
   const bugun = sonGun(new Date(), 0);
   const sonuc: Record<string, unknown> = {};
   sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📍 Günlük devriye",
-    `Bugünkü devriyede ${await noktaSayisi()} kontrol noktası var. Her noktada "Buradayım"a basın.`, { sayfa: "gorevler" });
+    `Bugünkü devriyede ${await noktaSayisi()} kontrol noktası var. Her noktada "Kontrol edildi"ye basın.`, { sayfa: "gorevler" });
   // Pazartesi: haftalık program da hatırlatılır
   if (haftaBasi(bugun) === bugun) {
     sonuc.haftalik = await bildir(GOREV_ISARETLEYEN, "📋 Haftalık görevler",
@@ -298,7 +298,7 @@ async function konumCoz(metin: string) {
   return k;
 }
 
-// Seçilen günün kontrol noktaları ve "Buradayım" kayıtları
+// Seçilen günün kontrol noktaları ve "Kontrol edildi" kayıtları
 async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
   const bugun = sonGun(new Date(), 0);
   const gun = /^\d{4}-\d{2}-\d{2}$/.test(istenen) && istenen <= bugun ? istenen : bugun;
@@ -804,7 +804,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "devriye_isaretle": {
-      if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("\"Buradayım\" işaretini yalnızca müdür ve şef verir.", 403);
+      if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("\"Kontrol edildi\" işaretini yalnızca müdür ve şef verir.", 403);
       const lat = Number(g.lat), lng = Number(g.lng), dogruluk = Math.round(Number(g.dogruluk) || 0);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Hata("Konum alınamadı. Telefonun konum iznini açıp tekrar deneyin.");
       if (dogruluk > 150) throw new Hata(`Konum net alınamadı (±${dogruluk} m). Açık alanda birkaç saniye bekleyip tekrar deneyin.`);
@@ -816,7 +816,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       }
       const gun = sonGun(new Date(), 0);
       const { data: var_ } = await db.from("devriye_kayitlari").select("id").eq("gun", gun).eq("nokta_id", n.id).eq("cihaz", u.cihaz).maybeSingle();
-      if (var_) throw new Hata(`${n.ad} noktası bugün zaten işaretlendi.`);
+      if (var_) throw new Hata(`${n.ad} noktası bugün zaten kontrol edildi olarak işaretlendi.`);
       const { error } = await db.from("devriye_kayitlari").insert({
         nokta_id: n.id, gun, cihaz: u.cihaz, ad: u.ad, rol, lat, lng, dogruluk: dogruluk || null, mesafe,
         foto: temiz(g.foto, 200) || null,

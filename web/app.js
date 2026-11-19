@@ -1166,8 +1166,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <b>📍 Devriye: ${ugranan} / ${v.noktalar.length} kontrol noktası</b>
         <span>${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : (v.gun === v.bugun ? "Henüz hiçbir noktaya uğranmadı" : "Bu gün hiçbir noktaya uğranmadı")}</span>
       </div>
-      ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“📍 Buradayım”</b>a basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
-        : `<p class="ipucu">Müdür ve şef her noktada “Buradayım”a basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
+      ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“✔ Kontrol edildi”</b>e basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
+        : `<p class="ipucu">Müdür ve şef her noktada “Kontrol edildi”ye basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
       ${v.noktalar.map((n, i) => {
         const ks = kayitlar(n.id);
         const benim = ks.find((k) => k.benim);
@@ -1180,7 +1180,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           ${!ks.length && !v.isaretleyebilir ? `<div class="dn-kayit dn-yok">${v.gun === v.bugun ? "Henüz uğranmadı" : "Uğranmadı"}</div>` : ""}
           ${v.isaretleyebilir && !benim ? `
           <label class="dn-foto-sec"><input type="file" accept="image/*" capture="environment" hidden data-dfoto="${n.id}"><span>📷 Fotoğraf ekle (isteğe bağlı)</span></label>
-          <button type="button" class="ana-dugme dn-buradayim" data-buradayim="${n.id}">📍 Buradayım</button>` : ""}
+          <button type="button" class="ana-dugme dn-buradayim" data-buradayim="${n.id}">✔ Kontrol edildi</button>` : ""}
         </div>`;
       }).join("")}` : `<p class="bos">Henüz kontrol noktası tanımlanmadı.${v.noktaYonetir ? " Aşağıdan ekleyin." : ""}</p>`}
       ${v.noktaYonetir ? `
@@ -1229,7 +1229,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         const foto = blob ? await fotoYukle(blob, "devriye") : null;
         const r = await api("devriye_isaretle", { nokta_id: Number(b.dataset.buradayim), lat: k.coords.latitude, lng: k.coords.longitude, dogruluk: k.coords.accuracy, foto });
         devriyeFoto.delete(b.dataset.buradayim);
-        mesaj(`✓ ${r.ad} işaretlendi.`);
+        mesaj(`✓ ${r.ad}: kontrol edildi.`);
         devriyeAc();
       } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = eski; }
       return;
