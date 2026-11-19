@@ -1106,11 +1106,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const yapilan = gunluk ? ugranan : isaret.size;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
-      <div class="gorev-sekme">
-        <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük · <small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
-        <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık · <small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
-      </div>
+      <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button>${gunluk
+        ? `<h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1>`
+        : `<h1 class="sayfa-bant bant-haftalik">🗓️ Haftalık Kontrol</h1>`}</div>
       ${gunluk ? "" : `<p class="gorev-donem">Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
       <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>`}
       ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>` : ""}
@@ -1395,6 +1393,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
 
   // Yönetim Kurulu ekranından açılan sayfalar geçmişe eklenir: telefonun geri tuşu da Yönetim Kurulu'na döner
   $("#gorevler-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler"); gorevlerAc("gunluk"); });
+  $("#haftalik-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler-haftalik"); gorevlerAc("haftalik"); });
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-geri-yksaha]")) return ykSahaAc();
     if (!e.target.closest("[data-geri-yk]")) return;
