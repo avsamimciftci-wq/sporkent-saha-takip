@@ -1105,14 +1105,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const yapilan = gunluk ? ugranan : isaret.size;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
+      <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
       <div class="gorev-sekme">
-        <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük<br><small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
-        <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık<br><small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
+        <button type="button" data-sekme="gunluk" class="${gunluk ? "secili" : ""}">Günlük · <small>${sayac("gunluk")} / ${v.gecmis.gunlukToplam}</small></button>
+        <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık · <small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
       </div>
-      <p class="gorev-donem">${gunluk ? (guncel ? "Bugün, " : "") + gunYazisi(donem) : `Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)}`}
-        · <b>${yapilan} / ${toplam} ${gunluk ? "nokta" : "yapıldı"}</b></p>
-      <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>
+      ${gunluk ? "" : `<p class="gorev-donem">Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
+      <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>`}
       ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>` : ""}
       ${gunluk ? devriyeGovde(dv) : `
       ${!v.isaretleyebilir ? `<p class="ipucu">Görevleri müdür ve şef işaretler; siz kimin, ne zaman yaptığını görürsünüz.</p>`
@@ -1295,8 +1294,8 @@ ${sokaklar.map((e) => `<Placemark><name>${x(e.s)}. Sokak</name><Point><coordinat
     return `
       ${v.noktalar.length ? `
       <div class="devriye-ozet ${ugranan === v.noktalar.length ? "tam" : ugranan ? "" : "hic"}">
-        <b>📍 Devriye: ${ugranan} / ${v.noktalar.length} kontrol noktası</b>
-        <span>${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : (v.gun === v.bugun ? "Henüz hiçbir noktaya uğranmadı" : "Bu gün hiçbir noktaya uğranmadı")}</span>
+        <b>📍 ${ugranan} / ${v.noktalar.length} nokta</b>
+        <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)} · ${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : "henüz uğranmadı"}</span>
       </div>
       ${devriyeHaritaHtml(v)}
       ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“✔ Kontrol edildi”</b>e basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
