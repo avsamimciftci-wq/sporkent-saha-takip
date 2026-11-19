@@ -491,9 +491,13 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       ykVeYonetici();
       const gun = Number(g.gun);
       if (!Number.isInteger(gun) || gun < 1 || gun > 60) throw new Hata("Süre 1 ile 60 gün arasında olmalı.");
-      const { data: k } = await db.from("kayitlar").select("id, created_at, durum").eq("id", g.id).maybeSingle();
+      const { data: k } = await db.from("kayitlar").select("id, created_at, durum, gizli, cihaz, bildiren").eq("id", g.id).maybeSingle();
       if (!k) throw new Hata("Kayıt bulunamadı.");
       if (k.durum === "tamam") throw new Hata("Bu iş zaten yapıldı.");
+      // YK iş emrinin süresini yalnızca emri veren değiştirir (yönetici ve diğer YK üyeleri değiştiremez)
+      if (k.gizli && k.cihaz !== u.cihaz && k.bildiren !== u.ad) {
+        throw new Hata(`Bu YK iş emrinin süresini yalnızca emri veren (${k.bildiren}) değiştirebilir.`, 403);
+      }
       const son_tarih = sonGun(k.created_at, gun);
       const { error } = await db.from("kayitlar").update({ son_tarih }).eq("id", k.id);
       if (error) throw error;
