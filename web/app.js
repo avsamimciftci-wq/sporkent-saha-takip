@@ -107,7 +107,7 @@
 
   // ---------- Ekranlar ----------
   // Ekran → modül (alt menüde hangisi seçili)
-  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim", devriye: "yonetim" };
+  const MODUL = { aidat: "aidat", iletisim: "iletisim", yonetimisleri: "yonetim", program: "yonetim", gorevler: "yonetim", yksaha: "yonetim" };
   function goster(ad) {
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     const menulu = !["giris", "bekle"].includes(ad) && onayli();
@@ -1098,7 +1098,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const toplam = gunluk ? v.gecmis.gunlukToplam : v.gecmis.haftalikToplam;
     const guncel = gunluk ? v.gun === v.bugun : v.hafta === v.buHafta;
     const duzenler = v.isaretleyebilir && guncel;
-    const sayac = (tur) => v.isaretler.filter((x) => x.tur === tur).length;
+    const dv = v.devriye;
+    const ugranan = dv ? dv.noktalar.filter((n) => dv.kayitlar.some((k) => k.nokta_id === n.id)).length : 0;
+    const sayac = (tur) => tur === "gunluk" ? ugranan : v.isaretler.filter((x) => x.tur === tur).length;
+    const yapilan = gunluk ? ugranan : isaret.size;
     let no = 0;
     $("#gorevler").innerHTML = `
       <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Görev Takibi</h1></div>
@@ -1107,11 +1110,11 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <button type="button" data-sekme="haftalik" class="${gunluk ? "" : "secili"}">Haftalık<br><small>${sayac("haftalik")} / ${v.gecmis.haftalikToplam}</small></button>
       </div>
       <p class="gorev-donem">${gunluk ? (guncel ? "Bugün, " : "") + gunYazisi(donem) : `Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)}`}
-        · <b>${isaret.size} / ${toplam} yapıldı</b></p>
-      <div class="gorev-cubuk"><span style="width:${Math.round((isaret.size / toplam) * 100)}%"></span></div>
-      ${gunluk ? `<button type="button" class="devriye-ac" data-devriye-gun="${v.gun}">📍 Tam saha devriyesi · Kontrol noktaları<small>${v.isaretleyebilir && guncel ? "Her noktada “Buradayım”a basın" : "Kim, hangi noktaya, ne zaman uğradı"}</small></button>` : ""}
-      ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>`
-        : !v.isaretleyebilir ? `<p class="ipucu">Görevleri müdür ve şef işaretler; siz kimin, ne zaman yaptığını görürsünüz.</p>`
+        · <b>${yapilan} / ${toplam} ${gunluk ? "nokta" : "yapıldı"}</b></p>
+      <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>
+      ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>` : ""}
+      ${gunluk ? devriyeGovde(dv) : `
+      ${!v.isaretleyebilir ? `<p class="ipucu">Görevleri müdür ve şef işaretler; siz kimin, ne zaman yaptığını görürsünüz.</p>`
         : `<p class="ipucu">Yaptığınız kalemin üstüne dokunun, "yapıldı" işaretlensin. Yanlışlıkla işaretlediyseniz tekrar dokunun.</p>`}
       <p class="ipucu">${kac(p.giris)}</p>
       ${p.bolumler.map((b) => `
@@ -1123,7 +1126,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
             <span><b>${kac(k.baslik)}</b><small>${kac(k.aciklama)}</small>
               ${i ? `<em>✓ Yapıldı · ${kac(i.ad || "")} · ${gunluk ? "" : gunYazisi(i.isaret_at.slice(0, 10)) + " "}${saatYazisi(i.isaret_at)}</em>` : ""}</span>
           </button>`;
-        }).join("")}`).join("")}
+        }).join("")}`).join("")}`}
       ${v.gecmisGorur ? `<h2>Geçmiş ${gunluk ? "günler" : "haftalar"}</h2>
       <div class="gorev-gecmis">
         ${(gunluk ? v.gecmis.gunler : v.gecmis.haftalar).map((x) => `<button type="button" data-gun="${x.donem}" class="${x.donem === donem ? "secili" : ""} ${x.yapilan === toplam ? "tam" : x.yapilan ? "" : "bos-gun"}">
@@ -1138,8 +1141,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       history.replaceState(history.state, "", gorevSekme === "haftalik" ? "#gorevler-haftalik" : "#gorevler");
       return gorevCiz();
     }
-    const dv = e.target.closest("[data-devriye-gun]");
-    if (dv) { history.pushState({ yk: 1 }, "", "#devriye"); return devriyeAc(dv.dataset.devriyeGun); }
     const gunB = e.target.closest("[data-gun]");
     if (gunB) return gorevlerAc(gorevSekme, gunB.dataset.gun || undefined);
     const b = e.target.closest("[data-kalem]"); if (!b || b.disabled) return;
@@ -1150,36 +1151,23 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     catch (err) { mesaj(err.message); b.disabled = false; }
   });
   // ---------- Devriye kontrol noktaları ----------
-  let devriyeVeri = null;
   const haritaLink = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
-  async function devriyeAc(gun) {
-    if (!gorevGorur()) return;
-    if (location.hash !== "#devriye") history.replaceState(history.state, "", "#devriye");
-    goster("devriye");
-    if (!devriyeVeri) $("#devriye").innerHTML = `<p class="bos">Yükleniyor…</p>`;
-    try { devriyeVeri = await api("devriye", gun ? { gun } : {}); devriyeCiz(); }
-    catch (e) { $("#devriye").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
-  }
-  const gunEkle = (g, n) => { const d = new Date(g + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  // Eski "#devriye" adresi: Görev Takibi › Günlük sekmesine gider
+  const devriyeAc = (gun) => gorevlerAc("gunluk", gun);
 
-  function devriyeCiz() {
-    const v = devriyeVeri;
+  function devriyeGovde(v) {
+    if (!v) return `<p class="bos">Yükleniyor…</p>`;
     const kayitlar = (nid) => v.kayitlar.filter((k) => k.nokta_id === nid);
     const ugranan = v.noktalar.filter((n) => kayitlar(n.id).length).length;
     const saatler = v.kayitlar.map((k) => k.zaman).sort();
-    $("#devriye").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📍 Devriye Kontrol Noktaları</h1></div>
-      <div class="devriye-gun">
-        <button type="button" class="kucuk-dugme" data-dgun="${gunEkle(v.gun, -1)}">◀</button>
-        <b>${v.gun === v.bugun ? "Bugün, " : ""}${gunYazisi(v.gun)}</b>
-        <button type="button" class="kucuk-dugme" data-dgun="${gunEkle(v.gun, 1)}" ${v.gun >= v.bugun ? "disabled" : ""}>▶</button>
-      </div>
+    return `
       ${v.noktalar.length ? `
       <div class="devriye-ozet ${ugranan === v.noktalar.length ? "tam" : ugranan ? "" : "hic"}">
-        <b>${ugranan} / ${v.noktalar.length} nokta</b>
-        <span>${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : "Bu gün hiçbir noktaya uğranmadı"}</span>
+        <b>📍 Devriye: ${ugranan} / ${v.noktalar.length} kontrol noktası</b>
+        <span>${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : (v.gun === v.bugun ? "Henüz hiçbir noktaya uğranmadı" : "Bu gün hiçbir noktaya uğranmadı")}</span>
       </div>
-      ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“📍 Buradayım”</b>a basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>` : ""}
+      ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“📍 Buradayım”</b>a basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
+        : `<p class="ipucu">Müdür ve şef her noktada “Buradayım”a basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
       ${v.noktalar.map((n, i) => {
         const ks = kayitlar(n.id);
         const benim = ks.find((k) => k.benim);
@@ -1196,17 +1184,18 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         </div>`;
       }).join("")}` : `<p class="bos">Henüz kontrol noktası tanımlanmadı.${v.noktaYonetir ? " Aşağıdan ekleyin." : ""}</p>`}
       ${v.noktaYonetir ? `
-      <h2>Kontrol noktalarını düzenle</h2>
+      <details class="nokta-yonet"><summary>⚙️ Kontrol noktalarını düzenle (${v.noktalar.length})</summary>
       <form class="nokta-ekle" id="nokta-ekle">
         <label>Noktanın adı<input name="ad" required maxlength="80" placeholder="Örn. Ana giriş kapısı"></label>
         <label>Google Haritalar bağlantısı ya da koordinat
-          <input name="konum" placeholder="https://maps.app.goo.gl/… ya da 40.9712, 29.0563">
+          <input name="konum" placeholder="https://maps.app.goo.gl/… ya da 37.1329, 27.3245">
           <small class="ipucu">Google Haritalar'da noktaya basılı tutun → “Paylaş” ile bağlantıyı kopyalayın ya da üstte çıkan koordinatı yapıştırın.</small></label>
-        <label>Kabul mesafesi (metre)<input name="yaricap" type="number" inputmode="numeric" min="25" max="300" value="75"></label>
+        <label>Kabul mesafesi (metre)<input name="yaricap" type="number" inputmode="numeric" min="25" max="300" value="50"></label>
         <div class="dugmeler"><button type="button" class="ikincil" id="nokta-burasi">📍 Bulunduğum yeri kullan</button><button class="ana-dugme" type="submit">➕ Noktayı ekle</button></div>
       </form>
       ${v.noktalar.map((n) => `<div class="uye"><div><b>${kac(n.ad)}</b><br><small>${n.lat.toFixed(5)}, ${n.lng.toFixed(5)} · ${n.yaricap} m · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">haritada gör</a></small></div>
-        <div class="uye-dugmeler"><button type="button" class="kucuk-dugme tehlike" data-nokta-sil="${n.id}">Kaldır</button></div></div>`).join("")}` : ""}`;
+        <div class="uye-dugmeler"><button type="button" class="kucuk-dugme" data-nokta-ad="${n.id}" data-ad="${kac(n.ad)}">Adını değiştir</button><button type="button" class="kucuk-dugme tehlike" data-nokta-sil="${n.id}">Kaldır</button></div></div>`).join("")}
+      </details>` : ""}`;
   }
 
   const konumAl = () => new Promise((ok, red) => {
@@ -1217,15 +1206,20 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
   const devriyeFoto = new Map();
 
-  $("#devriye").addEventListener("change", async (e) => {
+  $("#gorevler").addEventListener("change", async (e) => {
     const g = e.target.closest("[data-dfoto]"); if (!g?.files?.[0]) return;
     try { devriyeFoto.set(g.dataset.dfoto, await kucult(g.files[0])); g.nextElementSibling.textContent = "📷 Fotoğraf eklendi ✓ (değiştirmek için dokunun)"; }
     catch (err) { mesaj(err.message); }
   });
 
-  $("#devriye").addEventListener("click", async (e) => {
-    const gb = e.target.closest("[data-dgun]");
-    if (gb && !gb.disabled) return devriyeAc(gb.dataset.dgun);
+  $("#gorevler").addEventListener("click", async (e) => {
+    const yeniAd = e.target.closest("[data-nokta-ad]");
+    if (yeniAd) {
+      const ad = prompt("Noktanın yeni adı:", yeniAd.dataset.ad);
+      if (!ad || !ad.trim()) return;
+      try { await api("nokta_adi", { id: Number(yeniAd.dataset.noktaAd), ad: ad.trim() }); mesaj("Nokta adı değiştirildi."); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
+      return;
+    }
     const b = e.target.closest("[data-buradayim]");
     if (b) {
       b.disabled = true; const eski = b.textContent; b.textContent = "Konum alınıyor…";
@@ -1243,7 +1237,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const sil = e.target.closest("[data-nokta-sil]");
     if (sil) {
       if (!confirm("Bu kontrol noktası kaldırılsın mı? Geçmiş kayıtlar silinmez.")) return;
-      try { await api("nokta_sil", { id: Number(sil.dataset.noktaSil) }); devriyeAc(devriyeVeri?.gun); } catch (err) { mesaj(err.message); }
+      try { await api("nokta_sil", { id: Number(sil.dataset.noktaSil) }); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
       return;
     }
     if (e.target.closest("#nokta-burasi")) {
@@ -1252,14 +1246,14 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }
   });
 
-  $("#devriye").addEventListener("submit", async (e) => {
+  $("#gorevler").addEventListener("submit", async (e) => {
     if (e.target.id !== "nokta-ekle") return;
     e.preventDefault();
     const f = new FormData(e.target);
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
       await api("nokta_ekle", { ad: f.get("ad"), konum: f.get("konum"), yaricap: Number(f.get("yaricap")) || 75 });
-      mesaj("Kontrol noktası eklendi."); devriyeAc(devriyeVeri?.gun);
+      mesaj("Kontrol noktası eklendi."); devriyeAc(gorevVeri?.gun);
     } catch (err) { mesaj(err.message); d.disabled = false; }
   });
 

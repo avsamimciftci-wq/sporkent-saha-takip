@@ -107,7 +107,10 @@ async function gorevDurumu(gun: string, gecmisli = false) {
       .gte("donem", gunEkle(haftaBasi(bugun), -7 * 7));
     const say = (tur: string, donem: string) =>
       (eski ?? []).filter((x: any) => x.tur === tur && x.donem === donem && KALEM_IDLERI.has(x.kalem)).length;
-    gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: say("gunluk", d) }));
+    // Günlük: o gün uğranan kontrol noktası sayısı
+    const { data: dk } = await db.from("devriye_kayitlari").select("gun, nokta_id").gte("gun", gunEkle(bugun, -13));
+    const ugranan = (d: string) => new Set((dk ?? []).filter((x: any) => x.gun === d).map((x: any) => x.nokta_id)).size;
+    gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: ugranan(d) }));
     haftalar = Array.from({ length: 8 }, (_, i) => gunEkle(haftaBasi(bugun), -7 * i)).map((d) => ({ donem: d, yapilan: say("haftalik", d) }));
   }
   return {
@@ -115,15 +118,19 @@ async function gorevDurumu(gun: string, gecmisli = false) {
     gun, hafta, bugun, buHafta: haftaBasi(bugun),
     isaretler: (isaretler ?? []).filter((x: any) => KALEM_IDLERI.has(x.kalem)),
     gecmisGorur: gecmisli,
-    gecmis: { gunler, haftalar, gunlukToplam: kalemSayisi(GUNLUK), haftalikToplam: kalemSayisi(HAFTALIK) },
+    gecmis: { gunler, haftalar, gunlukToplam: await noktaSayisi(), haftalikToplam: kalemSayisi(HAFTALIK) },
   };
 }
+const noktaSayisi = async () => {
+  const { count } = await db.from("devriye_noktalari").select("id", { count: "exact", head: true }).eq("aktif", true);
+  return count ?? 0;
+};
 
 async function gorevHatirlat() {
   const bugun = sonGun(new Date(), 0);
   const sonuc: Record<string, unknown> = {};
-  sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📋 Günlük görevler",
-    `Bugünkü ${kalemSayisi(GUNLUK)} kalem görev ve denetim sizi bekliyor. Yaptıkça işaretleyin.`, { sayfa: "gorevler" });
+  sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📍 Günlük devriye",
+    `Bugünkü devriyede ${await noktaSayisi()} kontrol noktası var. Her noktada "Buradayım"a basın.`, { sayfa: "gorevler" });
   // Pazartesi: haftalık program da hatırlatılır
   if (haftaBasi(bugun) === bugun) {
     sonuc.haftalik = await bildir(GOREV_ISARETLEYEN, "📋 Haftalık görevler",
@@ -289,6 +296,25 @@ async function konumCoz(metin: string) {
     throw new Hata("Bağlantıdan konum çıkarılamadı. Google Haritalar'da noktaya basılı tutup çıkan koordinatı (örn. 40.97, 29.05) yapıştırın.");
   }
   return k;
+}
+
+// Seçilen günün kontrol noktaları ve "Buradayım" kayıtları
+async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
+  const bugun = sonGun(new Date(), 0);
+  const gun = /^\d{4}-\d{2}-\d{2}$/.test(istenen) && istenen <= bugun ? istenen : bugun;
+  const { data: noktalar, error: e1 } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap, sira").eq("aktif", true).order("sira").order("id");
+  if (e1) throw e1;
+  const { data: kayitlar, error: e2 } = await db.from("devriye_kayitlari").select("id, nokta_id, ad, rol, zaman, lat, lng, dogruluk, mesafe, foto, cihaz").eq("gun", gun).order("zaman");
+  if (e2) throw e2;
+  const yollar = (kayitlar ?? []).map((k: any) => k.foto).filter(Boolean);
+  const { data: imzali } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+  const foto = new Map((imzali ?? []).map((d: any) => [d.path, d.signedUrl]));
+  return {
+    gun, bugun, noktalar: noktalar ?? [],
+    kayitlar: (kayitlar ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz, foto_url: k.foto ? foto.get(k.foto) ?? null : null })),
+    isaretleyebilir: DEVRIYE_ISARETLEYEN.includes(u.rol) && gun === bugun,
+    noktaYonetir: u.rol === "baskan",
+  };
 }
 
 // ---------- Davet kodu ----------
@@ -572,7 +598,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       // Geçmiş günleri yönetici ve yönetim kurulu açabilir; müdür ve şef açamaz
       const gecmisli = rol === "baskan" || rol === "yonetim";
       const gun = gecmisli && /^\d{4}-\d{2}-\d{2}$/.test(String(g.gun ?? "")) && g.gun <= bugun ? String(g.gun) : bugun;
-      return { ...(await gorevDurumu(gun, gecmisli)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol) };
+      return { ...(await gorevDurumu(gun, gecmisli)), isaretleyebilir: GOREV_ISARETLEYEN.includes(rol), devriye: await devriyeVerisi(gun, u) };
     }
 
     case "gorev_isaretle": {
@@ -593,7 +619,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         const { error } = await db.from("gorev_isaretleri").delete().eq("tur", tur).eq("donem", donem).eq("kalem", kalem);
         if (error) throw error;
       }
-      return { ...(await gorevDurumu(bugun)), isaretleyebilir: true };
+      return { ...(await gorevDurumu(bugun)), isaretleyebilir: true, devriye: await devriyeVerisi(bugun, u) };
     }
 
     case "varsayilan_sure": {
@@ -773,23 +799,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "devriye": {
-      // Noktalar ve seçilen günün "Buradayım" kayıtları (yönetici, YK, müdür, şef)
       if (!GOREV_GOREN.includes(rol)) throw new Hata("Bu bölümü yalnızca yönetim, müdür ve şef görür.", 403);
-      const bugun = sonGun(new Date(), 0);
-      const gun = /^\d{4}-\d{2}-\d{2}$/.test(temiz(g.gun, 10)) ? temiz(g.gun, 10) : bugun;
-      const { data: noktalar, error: e1 } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap, sira").eq("aktif", true).order("sira").order("id");
-      if (e1) throw e1;
-      const { data: kayitlar, error: e2 } = await db.from("devriye_kayitlari").select("id, nokta_id, ad, rol, zaman, lat, lng, dogruluk, mesafe, foto, cihaz").eq("gun", gun).order("zaman");
-      if (e2) throw e2;
-      const yollar = (kayitlar ?? []).map((k: any) => k.foto).filter(Boolean);
-      const { data: imzali } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
-      const foto = new Map((imzali ?? []).map((d: any) => [d.path, d.signedUrl]));
-      return {
-        gun, bugun, noktalar: noktalar ?? [],
-        kayitlar: (kayitlar ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz, foto_url: k.foto ? foto.get(k.foto) ?? null : null })),
-        isaretleyebilir: DEVRIYE_ISARETLEYEN.includes(rol) && gun === bugun,
-        noktaYonetir: rol === "baskan",
-      };
+      return await devriyeVerisi(temiz(g.gun, 10), u);
     }
 
     case "devriye_isaretle": {
@@ -800,7 +811,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: n } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap").eq("id", g.nokta_id).eq("aktif", true).maybeSingle();
       if (!n) throw new Hata("Kontrol noktası bulunamadı.");
       const mesafe = mesafeM({ lat, lng }, n);
-      if (mesafe > n.yaricap + Math.min(dogruluk, 50)) {
+      if (mesafe > n.yaricap + Math.min(dogruluk, 25)) {
         throw new Hata(`${n.ad} noktasına yaklaşık ${mesafe} m uzaktasınız. Noktaya gidip tekrar deneyin.`, 403);
       }
       const gun = sonGun(new Date(), 0);
@@ -825,6 +836,15 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { error } = await db.from("devriye_noktalari").insert({ ad, lat: k.lat, lng: k.lng, yaricap, sira: (son?.sira ?? 0) + 1 });
       if (error) throw error;
       return { tamam: true, ...k };
+    }
+
+    case "nokta_adi": {
+      yonetici();
+      const ad = temiz(g.ad, 80);
+      if (!ad) throw new Hata("Noktanın adını yazın.");
+      const { error } = await db.from("devriye_noktalari").update({ ad }).eq("id", g.id);
+      if (error) throw error;
+      return { tamam: true };
     }
 
     case "nokta_sil": {

@@ -588,3 +588,6 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .dn-buradayim { width: 100%; font-size: 20px; padding: 14px; }
 .nokta-ekle { background: #f3f5f4; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .ugrandi .dn-kayit, .devriye-nokta.ugrandi { color: #1b2421; }
+.nokta-yonet { margin-top: 16px; border: 2px solid var(--cizgi); border-radius: 12px; padding: 10px 12px; }
+.nokta-yonet summary { font-weight: 800; cursor: pointer; font-size: 17px; }
+.nokta-yonet .nokta-ekle { margin-top: 10px; }
