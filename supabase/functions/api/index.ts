@@ -33,8 +33,8 @@ type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 // Yönetim işleri: yönetici ve yönetim kurulu girer; yalnızca bu dört görev görür, bildirim de yalnızca onlara gider
-// YK iş emrini verenler ve görenler: yönetici, yönetim kurulu, muhasebe, müdür, şef
-const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
+// YK iş emrini verenler: yönetici, yönetim kurulu, muhasebe, müdür (şef veremez, yalnızca görür ve kapatır)
+const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur"];
 const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
 const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
@@ -521,8 +521,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yeni": {
-      // Müdür ve şef Saha Takip'e sorun bildirmez; yalnızca YK iş emri verebilir ve işi "Yapıldı" olarak kapatır
-      if ((rol === "mudur" || rol === "sef") && !g.gizli) throw new Hata("Müdür ve şef Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.", 403);
+      // Şef hiç kayıt / iş emri girmez, yalnızca işi "Yapıldı" olarak kapatır.
+      // Müdür Saha Takip'e sorun bildirmez; yalnızca YK iş emri verebilir.
+      if (rol === "sef") throw new Hata("Şef yeni kayıt ya da iş emri giremez; yalnızca \"Yapıldı\" girebilir.", 403);
+      if (rol === "mudur" && !g.gizli) throw new Hata("Müdür Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.", 403);
       const kayit = {
         bildiren: u.ad,
         cihaz: u.cihaz,
