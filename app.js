@@ -69,13 +69,14 @@
   // Yönetici ve yönetim kurulu, TG üyesi / muhasebe kayıtlarını onaylar; bu dört görevin kaydı onaysız düşer
   const kayitOnaylar = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const onayBekliyor = (k) => k.onay_durumu === "bekliyor";
-  const programGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
+  // Yönetim Kurulu bölümüne girenler; muhasebe orada yalnızca YK Saha Takip'i görür
+  const programGorur = () => ["baskan", "yonetim", "mudur", "sef", "muhasebe"].includes(oturum?.rol);
+  const gorevGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
   const yeniGirebilir = () => !["mudur", "sef"].includes(oturum?.rol);
-  const gorevGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
-  const yonetimIsiGirebilir = () => ["baskan", "yonetim"].includes(oturum?.rol);
+  const yonetimIsiGirebilir = () => ["baskan", "yonetim", "muhasebe", "mudur", "sef"].includes(oturum?.rol);
   const yonetimIsiRozeti = (k) => k.gizli ? `<span class="rozet gizli-rozet">🔒 Yönetim İş Emri</span>` : "";
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
@@ -229,10 +230,11 @@
   // Yönetici ve yönetim kurulu için: müdür ve şef kaydı ne zaman gördü
   const gorulmeGorur = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const GOREN_ROLLER = [["mudur", "Müdür"], ["sef", "Şef"]];
+  const gorenRoller = (k) => k.gizli ? [...GOREN_ROLLER, ["muhasebe", "Muhasebe"]] : GOREN_ROLLER;
   const gorenler = (k, rol) => (k.gorenler || []).filter((g) => g.rol === rol);
-  const gorulmeSatiri = (k) => GOREN_ROLLER
+  const gorulmeSatiri = (k) => gorenRoller(k)
     .map(([r, ad]) => `${ad} ${gorenler(k, r).length ? "gördü ✓" : "görmedi"}`).join(" · ");
-  const gorulmeAlanlari = (k) => GOREN_ROLLER.map(([r, ad]) => {
+  const gorulmeAlanlari = (k) => gorenRoller(k).map(([r, ad]) => {
     const g = gorenler(k, r);
     return `<dt>${ad}</dt><dd>${g.length
       ? g.map((x) => `👁 ${tarihSaat(x.ilk_at)} gördü (${kac(x.ad)})`).join("<br>")
@@ -380,7 +382,7 @@
           <button type="button" class="ana-dugme" id="kayit-onayla">✔ Onayla</button>
         </div>
       </div>` : bekliyor ? `<p class="onay-kutu">⏳ Kaydınız yönetimin onayını bekliyor. Onaylanınca iş listesine düşer ve herkes görür.</p>` : ""}
-      ${k.gizli ? `<p class="gizli-not">🔒 Yönetim İş Emri: yalnızca yönetici, yönetim kurulu, müdür ve şef görür.</p>` : ""}
+      ${k.gizli ? `<p class="gizli-not">🔒 YK iş emri: yalnızca yönetici, yönetim kurulu, muhasebe, müdür ve şef görür.</p>` : ""}
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
       <div class="fotolar">
@@ -1689,6 +1691,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   }
   function yonetimIsleriAc() {
     if (!programGorur()) return;
+    for (const id of ["#program-ac", "#gorevler-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
     if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
     goster("yonetimisleri");
   }
@@ -1844,7 +1847,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   }
 
   async function programAc() {
-    if (!programGorur()) return;
+    if (!gorevGorur()) return;
     if (location.hash !== "#program") history.replaceState(history.state, "", "#program");
     goster("program");
     if (!$("#program").innerHTML) $("#program").innerHTML = `<p class="bos">Yükleniyor…</p>`;
