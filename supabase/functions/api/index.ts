@@ -33,8 +33,9 @@ type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 // Yönetim işleri: yönetici ve yönetim kurulu girer; yalnızca bu dört görev görür, bildirim de yalnızca onlara gider
-const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim"];
-const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
+// YK iş emrini verenler ve görenler: yönetici, yönetim kurulu, muhasebe, müdür, şef
+const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
+const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
 const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
 // Bu dört görevin yazdığı kayıt doğrudan iş listesine düşer; diğerlerininki (TG üyesi, muhasebe)
@@ -497,7 +498,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         // Yönetim kurulu üyelerinin ne zaman gördüğünü yalnızca yönetici alır.
         const ids = kayitlar.map((k: any) => k.id);
         let gq = db.from("goruntulemeler").select("kayit_id, ad, rol, ilk_at").in("kayit_id", ids).order("ilk_at");
-        if (rol !== "baskan") gq = gq.in("rol", ["mudur", "sef"]);
+        if (rol !== "baskan") gq = gq.in("rol", ["mudur", "sef", "muhasebe"]);
         const { data: g } = ids.length ? await gq : { data: [] };
         for (const k of kayitlar as any[]) {
           k.gorenler = (g ?? []).filter((x: any) => x.kayit_id === k.id).map(({ kayit_id: _i, ...x }: any) => x);
@@ -519,8 +520,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yeni": {
-      // Müdür ve şef sorun bildirmez, yalnızca işi "Yapıldı" olarak kapatır
-      if (rol === "mudur" || rol === "sef") throw new Hata("Müdür ve şef yeni kayıt giremez; yalnızca \"Yapıldı\" girebilir.", 403);
+      // Müdür ve şef Saha Takip'e sorun bildirmez; yalnızca YK iş emri verebilir ve işi "Yapıldı" olarak kapatır
+      if ((rol === "mudur" || rol === "sef") && !g.gizli) throw new Hata("Müdür ve şef Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.", 403);
       const kayit = {
         bildiren: u.ad,
         cihaz: u.cihaz,
@@ -588,8 +589,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "goruldu": {
-      // Müdür, şef ve yönetim kurulunun ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
-      if (!["mudur", "sef", "yonetim"].includes(rol)) return { tamam: true };
+      // Müdür, şef, muhasebe ve yönetim kurulunun ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
+      if (!["mudur", "sef", "yonetim", "muhasebe"].includes(rol)) return { tamam: true };
       await db.from("goruntulemeler").upsert(
         { kayit_id: Number(g.id), cihaz: u.cihaz, ad: u.ad, rol },
         { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
