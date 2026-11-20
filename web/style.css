@@ -742,3 +742,14 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 html, body { max-width: 100%; overflow-x: hidden; }
 
 .yonetim-kutu[hidden] { display: none; }
+
+/* Yönetim Kurulu: verilen iş emirleri listesine giden satır */
+.yk-liste-satir { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; width: 100%; margin-top: -2px;
+  padding: 14px 16px; border: 2px solid #1e6fe0; border-radius: 14px; background: #e8f0fe; color: #0b3c91;
+  font: inherit; font-size: 18px; font-weight: 800; text-align: left; cursor: pointer; }
+.yk-liste-satir small { font-size: 14px; font-weight: 700; background: #1e6fe0; color: #fff; border-radius: 99px; padding: 2px 10px; }
+.yk-liste-satir b { margin-left: auto; font-size: 26px; line-height: 1; }
+.yk-liste-satir:active { transform: scale(.99); }
+.yk-liste-satir { font-size: 17px; white-space: nowrap; }
+.yk-liste-satir small { white-space: nowrap; font-size: 13px; }
+@media (max-width: 380px) { .yk-liste-satir { font-size: 15px; padding: 12px; gap: 6px; } }

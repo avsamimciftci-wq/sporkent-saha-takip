@@ -298,7 +298,7 @@
     $("#liste").innerHTML = gorunen.length ? gorunen.map(satirHtml).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : filtre === "onay" ? "Onay bekleyen kayıt yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
     if (!$("#ekran-yksaha").hidden) ykSahaCiz();
     const ykAcik = kayitlar.filter((k) => k.gizli && k.durum !== "tamam").length;
-    $("#yksaha-sayi").textContent = ykAcik ? `${ykAcik} iş yapılmadı` : "";
+    $("#yksaha-sayi").textContent = ykAcik ? `${ykAcik} iş yapılmadı` : "hepsi yapıldı";
     // Alt menüdeki Yönetim Kurulu düğmesinde yapılmayan iş emri sayısı
     const rozet = $("#yk-rozet");
     rozet.textContent = ykAcik > 99 ? "99+" : String(ykAcik);
@@ -356,6 +356,8 @@
     const s = e.target.closest(".satir"); if (s) detayGoster(Number(s.dataset.id));
   });
   $("#yksaha-ac").addEventListener("click", () => { ykFiltre = "acik"; history.pushState({ yk: 1 }, "", "#yk-saha"); ykSahaAc(); });
+  // Yönetim Kurulu ekranından doğrudan yeni iş emri: geri tuşu ve Vazgeç Yönetim Kurulu'na döner
+  $("#yk-emir-ver").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#yeni-emir"); yeniFormAc("yonetim"); });
 
   const fotoKutu = (url, yazi, bos) => `<figure>${url
     ? `<a href="${kac(url)}" target="_blank" rel="noopener"><img src="${kac(url)}" alt="${yazi}"></a>`
@@ -808,7 +810,7 @@
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
-    if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
+    if (location.hash === "#yonetim-isleri" || location.hash === "#yeni-emir") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program") return programAc();
     if (location.hash === "#sokak-numaralari") return sokaklarAc();
@@ -2060,6 +2062,11 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   }
   $("#yeni-ac").addEventListener("click", () => { if (yeniGirebilir()) yeniFormAc("genel"); });
   $("#yk-yeni").addEventListener("click", () => yeniFormAc("yonetim"));
+  $("#yeni-vazgec").addEventListener("click", () => {
+    if (yeniTur !== "yonetim") { history.replaceState(null, "", location.pathname); goster("liste"); return listeCiz(); }
+    if (location.hash === "#yeni-emir" && history.state?.yk) return history.back();
+    ykSahaAc();
+  });
 
   yeniForm.addEventListener("submit", async (e) => {
     e.preventDefault();
