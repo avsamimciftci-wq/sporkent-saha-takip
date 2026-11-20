@@ -423,7 +423,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .aidat-resim img { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--yesil-acik); }
 .aidat-resim figcaption { margin-top: 8px; font-size: 15px; color: var(--soluk); display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 .aidat-resim figcaption b { color: var(--yazi); font-size: 18px; }
-.aidat-ekle { margin-bottom: 16px; }
+.aidat-ekle { margin: 8px 0 16px; }
 
 /* Dört düğme olunca yazılar sığsın */
 .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 15px; line-height: 1.15; }
