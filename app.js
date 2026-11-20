@@ -1776,6 +1776,12 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     $("#aidat").innerHTML = `
       <h1 class="modul-baslik">💳 Aidat</h1>
       <p class="modul-alt">Yıl içinde ödenmesi gereken ödemeler. Resme dokunursanız tam ekran açılır, iki parmakla büyütebilirsiniz.</p>
+      ${v.resimler.length ? v.resimler.map((x) => `
+      <figure class="aidat-resim">
+        ${x.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(x.url)}" aria-label="Tam ekran aç"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Aidat")}"></button>` : `<div class="foto-bos">Resim açılamadı</div>`}
+        <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b><br>` : ""}${tarihSaat(x.created_at)}</span>
+          ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-aidat-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
+      </figure>`).join("") : `<p class="bos">Henüz aidat bilgisi eklenmedi.</p>`}
       ${v.ekleyebilir ? `
       <form class="kart aidat-ekle" id="aidat-form">
         <label>Başlık (isteğe bağlı)
@@ -1783,13 +1789,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
         </label>
         <label class="foto-dugme"><input id="aidat-dosya" type="file" accept="image/*" hidden><span>➕ Resim ekle</span></label>
         <small class="ipucu">Resmi seçtiğiniz anda eklenir ve herkese bildirilir.</small>
-      </form>` : ""}
-      ${v.resimler.length ? v.resimler.map((x) => `
-      <figure class="aidat-resim">
-        ${x.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(x.url)}" aria-label="Tam ekran aç"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Aidat")}"></button>` : `<div class="foto-bos">Resim açılamadı</div>`}
-        <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b><br>` : ""}${tarihSaat(x.created_at)}</span>
-          ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-aidat-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
-      </figure>`).join("") : `<p class="bos">Henüz aidat bilgisi eklenmedi.</p>`}`;
+      </form>` : ""}`;
   }
 
   $("#aidat").addEventListener("change", async (e) => {
