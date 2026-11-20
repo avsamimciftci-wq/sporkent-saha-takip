@@ -1775,7 +1775,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
   function aidatCiz(v) {
     $("#aidat").innerHTML = `
       <h1 class="modul-baslik">💳 Aidat</h1>
-      <p class="modul-alt">Yıl içinde ödenmesi gereken ödemeler. Resme dokunursanız büyük açılır.</p>
+      <p class="modul-alt">Yıl içinde ödenmesi gereken ödemeler. Resme dokunursanız tam ekran açılır, iki parmakla büyütebilirsiniz.</p>
       ${v.ekleyebilir ? `
       <form class="kart aidat-ekle" id="aidat-form">
         <label>Başlık (isteğe bağlı)
@@ -1786,7 +1786,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       </form>` : ""}
       ${v.resimler.length ? v.resimler.map((x) => `
       <figure class="aidat-resim">
-        ${x.url ? `<a href="${kac(x.url)}" target="_blank" rel="noopener"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Aidat")}"></a>` : `<div class="foto-bos">Resim açılamadı</div>`}
+        ${x.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(x.url)}" aria-label="Tam ekran aç"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Aidat")}"></button>` : `<div class="foto-bos">Resim açılamadı</div>`}
         <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b><br>` : ""}${tarihSaat(x.created_at)}</span>
           ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-aidat-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
       </figure>`).join("") : `<p class="bos">Henüz aidat bilgisi eklenmedi.</p>`}`;
@@ -1805,7 +1805,44 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       await aidatAc();
     } catch (err) { mesaj(err.message); etiket.textContent = "➕ Resim ekle"; e.target.value = ""; }
   });
+  // ---------- Tam ekran resim: iki parmakla büyütülür; telefonun geri tuşu da kapatır ----------
+  let resimHarita = null;
+  async function resimGoster(url) {
+    const kutu = $("#resim-gorucu"); kutu.hidden = false; document.body.classList.add("gorucu-acik");
+    history.pushState({ ...(history.state || {}), resim: 1 }, "", location.hash || "#");
+    let L; try { L = await leaflet(); } catch (e) { mesaj(e.message); return resimKapat(); }
+    const img = new Image(); img.src = url;
+    try { await img.decode(); } catch { mesaj("Resim açılamadı."); return resimKapat(); }
+    if (kutu.hidden) return;
+    if (resimHarita) { resimHarita.remove(); resimHarita = null; }
+    const sinir = [[0, 0], [img.naturalHeight, img.naturalWidth]];
+    const h = L.map($("#resim-gorucu-alan"), { crs: L.CRS.Simple, attributionControl: false, zoomControl: false, zoomSnap: 0, zoomDelta: 0.5,
+      maxBounds: [[-img.naturalHeight * 0.2, -img.naturalWidth * 0.2], [img.naturalHeight * 1.2, img.naturalWidth * 1.2]], maxBoundsViscosity: 0.9 });
+    L.imageOverlay(url, sinir).addTo(h);
+    // Telefonun genişliğine tam sığan en büyük hali: resim ekran genişliğinde, üstten başlar; aşağı kaydırılır.
+    // Tamamını görmek için iki parmakla küçültülebilir, okumak için 4 kata kadar büyütülür.
+    const sigdir = () => {
+      h.invalidateSize();
+      const { x: W, y: H } = h.getSize(); if (!W || !H) return;
+      const genislik = Math.log2(W / img.naturalWidth), tamami = Math.min(genislik, Math.log2(H / img.naturalHeight));
+      h.setMinZoom(tamami); h.setMaxZoom(genislik + 2);
+      const yari = (H / 2) / Math.pow(2, genislik);
+      h.setView([Math.max(img.naturalHeight - yari, img.naturalHeight / 2), img.naturalWidth / 2], genislik, { animate: false });
+    };
+    sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
+    resimHarita = h;
+  }
+  function resimKapat(geriden) {
+    const kutu = $("#resim-gorucu"); if (kutu.hidden) return;
+    kutu.hidden = true; document.body.classList.remove("gorucu-acik");
+    if (resimHarita) { resimHarita.remove(); resimHarita = null; }
+    if (!geriden && history.state?.resim) history.back();
+  }
+  $("#resim-kapat").addEventListener("click", () => resimKapat());
+  window.addEventListener("popstate", () => resimKapat(true));
+
   $("#aidat").addEventListener("click", async (e) => {
+    const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
     const b = e.target.closest("[data-aidat-sil]"); if (!b) return;
     if (!confirm("Bu resim herkesten silinsin mi?")) return;
     b.disabled = true;

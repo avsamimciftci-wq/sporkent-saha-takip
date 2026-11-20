@@ -46,7 +46,8 @@ const ONAYSIZ_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef", "muhasebe"];
 const onaysizGirer = (u: any) => ONAYSIZ_GIREN.includes(u.rol) || (u.rol === "uye" && !u.ortak_no && /^TG/.test(u.unvan ?? ""));
 const KAYIT_ONAYLAYAN: Rol[] = ["baskan", "yonetim"];
 // Aidat resmini yönetici ve muhasebe ekler; iş programına bu dört görev girer
-const AIDAT_EKLEYEN: Rol[] = ["baskan", "muhasebe"];
+// Aidat resmini yalnızca yönetici ekler ve siler; herkes görür
+const AIDAT_EKLEYEN: Rol[] = ["baskan"];
 const PROGRAM_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
 const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi",
@@ -688,7 +689,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "aidat_ekle": {
-      if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Aidat resmini yalnızca yönetici ve muhasebe ekler.", 403);
+      if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Aidat resmini yalnızca yönetici ekler.", 403);
       const yol = temiz(g.yol, 200);
       if (!yol.startsWith("aidat/")) throw new Hata("Resim yüklenemedi, tekrar deneyin.");
       const baslik = temiz(g.baslik, 120);
@@ -699,7 +700,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "aidat_sil": {
-      if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Aidat resmini yalnızca yönetici ve muhasebe siler.", 403);
+      if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Aidat resmini yalnızca yönetici siler.", 403);
       const { data: x } = await db.from("aidat_resimleri").select("id, yol").eq("id", g.id).maybeSingle();
       if (!x) throw new Hata("Resim bulunamadı.");
       await db.storage.from(BUCKET).remove([x.yol]);

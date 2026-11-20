@@ -742,3 +742,19 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 html, body { max-width: 100%; overflow-x: hidden; }
 
 .yonetim-kutu[hidden] { display: none; }
+
+/* Aidat resmi: ekranın tam genişliğinde, kenardan kenara */
+.aidat-resim { margin: 0 -16px 16px; padding: 0; border-radius: 0; border-left: 0; border-right: 0; }
+.aidat-buyut { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.aidat-resim img { border-radius: 0; }
+.aidat-resim figcaption { padding: 0 16px 10px; }
+/* Tam ekran resim gösterici */
+.resim-gorucu { position: fixed; inset: 0; z-index: 60; background: #111; }
+.resim-gorucu[hidden] { display: none; }
+.resim-gorucu-alan { position: absolute; inset: 0; background: #111; }
+.resim-gorucu-alan.leaflet-container { background: #111; }
+.resim-kapat { position: absolute; z-index: 1000; top: calc(10px + env(safe-area-inset-top)); right: 12px; border: 2px solid #fff; border-radius: 12px;
+  background: rgba(0,0,0,.6); color: #fff; font: inherit; font-size: 18px; font-weight: 800; padding: 8px 14px; cursor: pointer; }
+.resim-ipucu { position: absolute; z-index: 1000; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); margin: 0; text-align: center;
+  color: #fff; font-size: 15px; opacity: .8; pointer-events: none; }
+body.gorucu-acik { overflow: hidden; }
