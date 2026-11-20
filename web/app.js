@@ -446,7 +446,7 @@
     goster("detay");
     if (kapat) kapatBagla(k);
     // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
-    if (["mudur", "sef", "yonetim"].includes(oturum.rol) && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
+    if (["mudur", "sef", "yonetim", "muhasebe"].includes(oturum.rol) && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
       gorulduGonderilen.add(k.id);
       api("goruldu", { id: k.id }).catch(() => gorulduGonderilen.delete(k.id));
     }
