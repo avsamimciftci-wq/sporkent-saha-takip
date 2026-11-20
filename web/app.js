@@ -1210,18 +1210,17 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   function devriyeHaritaHtml(v) {
     if (!v.noktalar.length) return "";
-    const ugrandi = (n) => v.kayitlar.some((k) => k.nokta_id === n.id && (!v.isaretleyebilir || k.benim));
-    const siradaki = v.noktalar.find((n) => !ugrandi(n));
     return `
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
       <div class="harita-dugmeler">
         <a class="ana-dugme rota-dugme" href="${rotaLinki(v.noktalar)}" target="_blank" rel="noopener">🧭 Rotayı Google Maps'te başlat</a>
-        ${v.isaretleyebilir && siradaki ? `<a class="ikincil siradaki-dugme" href="${yolTarifi(siradaki)}" target="_blank" rel="noopener">➡️ Sıradaki nokta: <b>${kac(siradaki.ad)}</b> · yol tarifi</a>` : ""}
+        ${v.isaretleyebilir ? "" /* müdür ve şef: sade ekran, yalnızca rota ve "Kontrol edildi" */ : `
         <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
-        ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}
+        ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}`}
       </div>
+      ${v.isaretleyebilir ? "" : `
       <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar.</p>
-      <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`;
+      <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`}`;
   }
 
   // Konum yalnızca mesai saatinde (08:00-17:00, Türkiye) ve devriye alanında kullanılır
@@ -1338,7 +1337,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
         <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)} · ${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : "henüz uğranmadı"}</span>
       </div>
       ${devriyeHaritaHtml(v)}
-      ${v.isaretleyebilir ? `<p class="ipucu">Her noktaya gelince <b>“✔ Kontrol edildi”</b>e basın. Telefon konum izni isterse <b>izin verin</b>. Fotoğraf isteğe bağlıdır.</p>`
+      ${v.isaretleyebilir ? ""
         : `<p class="ipucu">Müdür ve şef her noktada “Kontrol edildi”ye basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
       ${v.noktalar.map((n, i) => {
         const ks = kayitlar(n.id);
