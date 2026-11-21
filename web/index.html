@@ -24,6 +24,17 @@
     <button id="ana-don" class="ust-ana" type="button" data-ana hidden aria-label="Ana sayfa"><span>🏠</span>Ana Sayfa</button>
   </header>
 
+  <!-- Devriye sürerken başka ekrandayken: dokununca devriyeye döner -->
+  <button id="iz-cubuk" class="iz-cubuk" type="button" hidden></button>
+  <!-- Uygulama arka plana düşünce: kayıt durdu uyarısı -->
+  <div id="iz-uyari-perde" class="perde" hidden>
+    <div class="kart soru iz-uyari-kutu">
+      <h2>⚠ Konum kaydı durdu</h2>
+      <p></p>
+      <button id="iz-uyari-tamam" class="ana-dugme" type="button">Anladım, devam et</button>
+    </div>
+  </div>
+
   <!-- Ana sayfa: bölümler -->
   <main id="ekran-ana" class="ekran" hidden>
     <p class="ana-karsilama"><span id="ana-hitap"></span> <b id="ana-ad"></b></p>
@@ -125,7 +136,7 @@
     <div class="yonetim-kutular">
       <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span>📅</span>İş Programı</button>
-      <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>📋</span>Müdür/Şef Günlük Kontrol</button>
+      <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>🚶</span>Müdür/Şef Günlük Devriye</button>
       <button id="haftalik-ac" class="yonetim-kutu kutu-haftalik"><span>🗓️</span>Haftalık Kontrol</button>
     </div>
   </main>
