@@ -931,6 +931,30 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
+    case "servis": {
+      const { data } = await db.from("servis_guzergah").select("id, cizgi, duraklar, sure_sn, mesafe_m, kaydeden, created_at")
+        .eq("aktif", true).order("id", { ascending: false }).limit(1).maybeSingle();
+      return { guzergah: data ?? null };
+    }
+
+    case "servis_kaydet": {
+      yonetici();
+      const sayi = (x: any) => Number.isFinite(Number(x)) ? Number(x) : NaN;
+      const cizgi = (Array.isArray(g.cizgi) ? g.cizgi : []).slice(0, 5000)
+        .map((p: any) => [Math.round(sayi(p?.[0]) * 1e6) / 1e6, Math.round(sayi(p?.[1]) * 1e6) / 1e6])
+        .filter(([a, b]: number[]) => Math.abs(a) <= 90 && Math.abs(b) <= 180);
+      if (cizgi.length < 2) throw new Hata("Güzergah çok kısa; kaydedilemedi.");
+      const duraklar = (Array.isArray(g.duraklar) ? g.duraklar : []).slice(0, 60).map((d: any, i: number) => ({
+        ad: temiz(d?.ad, 60) || `Durak ${i + 1}`, lat: sayi(d?.lat), lng: sayi(d?.lng), sn: Math.max(0, Math.round(sayi(d?.sn) || 0)),
+      })).filter((d: any) => Number.isFinite(d.lat) && Number.isFinite(d.lng)).sort((a: any, b: any) => a.sn - b.sn);
+      const sure_sn = Math.max(60, Math.min(6 * 3600, Math.round(sayi(g.sure_sn) || 0)));
+      const mesafe_m = Math.max(0, Math.min(200000, Math.round(sayi(g.mesafe_m) || 0)));
+      await db.from("servis_guzergah").update({ aktif: false }).eq("aktif", true);
+      const { error } = await db.from("servis_guzergah").insert({ cizgi, duraklar, sure_sn, mesafe_m, kaydeden: u.ad });
+      if (error) throw error;
+      return { tamam: true };
+    }
+
     case "davet_kodu": {
       yonetici();
       const no = Number(temiz(g.ortak_no, 6));
