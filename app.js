@@ -126,6 +126,7 @@
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     if (ad !== "servis" && typeof servisHaritaKapat === "function") servisHaritaKapat();
+    setTimeout(() => { if (typeof izCubuk === "function") izCubuk(); }, 0);
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
     const menulu = !["giris", "bekle", "ana"].includes(ad) && onayli();
@@ -792,6 +793,7 @@
     if (oturum.durum !== "onayli") return bekleEkrani();
     clearInterval(bekleZamani);
     bildirimleriTemizle();
+    try { devriyeDevam(); } catch {}
     api("durum").then((r) => {
       if (!r || r.durum !== "onayli") return;
       const once = JSON.stringify([oturum.ad, oturum.rol, oturum.unvan]);
@@ -1146,13 +1148,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const guncel = gunluk ? v.gun === v.bugun : v.hafta === v.buHafta;
     const duzenler = v.isaretleyebilir && guncel;
     const dv = v.devriye;
-    const ugranan = dv ? dv.noktalar.filter((n) => dv.kayitlar.some((k) => k.nokta_id === n.id)).length : 0;
+    const ugranan = dv ? new Set(dv.turlar.map((t) => t.ad)).size : 0;
     const sayac = (tur) => tur === "gunluk" ? ugranan : v.isaretler.filter((x) => x.tur === tur).length;
     const yapilan = gunluk ? ugranan : isaret.size;
     let no = 0;
     $("#gorevler").innerHTML = `
       <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button>${gunluk
-        ? `<h1 class="sayfa-bant bant-gorev">📋 Müdür/Şef Günlük Kontrol</h1>`
+        ? `<h1 class="sayfa-bant bant-gorev">🚶 Müdür/Şef Günlük Devriye</h1>`
         : `<h1 class="sayfa-bant bant-haftalik">🗓️ Haftalık Kontrol</h1>`}</div>
       ${gunluk ? "" : `<p class="gorev-donem">Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
       <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>`}
@@ -1208,27 +1210,15 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       + (ns.length > 2 ? `&waypoints=${ns.slice(1, -1).map(gmNokta).join("%7C")}` : "") + "&travelmode=driving";
   const yolTarifi = (n) => `https://www.google.com/maps/dir/?api=1&destination=${gmNokta(n)}&travelmode=driving`;
 
-  function devriyeHaritaHtml(v) {
-    if (!v.noktalar.length) return "";
-    return `
-      <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
-      <div class="harita-dugmeler">
-        <a class="ana-dugme rota-dugme" href="${rotaLinki(v.noktalar)}" target="_blank" rel="noopener">🧭 Rotayı Google Maps'te başlat</a>
-        ${v.isaretleyebilir ? "" /* müdür ve şef: sade ekran, yalnızca rota ve "Kontrol edildi" */ : `
-        <button type="button" class="ikincil" id="konumum">📍 Haritada konumumu göster</button>
-        ${v.noktaYonetir ? `<button type="button" class="ikincil" id="kml-indir">📥 KML indir (Google My Maps)</button>` : ""}`}
-      </div>
-      ${v.isaretleyebilir ? "" : `
-      <p class="ipucu harita-not">Yeşil: kontrol edildi · Kırmızı: henüz uğranmadı. Noktaya dokunursanız adı ve yol tarifi çıkar.</p>
-      <p class="konum-kural ${mesaideMi() ? "" : "disinda"}">🔒 Konum yalnızca <b>mesai saatinde (08:00–17:00)</b> ve <b>devriye alanının içindeyken</b> kullanılır. Alan dışında ve mesai dışında konum alınmaz, kaydedilmez.${mesaideMi() ? "" : "<br><b>Şu an mesai dışı.</b>"}</p>`}`;
-  }
-
-  // Konum yalnızca mesai saatinde (08:00-17:00, Türkiye) ve devriye alanında kullanılır
-  const MESAI_BAS = 8, MESAI_BIT = 17, ALAN_PAYI_M = 200;
+  // ---------- Devriye izi: "Devriyeyi Başlat" ile "Devriyeyi Bitir" arasında konum kaydı ----------
+  // Konum yalnızca bu aralıkta, mesai saatinde ve devriye alanında alınır. Noktalar telefonda birikir,
+  // internet olunca topluca gönderilir. Ekran açık tutulur; uygulama arka plana düşerse kesinti kaydedilir.
+  const ALAN_PAYI_M = 200;
+  const IZ_ANAHTAR = "sk_devriye_izi", IZ_ARALIK_MS = 12000, IZ_ADIM_M = 10, IZ_DOGRULUK_M = 30, IZ_KOPUK_MS = 90000, IZ_GIZLI_MS = 15000;
   const trSaat = () => { const p = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
-    return Number(p.find((x) => x.type === "hour").value) + Number(p.find((x) => x.type === "minute").value) / 60; };
-  const mesaideMi = () => { const h = trSaat(); return h >= MESAI_BAS && h < MESAI_BIT; };
-  // Noktaya / rota çizgisine en kısa uzaklık (metre); alan = noktalar ve aralarındaki rota çevresinde 200 m
+    return Number(p.find((x) => x.type === "hour").value) % 24 + Number(p.find((x) => x.type === "minute").value) / 60; };
+  const mesaiBilgi = () => gorevVeri?.devriye?.mesai || sakla.al("sk_mesai") || { bas: 8, bit: 18, metin: "08:00–18:00" };
+  const mesaideMi = () => { const m = mesaiBilgi(), h = trSaat(); return h >= m.bas && h < m.bit; };
   function alanaUzaklik(lat, lng, ns) {
     const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
     const xy = (n) => [(n.lng - lng) * kx, (n.lat - lat) * ky];
@@ -1244,74 +1234,260 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }
     return en;
   }
-  const alanIcinde = (lat, lng, ns) => ns.length > 0 && alanaUzaklik(lat, lng, ns) <= ALAN_PAYI_M;
-  const MESAI_DISI = "Mesai saatleri (08:00–17:00) dışında konum kullanılmaz; kontrol yapılamaz.";
+  const alanNoktalari = () => gorevVeri?.devriye?.noktalar || sakla.al("sk_alan") || [];
+  const alanIcinde = (lat, lng) => { const ns = alanNoktalari(); return !ns.length || alanaUzaklik(lat, lng, ns) <= ALAN_PAYI_M; };
+  const metre = (a, b) => { const kx = 111320 * Math.cos((a[0] * Math.PI) / 180); return Math.hypot((b[1] - a[1]) * kx, (b[0] - a[0]) * 110540); };
+  const izSure = (ms) => { const dk = Math.max(0, Math.round(ms / 60000)); return dk < 60 ? `${dk} dk` : `${Math.floor(dk / 60)} sa ${dk % 60} dk`; };
+  const kmYazisi = (m) => m >= 1000 ? (m / 1000).toFixed(2).replace(".", ",") + " km" : Math.round(m) + " m";
 
+  // iz: { tur, basla, son:[lat,lng,t], kuyruk:[{z,lat,lng,d,k}], cizgi:[[lat,lng,k]], mesafe, sayi, kopukSonraki, kesinti, gizli, bitis, neden, uyarilar:[[bas,bit]] }
+  let iz = sakla.al(IZ_ANAHTAR);
+  let izIzle = null, izZaman = null, izKilit = null, izGonderiliyor = false, izSonDurum = "";
+  const izSakla = () => { if (iz) sakla.koy(IZ_ANAHTAR, iz); else sakla.sil(IZ_ANAHTAR); };
+  const izSuruyor = () => !!iz && !iz.bitis;
+  const izYapar = () => ["mudur", "sef"].includes(oturum?.rol);
+
+  async function izEkranAcik() {
+    try { if ("wakeLock" in navigator && !izKilit && document.visibilityState === "visible") { izKilit = await navigator.wakeLock.request("screen"); izKilit.addEventListener("release", () => { izKilit = null; }); } } catch {}
+  }
+  function izKonum(p) {
+    if (!izSuruyor()) return;
+    const { latitude: lat, longitude: lng, accuracy } = p.coords;
+    if (accuracy > IZ_DOGRULUK_M) { izSonDurum = `Konum zayıf (±${Math.round(accuracy)} m); açık alanda düzelir.`; return izDurumYaz(); }
+    if (!alanIcinde(lat, lng)) { iz.kopukSonraki = true; izSonDurum = "Devriye alanının dışındasınız; burada konum kaydedilmiyor."; izSakla(); return izDurumYaz(); }
+    izSonDurum = "";
+    const t = Date.now(), son = iz.son, d = son ? metre(son, [lat, lng]) : Infinity, dt = son ? t - son[2] : Infinity;
+    if (!son || (d >= IZ_ADIM_M && dt >= 3000) || dt >= IZ_ARALIK_MS) {
+      const kopuk = iz.kopukSonraki || (son && dt > IZ_KOPUK_MS);
+      iz.kuyruk.push({ z: t, lat, lng, d: Math.round(accuracy), k: kopuk ? 1 : 0 });
+      iz.cizgi.push([lat, lng, kopuk ? 1 : 0]); if (iz.cizgi.length > 4000) iz.cizgi.splice(0, 1000);
+      if (son && !kopuk) iz.mesafe += d;
+      iz.son = [lat, lng, t]; iz.kopukSonraki = false; iz.sayi++;
+      izSakla(); izCanliCiz(lat, lng, kopuk);
+    }
+    izDurumYaz();
+  }
+  async function izGonder() {
+    if (izGonderiliyor || !iz || !iz.kuyruk.length) return true;
+    izGonderiliyor = true;
+    const parti = iz.kuyruk.slice(0, 300);
+    try {
+      await api("tur_nokta", { tur_id: iz.tur, noktalar: parti });
+      if (iz) { iz.kuyruk.splice(0, parti.length); iz.cevrimdisi = false; izSakla(); }
+      return true;
+    } catch { if (iz) iz.cevrimdisi = true; return false; }
+    finally { izGonderiliyor = false; izDurumYaz(); }
+  }
+  function izZamanlayici() {
+    clearInterval(izZaman);
+    izZaman = setInterval(async () => {
+      if (!iz) return clearInterval(izZaman);
+      if (izSuruyor() && !mesaideMi()) return devriyeBitir("mesai");
+      if (iz.kuyruk.length) await izGonder();
+      if (iz?.bitis) izTamamla();
+      izDurumYaz();
+    }, 20000);
+  }
+  function izIzlemeyiAc() {
+    if (izIzle != null || !navigator.geolocation) return;
+    izEkranAcik();
+    izIzle = navigator.geolocation.watchPosition(izKonum, (e) => {
+      izSonDurum = e.code === 1 ? "Konum izni verilmedi. Telefonun ayarlarından bu uygulamaya konum izni verin." : "Konum alınamadı; açık alanda bekleyin.";
+      if (e.code === 1) mesaj(izSonDurum);
+      izDurumYaz();
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    izZamanlayici(); izCubuk();
+  }
+  function izIzlemeyiKapat() {
+    if (izIzle != null) navigator.geolocation.clearWatch(izIzle);
+    izIzle = null;
+    try { izKilit?.release(); } catch {} izKilit = null;
+    if (izCanli.ben) { izCanli.ben.remove(); izCanli.ben = null; }
+  }
+  async function devriyeBaslat(b) {
+    if (!navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
+    if (!mesaideMi()) return mesaj(`Devriye yalnızca mesai saatlerinde (${mesaiBilgi().metin}) başlatılabilir.`);
+    b.disabled = true; b.textContent = "Başlatılıyor…";
+    try {
+      const r = await api("tur_basla");
+      iz = { tur: r.tur.id, basla: Date.parse(r.tur.basla), son: null, kuyruk: [], cizgi: [], mesafe: 0, sayi: 0,
+        kopukSonraki: !!r.devam, kesinti: 0, gizli: null, bitis: null, neden: null, uyarilar: [] };
+      izSakla(); izIzlemeyiAc();
+      mesaj("Devriye başladı. Ekran açık kalsın, uygulamadan çıkmayın.");
+      gorevlerAc("gunluk");
+    } catch (e) { mesaj(e.message); b.disabled = false; b.textContent = "▶ Devriyeyi Başlat"; }
+  }
+  async function devriyeBitir(neden = "kullanici") {
+    if (!izSuruyor()) return;
+    izIzlemeyiKapat();
+    iz.bitis = Date.now(); iz.neden = neden; izSakla();
+    if (neden === "mesai") mesaj("Mesai saati bitti; devriye kaydı kendiliğinden durduruldu.");
+    await izTamamla(true);
+  }
+  // Biten devriyenin kalan noktaları ve bitişi gönderilir; internet yoksa sonra yeniden denenir
+  async function izTamamla(ekrandan) {
+    if (!iz?.bitis || izGonderiliyor) return;
+    for (let i = 0; i < 10 && iz?.kuyruk.length; i++) if (!(await izGonder())) break;
+    if (iz?.kuyruk.length) { izZamanlayici(); izCubuk(); if (ekrandan) mesaj("Devriye bitti. İnternet gelince bilgiler kendiliğinden gönderilecek."); return gorevCizGuvenli(); }
+    try {
+      const r = await api("tur_bitir", { tur_id: iz.tur, bitis: iz.bitis, neden: iz.neden, kesinti_sn: Math.round(iz.kesinti) });
+      iz = null; izSakla(); clearInterval(izZaman); izCubuk();
+      mesaj(`✓ Devriye kaydedildi: ${izSure(Date.parse(r.tur.bitis) - Date.parse(r.tur.basla))} · ${kmYazisi(r.tur.mesafe_m)}. Yöneticiye bildirildi.`);
+      if (!$("#ekran-gorevler").hidden) gorevlerAc("gunluk");
+    } catch {
+      izZamanlayici(); izCubuk();
+      if (ekrandan) mesaj("Devriye bitti. İnternet gelince bilgiler kendiliğinden gönderilecek.");
+      gorevCizGuvenli();
+    }
+  }
+  const gorevCizGuvenli = () => { if (!$("#ekran-gorevler").hidden && gorevVeri && gorevSekme === "gunluk") gorevCiz(); };
+  // Uygulama arka plana düşerse kayıt durur: döndüğünde belirgin uyarı ve kesinti kaydı
+  document.addEventListener("visibilitychange", () => {
+    if (!izSuruyor()) return;
+    if (document.visibilityState === "hidden") { iz.gizli = Date.now(); izSakla(); return; }
+    const gizli = iz.gizli; iz.gizli = null;
+    if (gizli && Date.now() - gizli > IZ_GIZLI_MS) {
+      iz.kesinti += (Date.now() - gizli) / 1000; iz.kopukSonraki = true; iz.uyarilar.push([gizli, Date.now()]);
+      izUyari([gizli, Date.now()]);
+    }
+    izSakla(); izEkranAcik(); izGonder(); izDurumYaz();
+  });
+  window.addEventListener("online", () => { if (iz) { izGonder(); if (iz.bitis) izTamamla(); } });
+  function izUyari([a, b]) {
+    try { navigator.vibrate?.([300, 120, 300]); } catch {}
+    const k = $("#iz-uyari-perde");
+    k.querySelector("p").innerHTML = `Uygulama <b>${saatYazisi(a)} – ${saatYazisi(b)}</b> arasında arka plandaydı ya da ekran kapandı.<br>Bu sürede <b>konum kaydedilemedi</b>; haritada bu aralık boş görünecek.<br><br>Devriye sürerken ekranı açık tutun, başka uygulamaya geçmeyin.`;
+    k.hidden = false;
+  }
+  // Açılışta yarım kalan devriye: aynı gün ve mesaideyse devam eder, değilse kapatılır
+  function devriyeDevam() {
+    if (!iz || !izYapar()) return;
+    if (iz.bitis) return izTamamla();
+    const ayniGun = new Date(iz.basla).toDateString() === new Date().toDateString();
+    if (!ayniGun || !mesaideMi()) {
+      iz.bitis = iz.son?.[2] || iz.basla; iz.neden = "mesai"; izSakla(); return izTamamla();
+    }
+    if (iz.gizli) { iz.kesinti += (Date.now() - iz.gizli) / 1000; iz.uyarilar.push([iz.gizli, Date.now()]); izUyari([iz.gizli, Date.now()]); iz.gizli = null; }
+    iz.kopukSonraki = true; izSakla(); izIzlemeyiAc();
+  }
+  // Devriye sürerken başka ekrandayken üstte ince kırmızı şerit: dokununca devriyeye döner
+  function izCubuk() {
+    const c = $("#iz-cubuk"); if (!c) return;
+    const goster_ = !!iz && $("#ekran-gorevler").hidden;
+    c.hidden = !goster_;
+    if (goster_) c.innerHTML = iz.bitis ? "⏳ Devriye bitti · bilgiler gönderilmeyi bekliyor" : `<span class="kayit-nokta"></span> Devriye sürüyor · dönmek için dokunun`;
+  }
+  function izDurumYaz() {
+    izCubuk();
+    const k = document.getElementById("iz-durum"); if (!k || !iz) return;
+    const ms = (iz.bitis || Date.now()) - iz.basla, s = Math.floor(ms / 1000);
+    k.innerHTML = `<b>${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}</b>
+      <span>${kmYazisi(iz.mesafe)} · ${iz.sayi} nokta${iz.kuyruk.length ? ` · ${iz.kuyruk.length} gönderilmeyi bekliyor` : ""}</span>
+      ${izSonDurum ? `<small class="iz-uyari-satir">${kac(izSonDurum)}</small>` : !iz.son ? `<small>Konum bekleniyor… İlk seferde telefon izin sorarsa <b>İzin ver</b>'e dokunun.</small>` : ""}
+      ${iz.cevrimdisi ? `<small class="iz-uyari-satir">İnternet yok: noktalar telefonda saklanıyor, bağlantı gelince gönderilecek.</small>` : ""}`;
+  }
+  setInterval(() => { if (izSuruyor()) izDurumYaz(); }, 1000);
+  $("#iz-uyari-tamam").addEventListener("click", () => { $("#iz-uyari-perde").hidden = true; });
+  $("#iz-cubuk").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler"); gorevlerAc("gunluk"); });
+
+  // ---------- Devriye haritası ----------
   let leafletYukle = null;
   const leaflet = () => leafletYukle ??= new Promise((ok, red) => {
     const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "vendor/leaflet/leaflet.css"; document.head.appendChild(css);
     const js = document.createElement("script"); js.src = "vendor/leaflet/leaflet.js"; js.onload = () => ok(window.L); js.onerror = () => { leafletYukle = null; red(new Error("Harita yüklenemedi.")); };
     document.head.appendChild(js);
   });
-  let devHarita = null, konumIzle = null, konumIsaret = null;
+  let devHarita = null;
+  const izCanli = { cizgi: null, ben: null };
   let sokakEtiketleri = null;
   // Kooperatif sokakları: { "12": { c: [[[lat,lng],...], ...], b: [lat,lng] (sokak başı) } }
   const sokaklariAl = async () => sokakEtiketleri ??= await fetch("veri/sokaklar.json").then((r) => r.json()).catch(() => { sokakEtiketleri = null; return {}; });
   function haritaKapat() {
-    if (konumIzle != null) { navigator.geolocation.clearWatch(konumIzle); konumIzle = null; }
-    konumIsaret = null;
     if (devHarita) { devHarita.remove(); devHarita = null; }
+    izCanli.cizgi = null; izCanli.ben = null;
   }
+  // İz noktalarını kopuk yerlerden bölerek çizgi parçalarına ayırır (kesinti düz çizgiyle birleştirilmez)
+  function izParcalari(nokta) {
+    const parcalar = []; let p = [];
+    nokta.forEach(([t, lat, lng, k], i) => {
+      if (i && (k || t - nokta[i - 1][0] > IZ_KOPUK_MS)) { if (p.length) parcalar.push(p); p = []; }
+      p.push([lat, lng]);
+    });
+    if (p.length) parcalar.push(p);
+    return parcalar;
+  }
+  const izGorunen = (v) => v.turlar.filter((t) => !v.izleyen || !izKisi || t.ad === izKisi);
   async function devriyeHaritaKur(v) {
     haritaKapat();
     const kutu = document.getElementById("devriye-harita");
-    if (!v || !kutu || !v.noktalar.length) return;
+    if (!v || !kutu) return;
     let L;
     try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
     if (!document.body.contains(kutu)) return;
     const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5 });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
-    const ns = v.noktalar;
-    L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#1565c0", weight: 4, dashArray: "8 8", opacity: .85 }).addTo(h);
-    ns.forEach((n, i) => {
-      const ks = v.kayitlar.filter((k) => k.nokta_id === n.id);
-      const tamam = ks.length > 0;
-      const ikon = L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17],
-        html: `<div class="hn ${tamam ? "hn-tamam" : ""} ${i === 0 ? "hn-ilk" : ""}">${tamam ? "✓" : i + 1}</div>` });
-      L.marker([n.lat, n.lng], { icon: ikon, title: n.ad }).addTo(h).bindPopup(`<b>${i + 1}. ${kac(n.ad)}</b><br>
-        ${tamam ? ks.map((k) => `✓ ${saatYazisi(k.zaman)} · ${kac(k.ad)}`).join("<br>") : "Henüz uğranmadı"}<br>
-        <a href="${yolTarifi(n)}" target="_blank" rel="noopener">🧭 Yol tarifi</a> · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">Google Maps</a>`);
-    });
-    const sigdir = () => { h.invalidateSize(); h.fitBounds(ns.map((n) => [n.lat, n.lng]), { padding: [28, 28] }); };
-    sigdir();
-    // Kutunun yüksekliği sayfa yerleşince kesinleşir: noktaları ekrana yeniden sığdır
-    requestAnimationFrame(() => setTimeout(sigdir, 60));
-    devHarita = h;
-  }
-  function konumumuGoster() {
-    if (!devHarita || !navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
-    if (!mesaideMi()) return mesaj(MESAI_DISI);
-    if (konumIzle != null) return;
-    const ns = gorevVeri?.devriye?.noktalar ?? [];
-    konumIzle = navigator.geolocation.watchPosition((p) => {
-      const yer = [p.coords.latitude, p.coords.longitude];
-      if (!mesaideMi() || !alanIcinde(yer[0], yer[1], ns)) {
-        navigator.geolocation.clearWatch(konumIzle); konumIzle = null;
-        if (konumIsaret) { konumIsaret.remove(); konumIsaret = null; }
-        return mesaj(mesaideMi() ? "Devriye alanının dışındasınız; konum gösterimi durduruldu." : "Mesai saati bitti; konum gösterimi durduruldu.");
+    const sokak = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
+    const uydu = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Uydu © Esri" });
+    // Sağ üstte yazılı seçici: Harita / Uydu
+    const secici = L.control({ position: "topright" });
+    secici.onAdd = () => {
+      const d = L.DomUtil.create("div", "altlik-sec");
+      d.innerHTML = `<button type="button" data-altlik="harita" class="secili">Harita</button><button type="button" data-altlik="uydu">🛰 Uydu</button>`;
+      L.DomEvent.disableClickPropagation(d);
+      d.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-altlik]"); if (!b) return;
+        const u = b.dataset.altlik === "uydu";
+        if (u) { h.removeLayer(sokak); uydu.addTo(h); } else { h.removeLayer(uydu); sokak.addTo(h); }
+        d.querySelectorAll("button").forEach((x) => x.classList.toggle("secili", x === b));
+      });
+      return d;
+    };
+    secici.addTo(h);
+    const ns = v.noktalar, sinir = [];
+    // Rota ve noktalar yalnızca yol gösterici: soluk kesik çizgi
+    if (ns.length) {
+      L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#607d8b", weight: 3, dashArray: "6 8", opacity: .7 }).addTo(h);
+      ns.forEach((n, i) => L.marker([n.lat, n.lng], { icon: L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="hn hn-rehber">${i + 1}</div>` }), title: n.ad })
+        .addTo(h).bindPopup(`<b>${i + 1}. ${kac(n.ad)}</b>`));
+    }
+    // Devriye izleri: mavi çizgi, kesintiler boş
+    for (const t of izGorunen(v)) {
+      const canli = izSuruyor() && t.benim && t.id === iz.tur;
+      const nokta = canli ? [...t.iz, ...iz.kuyruk.map((x) => [x.z, x.lat, x.lng, x.k])] : t.iz;
+      const parcalar = izParcalari(nokta.sort((a, b) => a[0] - b[0]));
+      parcalar.forEach((p) => { L.polyline(p, { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); sinir.push(...p); });
+      if (nokta.length) {
+        L.circleMarker([nokta[0][1], nokta[0][2]], { radius: 7, color: "#fff", weight: 2, fillColor: "#2e7d32", fillOpacity: 1 }).addTo(h)
+          .bindPopup(`<b>${kac(t.ad)}</b><br>Başladı: ${saatYazisi(t.basla)}`);
+        const s = nokta[nokta.length - 1];
+        if (t.bitis) L.circleMarker([s[1], s[2]], { radius: 7, color: "#fff", weight: 2, fillColor: "#c62828", fillOpacity: 1 }).addTo(h)
+          .bindPopup(`<b>${kac(t.ad)}</b><br>Bitti: ${saatYazisi(t.bitis)}`);
       }
-      if (!konumIsaret) {
-        konumIsaret = window.L.circleMarker(yer, { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(devHarita).bindPopup("Buradasınız");
-        devHarita.setView(yer, Math.max(devHarita.getZoom(), 17));
-      } else konumIsaret.setLatLng(yer);
-    }, (e) => { mesaj(e.code === 1 ? "Konum izni verilmedi. Telefonun ayarlarından izin verin." : "Konum alınamadı."); konumIzle = null; },
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+      if (canli) { izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); izCanli.son = nokta.length ? [nokta[nokta.length - 1][1], nokta[nokta.length - 1][2]] : null; }
+    }
+    if (izSuruyor() && v.isaretleyebilir && !izCanli.cizgi) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h);
+    const hedef = sinir.length ? sinir : ns.map((n) => [n.lat, n.lng]);
+    const sigdir = () => { h.invalidateSize(); if (hedef.length) h.fitBounds(hedef, { padding: [28, 28], maxZoom: 18 }); else h.setView([37.136, 27.322], 16); };
+    sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
+    devHarita = h;
+    if (izSuruyor() && iz.son) izCanliCiz(iz.son[0], iz.son[1], false, true);
+  }
+  // Devriye sürerken yeni nokta haritaya eklenir; mavi nokta müdürün o anki yeri
+  function izCanliCiz(lat, lng, kopuk, yalnizIsaret) {
+    if (!devHarita || !izCanli.cizgi) return;
+    const L = window.L;
+    if (!yalnizIsaret) {
+      if (kopuk) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(devHarita);
+      izCanli.cizgi.addLatLng([lat, lng]);
+    }
+    if (izCanli.ben) izCanli.ben.setLatLng([lat, lng]);
+    else izCanli.ben = L.circleMarker([lat, lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(devHarita).bindPopup("Buradasınız");
+    devHarita.panTo([lat, lng], { animate: true });
   }
   async function kmlIndir(v) {
     const sokaklar = await sokaklariAl();
     const x = (t) => String(t).replace(/[<&>]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;" })[c]);
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sporkent Devriye Kontrol Noktaları</name>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sporkent Devriye Rotası</name>
 ${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point><coordinates>${n.lng},${n.lat},0</coordinates></Point></Placemark>`).join("\n")}
 <Placemark><name>Devriye rotası</name><LineString><coordinates>${v.noktalar.map((n) => `${n.lng},${n.lat},0`).join(" ")}</coordinates></LineString></Placemark>
 <Style id="sokak"><LineStyle><color>ff00e6ff</color><width>5</width></LineStyle></Style>
@@ -1321,71 +1497,97 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
 </Document></kml>`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
-    a.download = "Devriye_Kontrol_Noktalari.kml"; a.click();
+    a.download = "Devriye_Rotasi.kml"; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
 
+  // ---------- Günlük Devriye ekranı ----------
+  let izKisi = "";
+  const turSatiri = (t, izleyen) => {
+    const bas = Date.parse(t.basla), bit = t.bitis ? Date.parse(t.bitis) : null;
+    const neden = t.bitis_nedeni === "mesai" ? " · mesai bitince kendiliğinden durdu" : t.bitis_nedeni === "otomatik" ? " · uzun süre konum gelmediği için kapandı" : "";
+    return `<div class="iz-tur ${bit ? "" : "suruyor"}">
+      <div class="iz-tur-ust">${izleyen ? `<b>${kac(t.ad)}</b> <small>${kac(ROL_ADI[t.rol] || t.rol)}</small>` : `<b>Devriye</b>`}
+        <span class="iz-tur-saat">${saatYazisi(bas)} – ${bit ? saatYazisi(bit) : "sürüyor"}</span></div>
+      <div class="iz-tur-alt">${bit ? `⏱ ${izSure(bit - bas)} · 🚶 ${kmYazisi(t.mesafe_m)}` : `● Devam ediyor · ${t.iz.length} nokta`}
+        ${t.kesinti_sn >= 30 ? ` · <span class="iz-kesinti">⚠ ${izSure(t.kesinti_sn * 1000)} kayıt yapılamadı</span>` : ""}${kac(neden)}</div>
+    </div>`;
+  };
   function devriyeGovde(v) {
     if (!v) return `<p class="bos">Yükleniyor…</p>`;
-    const kayitlar = (nid) => v.kayitlar.filter((k) => k.nokta_id === nid);
-    const ugranan = v.noktalar.filter((n) => kayitlar(n.id).length).length;
-    const saatler = v.kayitlar.map((k) => k.zaman).sort();
-    return `
-      ${v.noktalar.length ? `
-      <div class="devriye-ozet ${ugranan === v.noktalar.length ? "tam" : ugranan ? "" : "hic"}">
-        <b>📍 ${ugranan} / ${v.noktalar.length} nokta</b>
-        <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)} · ${saatler.length ? `İlk ${saatYazisi(saatler[0])} · Son ${saatYazisi(saatler[saatler.length - 1])}` : "henüz uğranmadı"}</span>
+    sakla.koy("sk_mesai", v.mesai); if (v.noktalar.length) sakla.koy("sk_alan", v.noktalar.map(({ lat, lng }) => ({ lat, lng })));
+    if (v.isaretleyebilir) {
+      // Müdür ve şef: yalnızca Başlat / Bitir, harita ve bugünkü kendi devriyeleri
+      const kendi = v.turlar.filter((t) => t.benim && !(izSuruyor() && t.id === iz.tur));
+      return `
+      <div class="iz-kart">
+        ${izSuruyor() ? `
+          <div class="servis-kayit-bant"><span class="kayit-nokta"></span> DEVRİYE SÜRÜYOR</div>
+          <div id="iz-durum" class="iz-durum"></div>
+          <button id="iz-bitir" class="ana-dugme iz-bitir" type="button">■ Devriyeyi Bitir</button>
+          <p class="iz-not">📱 Ekran açık kalsın, başka uygulamaya geçmeyin. Telefon kilitlenirse ya da uygulamadan çıkılırsa kayıt durur.</p>`
+        : iz?.bitis ? `
+          <div class="iz-bekliyor">⏳ Devriye bitti. Bilgiler internet gelince kendiliğinden gönderilecek.</div>
+          <div id="iz-durum" class="iz-durum"></div>`
+        : mesaideMi() ? `<button id="iz-basla" class="ana-dugme iz-basla" type="button">▶ Devriyeyi Başlat</button>
+          <p class="iz-not">Devriyeye çıkarken basın. Bitirince "Devriyeyi Bitir"e basın; konum yalnızca bu arada alınır.</p>`
+        : `<button class="ana-dugme iz-basla" type="button" disabled>🔒 Devriyeyi Başlat</button>
+          <p class="iz-neden">Devriye yalnızca mesai saatlerinde (<b>${kac(v.mesai.metin)}</b>) başlatılabilir. Şu an mesai dışı.</p>`}
       </div>
-      ${devriyeHaritaHtml(v)}
-      ${v.isaretleyebilir ? ""
-        : `<p class="ipucu">Müdür ve şef her noktada “Kontrol edildi”ye basar; konum o anda kontrol edilir. Siz kimin, hangi noktaya, ne zaman uğradığını görürsünüz.</p>`}
-      ${v.noktalar.map((n, i) => {
-        const ks = kayitlar(n.id);
-        const benim = ks.find((k) => k.benim);
-        return `<div class="devriye-nokta ${ks.length ? "ugrandi" : ""}" data-nokta="${n.id}">
-          <div class="dn-ust"><span class="dn-no">${ks.length ? "✓" : i + 1}</span><b>${kac(n.ad)}</b>
-            <a class="dn-harita" href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">🗺️ Harita</a></div>
-          ${ks.map((k) => `<div class="dn-kayit">✓ <b>${saatYazisi(k.zaman)}</b> · ${kac(k.ad)} · noktaya ${k.mesafe} m
-            · <a href="${haritaLink(k.lat, k.lng)}" target="_blank" rel="noopener">konum</a>
-            ${k.foto_url ? `<a href="${kac(k.foto_url)}" target="_blank" rel="noopener"><img class="dn-foto" src="${kac(k.foto_url)}" alt="Fotoğraf"></a>` : ""}</div>`).join("")}
-          ${!ks.length && !v.isaretleyebilir ? `<div class="dn-kayit dn-yok">${v.gun === v.bugun ? "Henüz uğranmadı" : "Uğranmadı"}</div>` : ""}
-          ${v.isaretleyebilir && !benim ? (mesaideMi() ? `
-          <label class="dn-foto-sec"><input type="file" accept="image/*" capture="environment" hidden data-dfoto="${n.id}"><span>📷 Fotoğraf ekle (isteğe bağlı)</span></label>
-          <button type="button" class="ana-dugme dn-buradayim" data-buradayim="${n.id}">✔ Kontrol edildi</button>`
-            : `<button type="button" class="ana-dugme dn-buradayim" disabled>🔒 Mesai dışı (08:00–17:00)</button>`) : ""}
-        </div>`;
-      }).join("")}` : `<p class="bos">Henüz kontrol noktası tanımlanmadı.${v.noktaYonetir ? " Aşağıdan ekleyin." : ""}</p>`}
+      <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
+      ${kendi.length ? `<h2 class="iz-baslik">Bugünkü devriyeleriniz</h2>${kendi.map((t) => turSatiri(t, false)).join("")}` : ""}`;
+    }
+    // Yönetici ve yönetim kurulu: gün ve kişi seçilir, iz haritada mavi çizgi
+    const gorunen = izGorunen(v);
+    const toplam = gorunen.reduce((a, t) => a + (t.mesafe_m || 0), 0);
+    const adlar = [...new Set([...v.kisiler.map((k) => k.ad), ...v.turlar.map((t) => t.ad)])];
+    return `
+      <div class="iz-secim">
+        <label>Gün<input type="date" id="iz-gun" value="${v.gun}" max="${v.bugun}"></label>
+        <label>Kişi<select id="iz-kisi"><option value="">Hepsi</option>${adlar.map((a) => `<option ${a === izKisi ? "selected" : ""}>${kac(a)}</option>`).join("")}</select></label>
+      </div>
+      <div class="devriye-ozet ${gorunen.length ? "tam" : "hic"}">
+        <b>🚶 ${gorunen.length ? `${gorunen.length} devriye · ${kmYazisi(toplam)}` : "Devriye yapılmadı"}</b>
+        <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)}${izKisi ? ` · ${kac(izKisi)}` : ""}</span>
+      </div>
+      <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
+      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık · Gri kesik çizgi: önerilen rota. Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
+      ${gorunen.map((t) => turSatiri(t, true)).join("") || `<p class="bos">Bu gün ${izKisi ? kac(izKisi) + " için " : ""}devriye kaydı yok.</p>`}
       ${v.noktaYonetir ? `
-      <details class="nokta-yonet"><summary>⚙️ Kontrol noktalarını düzenle (${v.noktalar.length})</summary>
+      <details class="nokta-yonet"><summary>⏰ Devriye mesai saatleri: ${kac(v.mesai.metin)}</summary>
+        <form id="mesai-form" class="mesai-form">
+          <label>Başlangıç<input type="time" name="bas" value="${v.mesai.ham.slice(0, 5)}" required></label>
+          <label>Bitiş<input type="time" name="bit" value="${v.mesai.ham.slice(6, 11)}" required></label>
+          <button class="ana-dugme" type="submit">Kaydet</button>
+        </form>
+        <small class="ipucu">Bu saatlerin dışında devriye başlatılamaz; süren devriye bitişte kendiliğinden durur.</small>
+      </details>
+      <details class="nokta-yonet"><summary>⚙️ Rota noktalarını düzenle (${v.noktalar.length})</summary>
+      <button type="button" class="ikincil" id="kml-indir" style="width:100%;margin:8px 0">📥 Rotayı KML olarak indir (Google My Maps)</button>
       <form class="nokta-ekle" id="nokta-ekle">
         <label>Noktanın adı<input name="ad" required maxlength="80" placeholder="Örn. Ana giriş kapısı"></label>
         <label>Google Haritalar bağlantısı ya da koordinat
           <input name="konum" placeholder="https://maps.app.goo.gl/… ya da 37.1329, 27.3245">
           <small class="ipucu">Google Haritalar'da noktaya basılı tutun → “Paylaş” ile bağlantıyı kopyalayın ya da üstte çıkan koordinatı yapıştırın.</small></label>
-        <label>Kabul mesafesi (metre)<input name="yaricap" type="number" inputmode="numeric" min="25" max="300" value="50"></label>
-        <div class="dugmeler"><button type="button" class="ikincil" id="nokta-burasi">📍 Bulunduğum yeri kullan</button><button class="ana-dugme" type="submit">➕ Noktayı ekle</button></div>
+        <input type="hidden" name="yaricap" value="50">
+        <div class="dugmeler"><button class="ana-dugme" type="submit">➕ Noktayı ekle</button></div>
       </form>
-      ${v.noktalar.map((n) => `<div class="uye"><div><b>${kac(n.ad)}</b><br><small>${n.lat.toFixed(5)}, ${n.lng.toFixed(5)} · ${n.yaricap} m · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">haritada gör</a></small></div>
+      ${v.noktalar.map((n) => `<div class="uye"><div><b>${kac(n.ad)}</b><br><small>${n.lat.toFixed(5)}, ${n.lng.toFixed(5)} · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">haritada gör</a></small></div>
         <div class="uye-dugmeler"><button type="button" class="kucuk-dugme" data-nokta-ad="${n.id}" data-ad="${kac(n.ad)}">Adını değiştir</button><button type="button" class="kucuk-dugme tehlike" data-nokta-sil="${n.id}">Kaldır</button></div></div>`).join("")}
       </details>` : ""}`;
   }
 
-  const konumAl = () => new Promise((ok, red) => {
-    if (!navigator.geolocation) return red(new Error("Bu telefon konum vermiyor."));
-    navigator.geolocation.getCurrentPosition(ok, (e) => red(new Error(e.code === 1
-      ? "Konum izni verilmedi. Telefonun ayarlarından bu uygulamaya konum izni verin ve tekrar deneyin."
-      : "Konum alınamadı. Açık alanda tekrar deneyin.")), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-  });
-  const devriyeFoto = new Map();
-
-  $("#gorevler").addEventListener("change", async (e) => {
-    const g = e.target.closest("[data-dfoto]"); if (!g?.files?.[0]) return;
-    try { devriyeFoto.set(g.dataset.dfoto, await kucult(g.files[0])); g.nextElementSibling.textContent = "📷 Fotoğraf eklendi ✓ (değiştirmek için dokunun)"; }
-    catch (err) { mesaj(err.message); }
+  $("#gorevler").addEventListener("change", (e) => {
+    if (e.target.id === "iz-gun" && e.target.value) return gorevlerAc("gunluk", e.target.value);
+    if (e.target.id === "iz-kisi") { izKisi = e.target.value; gorevCiz(); }
   });
 
   $("#gorevler").addEventListener("click", async (e) => {
-    if (e.target.closest("#konumum")) return konumumuGoster();
+    const bas = e.target.closest("#iz-basla"); if (bas && !bas.disabled) return devriyeBaslat(bas);
+    if (e.target.closest("#iz-bitir")) {
+      if (!confirm("Devriye bitirilsin mi? Konum kaydı durur.")) return;
+      return devriyeBitir("kullanici");
+    }
     if (e.target.closest("#kml-indir")) return kmlIndir(gorevVeri.devriye);
     const yeniAd = e.target.closest("[data-nokta-ad]");
     if (yeniAd) {
@@ -1394,44 +1596,26 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       try { await api("nokta_adi", { id: Number(yeniAd.dataset.noktaAd), ad: ad.trim() }); mesaj("Nokta adı değiştirildi."); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
       return;
     }
-    const b = e.target.closest("[data-buradayim]");
-    if (b) {
-      b.disabled = true; const eski = b.textContent; b.textContent = "Konum alınıyor…";
-      try {
-        if (!mesaideMi()) throw new Error(MESAI_DISI);
-        const k = await konumAl();
-        if (!alanIcinde(k.coords.latitude, k.coords.longitude, gorevVeri?.devriye?.noktalar ?? [])) {
-          throw new Error("Devriye alanının dışındasınız. Konumunuz kaydedilmedi ve gönderilmedi.");
-        }
-        const blob = devriyeFoto.get(b.dataset.buradayim);
-        const foto = blob ? await fotoYukle(blob, "devriye") : null;
-        const r = await api("devriye_isaretle", { nokta_id: Number(b.dataset.buradayim), lat: k.coords.latitude, lng: k.coords.longitude, dogruluk: k.coords.accuracy, foto });
-        devriyeFoto.delete(b.dataset.buradayim);
-        mesaj(`✓ ${r.ad}: kontrol edildi.`);
-        devriyeAc();
-      } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = eski; }
-      return;
-    }
     const sil = e.target.closest("[data-nokta-sil]");
     if (sil) {
-      if (!confirm("Bu kontrol noktası kaldırılsın mı? Geçmiş kayıtlar silinmez.")) return;
+      if (!confirm("Bu rota noktası kaldırılsın mı?")) return;
       try { await api("nokta_sil", { id: Number(sil.dataset.noktaSil) }); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
-      return;
-    }
-    if (e.target.closest("#nokta-burasi")) {
-      try { const k = await konumAl(); $("#nokta-ekle").konum.value = `${k.coords.latitude.toFixed(6)}, ${k.coords.longitude.toFixed(6)}`; mesaj(`Konum alındı (±${Math.round(k.coords.accuracy)} m).`); }
-      catch (err) { mesaj(err.message); }
     }
   });
 
   $("#gorevler").addEventListener("submit", async (e) => {
-    if (e.target.id !== "nokta-ekle") return;
     e.preventDefault();
     const f = new FormData(e.target);
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
-      await api("nokta_ekle", { ad: f.get("ad"), konum: f.get("konum"), yaricap: Number(f.get("yaricap")) || 75 });
-      mesaj("Kontrol noktası eklendi."); devriyeAc(gorevVeri?.gun);
+      if (e.target.id === "mesai-form") {
+        await api("devriye_mesai", { bas: f.get("bas"), bit: f.get("bit") });
+        mesaj("Mesai saatleri kaydedildi."); return devriyeAc(gorevVeri?.gun);
+      }
+      if (e.target.id === "nokta-ekle") {
+        await api("nokta_ekle", { ad: f.get("ad"), konum: f.get("konum"), yaricap: Number(f.get("yaricap")) || 50 });
+        mesaj("Rota noktası eklendi."); devriyeAc(gorevVeri?.gun);
+      }
     } catch (err) { mesaj(err.message); d.disabled = false; }
   });
 
