@@ -1450,7 +1450,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     let L;
     try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
     if (!document.body.contains(kutu)) return;
-    const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5 });
+    // Telefonda tek parmak sayfayı kaydırır; harita iki parmakla büyütülüp kaydırılır (+ / − düğmeleri de var)
+    const h = L.map(kutu, { zoomControl: true, attributionControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5, dragging: !L.Browser.mobile });
     const sokak = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
     const uydu = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Uydu © Esri" });
     // Sağ üstte yazılı seçici: Harita / Uydu
@@ -1570,18 +1571,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)}${izKisi ? ` · ${kac(izKisi)}` : ""}</span>
       </div>
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
-      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık · Turuncu kesik çizgi: site sınırı (dışında konum kaydedilmez). Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
-      ${gorunen.map((t) => turSatiri(t, true)).join("") || `<p class="bos">Bu gün ${izKisi ? kac(izKisi) + " için " : ""}devriye kaydı yok.</p>`}
-      ${v.mesaiAyarlar ? `
-      <details class="nokta-yonet"><summary>⏰ Devriye mesai saatleri: ${kac(v.mesai.metin)}</summary>
-        <form id="mesai-form" class="mesai-form">
-          <label>Başlangıç<input type="time" name="bas" value="${v.mesai.ham.slice(0, 5)}" required></label>
-          <label>Bitiş<input type="time" name="bit" value="${v.mesai.ham.slice(6, 11)}" required></label>
-          <button class="ana-dugme" type="submit">Kaydet</button>
-        </form>
-        <small class="ipucu">Bu saatlerin dışında devriye başlatılamaz; süren devriye bitişte kendiliğinden durur.</small>
-      </details>
-      </details>` : ""}`;
+      ${gorunen.map((t) => turSatiri(t, true)).join("")}
+`;
   }
 
   $("#gorevler").addEventListener("change", (e) => {
@@ -1754,7 +1745,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const kutu = $("#servis-harita"); if (!kutu) return;
     let L; try { L = await leaflet(); } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
     if (!document.body.contains(kutu)) return;
-    const h = L.map(kutu, { zoomControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5 });
+    const h = L.map(kutu, { zoomControl: true, tap: true, zoomSnap: 0.25, zoomDelta: 0.5, dragging: !L.Browser.mobile });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(h);
     servisCizgi = L.polyline(cizgi, { color: "#ef6c00", weight: 6, opacity: .9 }).addTo(h);
     duraklar.forEach((d, i) => durakIsareti(d, i).addTo(h));
