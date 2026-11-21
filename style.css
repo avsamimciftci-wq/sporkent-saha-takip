@@ -804,3 +804,6 @@ body.gorucu-acik { overflow: hidden; }
 .tel-ayar li { margin-bottom: 4px; }
 .iz-tur-cihaz { font-size: 14px; color: var(--soluk); margin-top: 2px; }
 .iz-durum small b { font-size: inherit; }
+.mesai-form { grid-template-columns: 1fr 1fr; }
+.mesai-form label { min-width: 0; }
+.mesai-form button { grid-column: 1 / -1; }
