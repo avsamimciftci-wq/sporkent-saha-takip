@@ -75,8 +75,8 @@
   const KAPATABILIR = ["baskan", "mudur", "sef"];
   const kapatabilir = () => KAPATABILIR.includes(oturum?.rol);
   const yonetici = () => oturum?.rol === "baskan";
-  const yeniGirebilir = () => !["mudur", "sef"].includes(oturum?.rol);
-  const yonetimIsiGirebilir = () => ["baskan", "yonetim", "muhasebe", "mudur"].includes(oturum?.rol);
+  const yeniGirebilir = () => oturum?.rol !== "mudur";
+  const yonetimIsiGirebilir = () => ["baskan", "yonetim", "muhasebe", "mudur", "sef"].includes(oturum?.rol);
   const yonetimIsiRozeti = (k) => k.gizli ? `<span class="rozet gizli-rozet">🔒 Yönetim İş Emri</span>` : "";
   const onayli = () => oturum?.anahtar && oturum.durum === "onayli";
 
