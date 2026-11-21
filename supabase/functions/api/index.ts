@@ -582,8 +582,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yeni": {
-      // Müdür ve şef Saha Takip'e kayıt girmez; yalnızca Yönetim Kurulu bölümünden iş emri verebilir.
-      if ((rol === "mudur" || rol === "sef") && !g.gizli) throw new Hata(`${rol === "sef" ? "Şef" : "Müdür"} Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.`, 403);
+      // Müdür, şef ve muhasebe Saha Takip'e kayıt girmez; yalnızca Yönetim Kurulu bölümünden iş emri verebilir.
+      if (["mudur", "sef", "muhasebe"].includes(rol) && !g.gizli) throw new Hata(`${({ mudur: "Müdür", sef: "Şef", muhasebe: "Muhasebe" } as Record<string, string>)[rol]} Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.`, 403);
       const kayit = {
         bildiren: u.ad,
         cihaz: u.cihaz,
