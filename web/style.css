@@ -64,8 +64,8 @@ img { -webkit-user-drag: none; }
 }
 .ust-sol { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .ust-logo {
-  width: 70px; height: 70px; flex: none; border-radius: 50%;
-  background: #fff; object-fit: contain; padding: 3px;
+  width: 70px; height: 70px; flex: none; border-radius: 14px;
+  background: #fff; object-fit: contain; padding: 2px;
   box-shadow: 0 0 0 2px rgba(255,255,255,.35);
   -webkit-user-drag: none; pointer-events: none;
 }
