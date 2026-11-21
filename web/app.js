@@ -164,19 +164,32 @@
 
   // ---------- Yeni iş gelince: sesli uyarı + pencere kendiliğinden açılır ----------
   // Herkes için: yeni açılan sorunlar ve yeni "yapıldı" işler.
-  const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a");
+  const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a") + (k.gizli && k.cevaplar?.length ? ":c" + k.cevaplar.length : "");
+  // YK iş emrine gelen cevabı bu telefonda açıp okudu mu (okunmadıysa kırmızı yanıp söner)
+  const cevapOkunan = () => sakla.al("sk_cevap_okunan") || {};
+  const cevapOkunmadi = (k) => k.gizli && (k.cevaplar?.length || 0) > (cevapOkunan()[k.id] || 0);
+  function cevapOkundu(k) {
+    if (!k.gizli || !k.cevaplar?.length) return;
+    const o = cevapOkunan(); if ((o[k.id] || 0) >= k.cevaplar.length) return;
+    o[k.id] = k.cevaplar.length; sakla.koy("sk_cevap_okunan", o);
+  }
 
   function yenileriAc() {
     const gorulen = sakla.al("sk_gorulen");
     const yeniler = gorulen ? kayitlar.filter((k) => !gorulen.includes(anahtar(k))) : [];
     sakla.koy("sk_gorulen", kayitlar.map(anahtar).slice(0, 500));
     if (!yeniler.length) return;
-    sesCal();
-    const en = yeniler.sort((a, b) => (b.kapanis_at || b.created_at).localeCompare(a.kapanis_at || a.created_at))[0];
-    const baslik = en.durum === "tamam" ? `Yapıldı: ${en.yer}` : onayBekliyor(en) ? `Onay bekleyen kayıt: ${en.yer}` : `Yeni sorun: ${en.yer}`;
+    // Yeni YK cevabı: daha önce görülmüş iş emrine cevap eklenmiş
+    const cevapli = yeniler.filter((k) => k.gizli && k.cevaplar?.length && gorulen.some((x) => x.startsWith(k.id + ":")));
+    sesCal(cevapli.length > 0);
+    const son = (k) => (cevapli.includes(k) ? k.cevaplar.at(-1).at : k.kapanis_at || k.created_at);
+    const en = yeniler.sort((a, b) => son(b).localeCompare(son(a)))[0];
+    const baslik = cevapli.includes(en) ? `💬 Yeni cevap: ${en.yer} — ${en.cevaplar.at(-1).ad}: ${en.cevaplar.at(-1).metin}`
+      : en.durum === "tamam" ? `Yapıldı: ${en.yer}` : onayBekliyor(en) ? `Onay bekleyen kayıt: ${en.yer}` : `Yeni sorun: ${en.yer}`;
     // Yeni kayıt formu doluyken yazılanı kaybettirme, sadece haber ver
     if (!$("#ekran-yeni").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden)) return mesaj(baslik);
     detayGoster(en.id);
+    if (cevapli.includes(en)) setTimeout(() => $(".yk-cevaplar")?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
     mesaj(yeniler.length > 1 ? `${baslik} (+${yeniler.length - 1} yeni)` : baslik);
   }
 
@@ -194,9 +207,9 @@
     f.addEventListener("animationend", () => f.remove());
     document.body.appendChild(f);
   }
-  function sesCal() {
-    // Ekran yanıp sönmesi yalnızca müdür ve şefte
-    if (["mudur", "sef"].includes(oturum?.rol)) ekranFlas();
+  function sesCal(herkeseFlas = false) {
+    // Ekran yanıp sönmesi müdür ve şefte; YK cevabı gelince herkeste
+    if (herkeseFlas || ["mudur", "sef"].includes(oturum?.rol)) ekranFlas();
     try { navigator.vibrate?.([500, 150, 500, 150, 500, 150, 800]); } catch {}
     if (!sesBaglam) return;
     const t = sesBaglam.currentTime;
@@ -309,9 +322,10 @@
   }
 
   // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
-  const siraya = (liste, f) => liste.sort((a, b) => f === "tamam"
+  // Okunmamış YK cevabı olan iş en üstte
+  const siraya = (liste, f) => liste.sort((a, b) => (!!cevapOkunmadi(b) - !!cevapOkunmadi(a)) || (f === "tamam"
     ? b.kapanis_at.localeCompare(a.kapanis_at)
-    : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at));
+    : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at)));
 
   const satirHtml = (k) => `
       <button class="satir ${gecikti(k) ? "gecikti" : ""}" data-id="${k.id}">
@@ -326,7 +340,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
-          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap">💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
+          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi ${cevapOkunmadi(k) ? "yanip" : ""}">💬 ${cevapOkunmadi(k) ? "YENİ CEVAP · " : ""}${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`;
@@ -408,8 +422,8 @@
       ${k.gizli ? `
       <div class="islem yk-cevaplar">
         <h2>💬 Cevaplar</h2>
-        ${(k.cevaplar || []).length ? k.cevaplar.map((c) => `
-        <div class="yk-cevap"><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
+        ${(k.cevaplar || []).length ? k.cevaplar.map((c, i) => `
+        <div class="yk-cevap ${i >= (cevapOkunan()[k.id] || 0) ? "yanip" : ""}"><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
           : `<p class="ipucu" style="margin:0">Henüz cevap yazılmadı.</p>`}
         ${kayitOnaylar() ? `
         <button type="button" class="ana-dugme" id="yk-cevap-ac">💬 Cevap Ver</button>
@@ -462,6 +476,7 @@
         <small class="ipucu">Yalnızca yönetici görür. Uygun olmayan kaydı fotoğraflarıyla birlikte herkesten kaldırır.</small>
       </div>` : ""}`;
     goster("detay");
+    cevapOkundu(k); // açıldı: listede artık yanıp sönmez (bu ekranda okunmamışlar yanıp sönmeye devam eder)
     if (kapat) kapatBagla(k);
     // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
     if (["mudur", "sef", "yonetim", "muhasebe"].includes(oturum.rol) && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
@@ -478,6 +493,8 @@
       d.disabled = true; d.textContent = "Gönderiliyor…";
       try {
         Object.assign(k, await api("yk_cevap", { id: k.id, metin }));
+        sakla.koy("sk_gorulen", [anahtar(k), ...(sakla.al("sk_gorulen") || [])]);
+        cevapOkundu(k);
         listeCiz(); detayGoster(k.id);
         mesaj("Cevap gönderildi. Yönetim Kurulu bölümündekilere bildirildi.");
       } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Gönder"; }
