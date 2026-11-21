@@ -11,7 +11,8 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE") ?? "";
 const BUCKET = "fotograflar";
 
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
-  webpush.setVapidDetails("mailto:bildirim@sporkent.local", VAPID_PUBLIC, VAPID_PRIVATE);
+  // Apple (iPhone) ".local" gibi geçersiz adresi "BadJwtToken" diye reddeder: gerçek bir https adresi olmalı
+  webpush.setVapidDetails("https://avsamimciftci-wq.github.io/sporkent-saha-takip/", VAPID_PUBLIC, VAPID_PRIVATE);
 }
 
 const CORS = {
