@@ -820,15 +820,12 @@ body.gorucu-acik { overflow: hidden; }
 }
 
 /* YK cevabı: kırmızı; okunmadıysa yanıp söner */
-.satir-cevap.yk-cevap-kirmizi { color: #c62828; font-weight: 800; }
-.yk-cevap { border-left-color: #c62828; background: #ffebee; }
-.yk-cevap p { color: #b71c1c; font-weight: 700; }
-.yk-cevap-kirmizi.yanip { animation: cevap-yanip 1s ease-in-out infinite; }
-.yk-cevap.yanip { animation: cevap-kutu-yanip 1s ease-in-out infinite; }
-@keyframes cevap-yanip { 50% { opacity: .25; } }
-@keyframes cevap-kutu-yanip { 50% { background: #ffcdd2; box-shadow: 0 0 0 3px #e53935; } }
+/* YK cevabı: sarı panel üzerinde kırmızı yazı */
+.satir-cevap.yk-cevap-kirmizi { color: #c62828; font-weight: 800; background: #fff59d; border: 2px solid #fbc02d; border-radius: 8px; padding: 6px 10px; margin-top: 6px; }
+.yk-cevap { border: 2px solid #fbc02d; border-left: 6px solid #c62828; background: #fff59d; }
+.yk-cevap p { color: #c62828; font-weight: 800; }
+.yk-cevap small { color: #5d4037; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .satir-cevap.yk-cevap-kirmizi, :root:not([data-theme="light"]) .yk-cevap p { color: #ff8a80; }
-  :root:not([data-theme="light"]) .yk-cevap { background: #3b1414; }
+  :root:not([data-theme="light"]) .satir-cevap.yk-cevap-kirmizi, :root:not([data-theme="light"]) .yk-cevap { background: #fff59d; }
+  :root:not([data-theme="light"]) .satir-cevap.yk-cevap-kirmizi, :root:not([data-theme="light"]) .yk-cevap p { color: #c62828; }
 }
-@media (prefers-reduced-motion: reduce) { .yk-cevap-kirmizi.yanip, .yk-cevap.yanip { animation-duration: 2s; } }
