@@ -340,7 +340,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
-          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi">💬 ${cevapOkunmadi(k) ? "YENİ CEVAP · " : ""}${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
+          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi"><span class="cevap-verildi">✅ CEVAP VERİLDİ${k.cevaplar.length > 1 ? ` (${k.cevaplar.length})` : ""}${cevapOkunmadi(k) ? " · YENİ" : ""}</span>💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`;
@@ -423,7 +423,7 @@
       <div class="islem yk-cevaplar">
         <h2>💬 Cevaplar</h2>
         ${(k.cevaplar || []).length ? k.cevaplar.map((c) => `
-        <div class="yk-cevap"><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
+        <div class="yk-cevap"><span class="cevap-verildi">✅ CEVAP VERİLDİ</span><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
           : `<p class="ipucu" style="margin:0">Henüz cevap yazılmadı.</p>`}
         ${kayitOnaylar() ? `
         <button type="button" class="ana-dugme" id="yk-cevap-ac">💬 Cevap Ver</button>
