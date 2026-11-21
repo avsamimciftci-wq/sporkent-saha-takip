@@ -217,11 +217,13 @@
   // son_tarih "YYYY-MM-DD"; o gün bitene kadar süre var, ertesi gün gecikmiş sayılır.
   const gunFarki = (t) => Math.round((Date.parse(t + "T00:00:00") - Date.parse(bugun() + "T00:00:00")) / 864e5);
   const gecikti = (k) => k.durum !== "tamam" && k.onay_durumu !== "bekliyor" && k.son_tarih && gunFarki(k.son_tarih) < 0;
+  // Müdür, şef ve muhasebe YK iş emrinin süresini görmez ve seçmez
+  const sureGormez = () => ["mudur", "sef", "muhasebe"].includes(oturum?.rol);
   // Kaydın açıldığı gün (İstanbul) ile son gün arasındaki gün sayısı
   const acilisGunu = (k) => new Date(Date.parse(k.created_at) + 3 * 3600e3).toISOString().slice(0, 10);
   const sureGun = (k) => k.son_tarih ? Math.round((Date.parse(k.son_tarih) - Date.parse(acilisGunu(k))) / 864e5) : null;
   function sureYazisi(k) {
-    if (k.durum === "tamam" || !k.son_tarih || onayBekliyor(k)) return "";
+    if (k.durum === "tamam" || !k.son_tarih || onayBekliyor(k) || (k.gizli && sureGormez())) return "";
     const f = gunFarki(k.son_tarih);
     if (f < 0) return `<span class="sure gecikmis">⚠ ${-f} gün gecikti</span>`;
     if (f === 0) return `<span class="sure son-gun">⏰ Bugün son gün</span>`;
@@ -324,6 +326,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
+          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap">💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`;
@@ -396,12 +399,26 @@
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
         ${k.yanit ? `<dt>Cevap</dt><dd>💬 ${kac(k.yanit)}<br><small>${kac(k.yanit_veren || "")} · ${tarihSaat(k.yanit_at)}</small></dd>` : ""}
         ${gorulmeGorur() ? gorulmeAlanlari(k) : ""}
-        ${k.son_tarih ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
+        ${k.son_tarih && !(k.gizli && sureGormez()) ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
         <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
         ${k.sonuc ? `<dt>Not</dt><dd>${kac(k.sonuc)}</dd>` : ""}` : ""}
       </dl>
+      ${k.gizli ? `
+      <div class="islem yk-cevaplar">
+        <h2>💬 Cevaplar</h2>
+        ${(k.cevaplar || []).length ? k.cevaplar.map((c) => `
+        <div class="yk-cevap"><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
+          : `<p class="ipucu" style="margin:0">Henüz cevap yazılmadı.</p>`}
+        ${kayitOnaylar() ? `
+        <button type="button" class="ana-dugme" id="yk-cevap-ac">💬 Cevap Ver</button>
+        <form id="yk-cevap-form" hidden>
+          <textarea name="metin" rows="3" maxlength="1000" required placeholder="Cevabınızı yazın"></textarea>
+          <button type="submit" class="ana-dugme">Gönder</button>
+          <small class="ipucu">Yönetim Kurulu bölümündeki herkes (yönetici, yönetim kurulu, muhasebe, müdür, şef) görür ve bildirim alır.</small>
+        </form>` : ""}
+      </div>` : ""}
       ${kapat ? `
       <form class="islem" id="kapat-form">
         <h2>Sorunu giderdiniz mi?</h2>
@@ -428,7 +445,7 @@
       </div>`}
       <div class="islem">
         <h2>Yapılma süresi</h2>
-        ${!k.gizli || k.benim || k.bildiren === oturum.ad ? `
+        ${!k.gizli || k.benim || k.bildiren === oturum.ad || ["mudur", "sef", "muhasebe"].includes(k.veren_rol) ? `
         <div class="sure-sec" id="sure-sec">
           ${[1, 2, 3, 5, 7, 10, 15, 30].map((g) => `<button type="button" data-gun="${g}" class="${sureGun(k) === g ? "secili" : ""}">${g} gün</button>`).join("")}
         </div>
@@ -451,6 +468,20 @@
       gorulduGonderilen.add(k.id);
       api("goruldu", { id: k.id }).catch(() => gorulduGonderilen.delete(k.id));
     }
+    $("#yk-cevap-ac")?.addEventListener("click", (e) => {
+      e.target.hidden = true; $("#yk-cevap-form").hidden = false; $("#yk-cevap-form textarea").focus();
+    });
+    $("#yk-cevap-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const d = e.target.querySelector("button[type=submit]"), metin = e.target.metin.value.trim();
+      if (!metin) return;
+      d.disabled = true; d.textContent = "Gönderiliyor…";
+      try {
+        Object.assign(k, await api("yk_cevap", { id: k.id, metin }));
+        listeCiz(); detayGoster(k.id);
+        mesaj("Cevap gönderildi. Yönetim Kurulu bölümündekilere bildirildi.");
+      } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Gönder"; }
+    });
     let cevapGun = null;
     $("#cevap-sec")?.addEventListener("click", (e) => {
       const b = e.target.closest("[data-gun]"); if (!b) return;
@@ -2236,7 +2267,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     yeniForm.reset(); yeniFoto.sifirla();
     $("#yeni-baslik").textContent = yeniTur === "yonetim" ? "Yeni YK iş emri" : "Yeni kayıt";
     $("#yeni-tur-not").hidden = yeniTur !== "yonetim";
-    $("#emir-sure").hidden = yeniTur !== "yonetim";
+    $("#emir-sure").hidden = yeniTur !== "yonetim" || sureGormez();
     emirGun = EMIR_VARSAYILAN_GUN; emirSureCiz();
     goster("yeni");
   }
@@ -2254,7 +2285,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       const r = await api("yeni", {
         bildiren: oturum.ad, yer: f.get("yer"), sorun: f.get("sorun"), foto,
         gizli: yonetimIsiGirebilir() && yeniTur === "yonetim",
-        sure: yonetimIsiGirebilir() && yeniTur === "yonetim" ? emirGun : undefined,
+        sure: yonetimIsiGirebilir() && yeniTur === "yonetim" && !sureGormez() ? emirGun : undefined,
       });
       mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);

@@ -36,6 +36,8 @@ const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 // YK iş emrini verenler: yönetici, yönetim kurulu, muhasebe, müdür (şef veremez, yalnızca görür ve kapatır)
 const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
 const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
+// Bu roller YK iş emrinin süresini görmez ve seçmez; süreyi yönetici ve yönetim kurulu belirler
+const SURE_GORMEYEN: Rol[] = ["mudur", "sef", "muhasebe"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
 const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
 // Bu dört görevin yazdığı kayıt doğrudan iş listesine düşer; diğerlerininki (TG üyesi, muhasebe)
@@ -157,11 +159,12 @@ async function fotoUrlleri(kayitlar: any[]) {
 
 type Hedef = Rol[] | "hepsi" | { cihaz: string };
 
-async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId?: number; resim?: string | null; sayfa?: string } = {}) {
+async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId?: number; resim?: string | null; sayfa?: string; haric?: string } = {}) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return { hedef: 0, basarili: 0 };
   let q = db.from("abonelikler").select("endpoint, abonelik, rol");
   if (Array.isArray(hedef)) q = q.in("rol", hedef);
   else if (hedef !== "hepsi") q = q.eq("cihaz", hedef.cihaz);
+  if (ek.haric) q = q.neq("cihaz", ek.haric);
   const { data } = await q;
   const mesaj = JSON.stringify({ baslik, govde, kayitId: ek.kayitId, resim: ek.resim ?? undefined, sayfa: ek.sayfa });
   const hatalar: unknown[] = [];
@@ -548,7 +551,15 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!KAYIT_ONAYLAYAN.includes(rol)) q = q.or(`onay_durumu.eq.onayli,cihaz.eq.${u.cihaz}`);
       const { data, error } = await q;
       if (error) throw error;
-      const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => ({ ...k, benim: c === u.cihaz }));
+      const verenler = [...new Set((data ?? []).filter((k: any) => k.gizli && k.cihaz).map((k: any) => k.cihaz))];
+      const { data: vr } = verenler.length ? await db.from("uyeler").select("cihaz, rol").in("cihaz", verenler) : { data: [] };
+      const verenRol = new Map((vr ?? []).map((x: any) => [x.cihaz, x.rol]));
+      const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => {
+        const x: any = { ...k, benim: c === u.cihaz };
+        if (k.gizli) x.veren_rol = verenRol.get(c) ?? null;
+        if (k.gizli && SURE_GORMEYEN.includes(rol)) x.son_tarih = null;
+        return x;
+      });
       let bekleyen: number | undefined;
       if (rol === "baskan") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "bekliyor");
@@ -592,7 +603,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         foto_once: temiz(g.foto, 200) || null,
         gizli: !!g.gizli && YONETIM_ISI_GIREN.includes(rol),
         // YK iş emrinde süre emri veren tarafından seçilir (1-60 gün); diğer kayıtlarda varsayılan süre
-        son_tarih: sonGun(new Date(), !!g.gizli && YONETIM_ISI_GIREN.includes(rol) && Number.isInteger(Number(g.sure)) && Number(g.sure) >= 1 && Number(g.sure) <= 60
+        son_tarih: sonGun(new Date(), !!g.gizli && YONETIM_ISI_GIREN.includes(rol) && !SURE_GORMEYEN.includes(rol) && Number.isInteger(Number(g.sure)) && Number(g.sure) >= 1 && Number(g.sure) <= 60
           ? Number(g.sure) : await varsayilanSure()),
         onay_durumu: onaysizGirer(u) ? "onayli" : "bekliyor",
       };
@@ -641,7 +652,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!k) throw new Hata("Kayıt bulunamadı.");
       if (k.durum === "tamam") throw new Hata("Bu iş zaten yapıldı.");
       // YK iş emrinin süresini yalnızca emri veren değiştirir (yönetici ve diğer YK üyeleri değiştiremez)
-      if (k.gizli && k.cihaz !== u.cihaz && k.bildiren !== u.ad) {
+      const verenRolu = k.gizli && k.cihaz ? (await db.from("uyeler").select("rol").eq("cihaz", k.cihaz).maybeSingle()).data?.rol : null;
+      if (k.gizli && k.cihaz !== u.cihaz && k.bildiren !== u.ad && !SURE_GORMEYEN.includes(verenRolu)) {
         throw new Hata(`Bu YK iş emrinin süresini yalnızca emri veren (${k.bildiren}) değiştirebilir.`, 403);
       }
       const son_tarih = sonGun(k.created_at, gun);
@@ -658,6 +670,22 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
       );
       return { tamam: true };
+    }
+
+    case "yk_cevap": {
+      // YK iş emrine yönetici ya da yönetim kurulu cevap yazar; Yönetim Kurulu bölümündeki herkes görür ve bildirim alır
+      ykVeYonetici();
+      const metin = temiz(g.metin, 1000);
+      if (!metin) throw new Hata("Cevap boş olamaz.");
+      const { data: k } = await db.from("kayitlar").select("id, yer, gizli, cevaplar").eq("id", g.id).maybeSingle();
+      if (!k || !k.gizli) throw new Hata("YK iş emri bulunamadı.");
+      const cevaplar = [...(Array.isArray(k.cevaplar) ? k.cevaplar : []), { ad: u.ad, rol, metin, at: new Date().toISOString() }];
+      const { error } = await db.from("kayitlar").update({ cevaplar }).eq("id", k.id);
+      if (error) throw error;
+      if (!u.cihaz.startsWith("test-")) {
+        await bildir(YONETIM_ISI_GOREN, `💬 YK cevabı • ${k.yer}`.slice(0, 80), `${u.ad}: ${metin}`.slice(0, 200), { kayitId: k.id, haric: u.cihaz });
+      }
+      return { cevaplar };
     }
 
     case "cevap_ver": {
