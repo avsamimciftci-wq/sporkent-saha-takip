@@ -829,3 +829,5 @@ body.gorucu-acik { overflow: hidden; }
   :root:not([data-theme="light"]) .satir-cevap.yk-cevap-kirmizi, :root:not([data-theme="light"]) .yk-cevap { background: #fff59d; }
   :root:not([data-theme="light"]) .satir-cevap.yk-cevap-kirmizi, :root:not([data-theme="light"]) .yk-cevap p { color: #c62828; }
 }
+
+.cevap-verildi { display: block; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dashed #f9a825; color: #1b5e20; font-weight: 900; font-size: 15px; letter-spacing: .3px; }
