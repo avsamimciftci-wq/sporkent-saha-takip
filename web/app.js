@@ -2217,7 +2217,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
 
   const isKarti = (x) => `<div class="prog-is">
-      <span class="saat">${x.saat ? kac(x.saat) : "—"}</span>
+      ${x.saat ? `<span class="saat">${kac(x.saat)}</span>` : ""}
       <span class="icerik"><b>${kac(x.baslik)}</b>
         ${x.aciklama ? `<small>${kac(x.aciklama)}</small>` : ""}
         <small>${TEKRAR[x.tekrar] ? `🔁 ${TEKRAR[x.tekrar]} · ` : ""}Giren: ${kac(x.ekleyen || "")}</small></span>
@@ -2274,21 +2274,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       <form id="prog-form" class="prog-form" ${progFormAcik ? "" : "hidden"}>
         <h2 style="margin-top:0">Yeni iş</h2>
         <label>Yapılacak iş
-          <input name="baslik" required maxlength="200" placeholder="Örn. Havuz bakımı kontrolü">
+          <textarea name="baslik" class="prog-is-yaz" required rows="6" maxlength="1000" placeholder="Örn. Ağaçlar bugün teslim edilecek"></textarea>
+          <small class="ipucu">Konuşarak yazmak için klavyedeki 🎤 mikrofon tuşuna basın.</small>
         </label>
-        <label>Açıklama (isteğe bağlı)
-          <textarea name="aciklama" rows="2" maxlength="2000"></textarea>
-        </label>
-        <label>Tarih
-          <input name="tarih" type="date" required value="${progTarih}">
-        </label>
-        <label>Saat (isteğe bağlı)
-          <input name="saat" type="time">
-        </label>
-        <fieldset class="tekrar-sec">
-          <legend>Ne sıklıkla?</legend>
-          ${[["yok", "Bir kez"], ["gunluk", "Her gün"], ["haftalik", "Her hafta"], ["aylik", "Her ay"]].map(([k, ad], i) => `<label><input type="radio" name="tekrar" value="${k}" ${i ? "" : "checked"}><span>${ad}</span></label>`).join("")}
-        </fieldset>
         <div class="dugmeler">
           <button type="button" class="ikincil" id="prog-vazgec">Vazgeç</button>
           <button class="ana-dugme" type="submit">Kaydet</button>
@@ -2339,8 +2327,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const d = e.target.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Kaydediliyor…";
     try {
-      await api("program_ekle", { baslik: f.get("baslik"), aciklama: f.get("aciklama"), tarih: f.get("tarih"), saat: f.get("saat"), tekrar: f.get("tekrar") });
-      progFormAcik = false; progTarih = String(f.get("tarih"));
+      // Tarih sorulmaz: iş bugüne yazılır (aylık takvimde bir gün seçiliyse o güne)
+      const tarih = progGorunum === "ay" ? progTarih : bugun();
+      await api("program_ekle", { baslik: f.get("baslik"), tarih, tekrar: "yok" });
+      progFormAcik = false; progTarih = tarih;
       mesaj("İş programına eklendi. Yönetim, müdür ve şefe bildirildi.");
       await programAc();
     } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Kaydet"; }

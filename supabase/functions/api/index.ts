@@ -921,7 +921,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih)) throw new Hata("Tarih seçin.");
       const tekrar: string = ["yok", "gunluk", "haftalik", "aylik"].includes(g.tekrar) ? g.tekrar : "yok";
       const saat = /^\d{2}:\d{2}$/.test(String(g.saat ?? "")) ? String(g.saat) : null;
-      const baslik = temiz(g.baslik, 200);
+      const baslik = temiz(g.baslik, 1000);
       if (!baslik) throw new Hata("Yapılacak işi yazın.");
       const { error } = await db.from("is_programi").insert({
         tarih, saat, tekrar, baslik, aciklama: temiz(g.aciklama) || null, ekleyen: u.ad, cihaz: u.cihaz, rol,
