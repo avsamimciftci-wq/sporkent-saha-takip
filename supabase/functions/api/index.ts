@@ -397,7 +397,7 @@ async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
   await acikTurlariKapat().catch(() => {});
   const { data: noktalar, error: e1 } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap, sira").eq("aktif", true).order("sira").order("id");
   if (e1) throw e1;
-  let q = db.from("devriye_turlari").select("id, cihaz, ad, rol, basla, bitis, bitis_nedeni, mesafe_m, nokta_sayisi, kesinti_sn").eq("gun", gun).order("basla");
+  let q = db.from("devriye_turlari").select("id, cihaz, ad, rol, basla, bitis, bitis_nedeni, mesafe_m, nokta_sayisi, kesinti_sn, cihaz_turu, ekran").eq("gun", gun).order("basla");
   if (!izleyen) q = q.eq("cihaz", u.cihaz); // müdür ve şef yalnızca kendi devriyesini görür
   const { data: turlar, error: e2 } = (izleyen || yapan) ? await q : { data: [], error: null };
   if (e2) throw e2;
@@ -937,7 +937,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       await acikTurlariKapat().catch(() => {});
       const { data: acik } = await db.from("devriye_turlari").select("*").eq("cihaz", u.cihaz).is("bitis", null).maybeSingle();
       if (acik) return { tur: acik, devam: true };
-      const { data, error } = await db.from("devriye_turlari").insert({ cihaz: u.cihaz, ad: u.ad, rol, gun: sonGun(new Date(), 0) }).select().single();
+      const { data, error } = await db.from("devriye_turlari").insert({ cihaz: u.cihaz, ad: u.ad, rol, gun: sonGun(new Date(), 0), cihaz_turu: temiz(g.cihaz_turu, 60) || null }).select().single();
       if (error) throw error;
       return { tur: data };
     }
@@ -965,6 +965,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("Yetkisiz.", 403);
       const { data: tur } = await db.from("devriye_turlari").select("*").eq("id", Number(g.tur_id)).eq("cihaz", u.cihaz).maybeSingle();
       if (!tur) throw new Hata("Devriye bulunamadı.", 404);
+      if (["kilit", "video", "yok"].includes(g.ekran)) await db.from("devriye_turlari").update({ ekran: g.ekran }).eq("id", tur.id);
       if (tur.bitis) return { tur };
       return { tur: await turKapat(tur, g.neden === "mesai" ? "mesai" : "kullanici", Number(g.bitis), Number(g.kesinti_sn)) };
     }

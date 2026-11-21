@@ -795,3 +795,11 @@ body.gorucu-acik { overflow: hidden; }
 .altlik-sec { display: flex; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .altlik-sec button { border: 0; padding: 8px 12px; font: inherit; font-size: 14px; font-weight: 800; background: #fff; color: #1b2421; cursor: pointer; }
 .altlik-sec button.secili { background: #1565c0; color: #fff; }
+
+.iz-uyanik { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; opacity: .01; pointer-events: none; z-index: -1; }
+.iz-durum .iz-ekran-ok { color: #2e7d32; font-weight: 700; }
+.tel-ayar { margin-top: 10px; border: 2px solid var(--cizgi); border-radius: 12px; padding: 8px 12px; background: var(--kart); }
+.tel-ayar summary { font-weight: 800; cursor: pointer; }
+.tel-ayar ol { margin: 8px 0 4px; padding-left: 20px; line-height: 1.45; font-size: 15px; }
+.tel-ayar li { margin-bottom: 4px; }
+.iz-tur-cihaz { font-size: 14px; color: var(--soluk); margin-top: 2px; }
