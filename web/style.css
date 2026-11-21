@@ -667,6 +667,33 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* Kutu sayısı tekse son kutu tam genişlik */
 .ana-kutu.tam { grid-column: 1 / -1; min-height: 120px; }
 
+/* ---------- Parsel Temsilcisi ---------- */
+.ak-parsel { background: linear-gradient(145deg, #c2185b, #880e4f); min-height: 170px; }
+.ana-kutu .parsel-foto { width: 96px; height: 96px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.2);
+  display: grid; place-items: center; overflow: hidden; font-size: 52px; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.ana-kutu .parsel-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.parsel-ust { margin-bottom: 14px; }
+.parsel-kart { background: var(--kart); border: 2px solid #c2185b; border-radius: 16px; padding: 14px; box-shadow: var(--golge); margin-bottom: 10px; }
+.parsel-kimlik { display: flex; align-items: center; gap: 14px; }
+.parsel-resim { flex: none; width: 78px; height: 78px; border-radius: 50%; overflow: hidden; background: #fce4ec; display: grid; place-items: center; font-size: 42px; border: 2px solid #c2185b; }
+.parsel-resim img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.parsel-kimlik small { display: block; font-size: 14px; font-weight: 700; color: #ad1457; }
+.parsel-kimlik b { display: block; font-size: 22px; line-height: 1.2; color: var(--yazi); }
+.parsel-tel { display: block; font-size: 18px; font-weight: 700; color: var(--yazi); margin-top: 2px; }
+.parsel-dugmeler { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.parsel-dugmeler a { display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 12px; color: #fff; font-weight: 800; font-size: 16px; text-decoration: none; text-align: center; padding: 4px; }
+.parsel-dugmeler a:active { transform: scale(.97); }
+.parsel-ara { background: #1565c0; }
+.parsel-wp { background: #1b8a4a; }
+.parsel-sms { background: #6a1b9a; }
+.parsel-resim-ekle { margin-top: 12px; }
+.parsel-not { margin: 0 0 4px; padding: 10px 12px; border-radius: 12px; background: #fce4ec; color: #5c0b2e; font-size: 15px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .parsel-kimlik small { color: #f48fb1; }
+  :root:not([data-theme="light"]) .parsel-not { background: #3b1426; color: #fce4ec; }
+  :root:not([data-theme="light"]) .parsel-resim { background: #3b1426; }
+}
+
 /* ---------- Servis Güzergahı ---------- */
 .bant-servis { background: #e65100; }
 .servis-harita { height: min(calc(100vh - 380px), 620px); min-height: 280px; border-radius: 12px; margin: 10px 0; position: relative; z-index: 0; border: 1px solid var(--cizgi); }

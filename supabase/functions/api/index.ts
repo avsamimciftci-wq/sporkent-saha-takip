@@ -40,6 +40,31 @@ const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef
 // Bu roller YK iş emrinin süresini görmez ve seçmez; süreyi yönetici ve yönetim kurulu belirler
 const SURE_GORMEYEN: Rol[] = ["mudur", "sef", "muhasebe"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
+
+// ---------- Parsel temsilcileri ----------
+// Ortak numarası aralığındaki temsilci: bu ortağın Saha Takip kaydı önce ona düşer
+async function temsilciBul(no: number | null | undefined) {
+  if (!no) return null;
+  const { data } = await db.from("parsel_temsilcileri").select("*").lte("no_bas", no).gte("no_bit", no).order("id").limit(1).maybeSingle();
+  return data as any;
+}
+// Kullanıcının temsilcisi olduğu parseller (temsilci, şahsi koduyla giren TG üyesidir; adı eşleşir)
+async function temsilcilikleri(u: any): Promise<any[]> {
+  if (u.rol !== "uye" || u.ortak_no) return [];
+  const { data } = await db.from("parsel_temsilcileri").select("*").eq("ad", u.ad).order("id");
+  return data ?? [];
+}
+async function temsilciGorunumu(liste: any[]) {
+  const yollar = liste.map((t) => t.resim).filter(Boolean);
+  const { data } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+  const harita = new Map((data ?? []).map((d: any) => [d.path, d.signedUrl]));
+  return liste.map((t) => ({ id: t.id, baslik: t.baslik, ad: t.ad, telefon: t.telefon, no_bas: t.no_bas, no_bit: t.no_bit, resim_url: t.resim ? harita.get(t.resim) ?? null : null }));
+}
+// Temsilcinin telefonlarına bildirim
+async function temsilciyeBildir(t: any, baslik: string, govde: string, ek: { kayitId?: number } = {}) {
+  const { data } = await db.from("uyeler").select("cihaz").eq("ad", t.ad).eq("rol", "uye").is("ortak_no", null).eq("durum", "onayli");
+  for (const x of data ?? []) await bildir({ cihaz: x.cihaz }, baslik, govde, ek);
+}
 const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
 // Bu dört görevin yazdığı kayıt doğrudan iş listesine düşer; diğerlerininki (TG üyesi, muhasebe)
 // önce yönetici / yönetim kurulu onayını bekler, onaylanınca herkes görür.
@@ -510,7 +535,7 @@ async function kimlik(g: any) {
 async function tumFotograflariSil() {
   const { data: klasorler } = await db.storage.from(BUCKET).list("", { limit: 1000 });
   for (const k of klasorler ?? []) {
-    if (k.name === "aidat" || k.name === "devriye") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
+    if (k.name === "aidat" || k.name === "devriye" || k.name === "temsilci") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
     for (;;) {
       const { data: dosyalar } = await db.storage.from(BUCKET).list(k.name, { limit: 1000 });
       if (!dosyalar?.length) break;
@@ -535,6 +560,16 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   const yonetici = () => { if (rol !== "baskan") throw new Hata("Bu işlemi yalnızca yönetici (YK başkanı) yapabilir.", 403); };
   // Cevap yazma ve yapılma süresi: yönetici ve yönetim kurulu
   const ykVeYonetici = () => { if (rol !== "baskan" && rol !== "yonetim") throw new Hata("Bu işlemi yalnızca yönetici ve yönetim kurulu yapabilir.", 403); };
+  // Onay bekleyen kaydı kim onaylar / reddeder: parsel temsilcisine düşmüşse yalnızca o temsilci,
+  // değilse yönetici ve yönetim kurulu
+  const onayYetkisi = async (id: unknown) => {
+    const { data: k } = await db.from("kayitlar").select("temsilci_id").eq("id", id).maybeSingle();
+    if (!k) throw new Hata("Kayıt bulunamadı ya da zaten onaylanmış.");
+    if (k.temsilci_id) {
+      const tIds = (await temsilcilikleri(u)).map((t) => t.id);
+      if (!tIds.includes(k.temsilci_id)) throw new Hata("Bu kaydı yalnızca ortağın parsel temsilcisi onaylar.", 403);
+    } else if (!KAYIT_ONAYLAYAN.includes(rol)) throw new Hata("Kayıtları yalnızca yönetici ve yönetim kurulu onaylar.", 403);
+  };
 
   // Onay bekleyen telefon yalnızca durumunu sorabilir ve bildirime kaydolabilir
   if (u.durum !== "onayli" && !["durum", "abone_ol", "izin_bildir"].includes(eylem)) {
@@ -548,15 +583,32 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "liste": {
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
-      // Onay bekleyen kaydı yalnızca yönetici, yönetim kurulu ve yazan kişi görür
-      if (!KAYIT_ONAYLAYAN.includes(rol)) q = q.or(`onay_durumu.eq.onayli,cihaz.eq.${u.cihaz}`);
+      // Onay bekleyen kaydı yazan kişi ve onaylayacak olan görür: ortağın kaydını parsel temsilcisi,
+      // diğerlerini yönetici ve yönetim kurulu
+      const temsil = await temsilcilikleri(u);
+      const tIds: number[] = temsil.map((t) => t.id);
+      const tKosul = tIds.length ? `,temsilci_id.in.(${tIds.join(",")})` : "";
+      q = KAYIT_ONAYLAYAN.includes(rol)
+        ? q.or(`onay_durumu.eq.onayli,temsilci_id.is.null,cihaz.eq.${u.cihaz}${tKosul}`)
+        : q.or(`onay_durumu.eq.onayli,cihaz.eq.${u.cihaz}${tKosul}`);
       const { data, error } = await q;
       if (error) throw error;
+      // Parsel temsilcisi: ortak kendi temsilcisini, temsilci kendi parsellerini, yönetici hepsini görür
+      let parsel: any;
+      if (rol === "uye" && (u as any).ortak_no) {
+        const t = await temsilciBul((u as any).ortak_no);
+        parsel = { ortak: true, temsilci: t ? (await temsilciGorunumu([t]))[0] : null };
+      } else if (rol === "baskan") {
+        const { data: hepsi } = await db.from("parsel_temsilcileri").select("*").order("id");
+        parsel = { temsilciler: await temsilciGorunumu(hepsi ?? []), resimEkler: true };
+      }
+      if (temsil.length) parsel = { ...(parsel ?? {}), temsilcilik: await temsilciGorunumu(temsil) };
       const verenler = [...new Set((data ?? []).filter((k: any) => k.gizli && k.cihaz).map((k: any) => k.cihaz))];
       const { data: vr } = verenler.length ? await db.from("uyeler").select("cihaz, rol").in("cihaz", verenler) : { data: [] };
       const verenRol = new Map((vr ?? []).map((x: any) => [x.cihaz, x.rol]));
       const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => {
         const x: any = { ...k, benim: c === u.cihaz };
+        if (k.onay_durumu === "bekliyor") x.onaylayabilir = k.temsilci_id ? tIds.includes(k.temsilci_id) : KAYIT_ONAYLAYAN.includes(rol);
         if (k.gizli) x.veren_rol = verenRol.get(c) ?? null;
         if (k.gizli && SURE_GORMEYEN.includes(rol)) x.son_tarih = null;
         return x;
@@ -596,11 +648,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         }
       }
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel };
     }
 
     case "yukleme_adresi": {
-      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -609,7 +661,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "yeni": {
       // Müdür, şef ve muhasebe Saha Takip'e kayıt girmez; yalnızca Yönetim Kurulu bölümünden iş emri verebilir.
       if (["mudur", "sef", "muhasebe"].includes(rol) && !g.gizli) throw new Hata(`${({ mudur: "Müdür", sef: "Şef", muhasebe: "Muhasebe" } as Record<string, string>)[rol]} Saha Takip'e kayıt giremez; Yönetim Kurulu bölümünden iş emri verebilir.`, 403);
+      // Ortağın kaydı önce parsel temsilcisinin onayına düşer
+      const temsilci = rol === "uye" && (u as any).ortak_no ? await temsilciBul((u as any).ortak_no) : null;
       const kayit = {
+        temsilci_id: temsilci?.id ?? null,
         bildiren: u.ad,
         cihaz: u.cihaz,
         yer: temiz(g.yer, 200),
@@ -619,11 +674,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         // YK iş emrinde süre emri veren tarafından seçilir (1-60 gün); diğer kayıtlarda varsayılan süre
         son_tarih: sonGun(new Date(), !!g.gizli && YONETIM_ISI_GIREN.includes(rol) && !SURE_GORMEYEN.includes(rol) && Number.isInteger(Number(g.sure)) && Number(g.sure) >= 1 && Number(g.sure) <= 60
           ? Number(g.sure) : await varsayilanSure()),
-        onay_durumu: onaysizGirer(u) ? "onayli" : "bekliyor",
+        onay_durumu: temsilci || !onaysizGirer(u) ? "bekliyor" : "onayli",
       };
       if (!kayit.yer || !kayit.sorun) throw new Hata("Yer ve sorun zorunlu.");
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
+      if (data.onay_durumu === "bekliyor" && temsilci) {
+        if (!u.cihaz.startsWith("test-")) {
+          await temsilciyeBildir(temsilci, `⏳ Onayınızı bekleyen kayıt ${data.no}`, `${u.ad} · ${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
+        }
+        const { cihaz: _c, ...donen } = data;
+        return { kayit: { ...donen, benim: true }, temsilci_ad: temsilci.ad };
+      }
       if (data.onay_durumu === "bekliyor") {
         await duyur(KAYIT_ONAYLAYAN, `⏳ Onay bekleyen kayıt ${data.no}`, `${u.ad} · ${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
         const { cihaz: _c, ...donen } = data;
@@ -770,7 +832,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "kayit_onayla": {
       // Yönetici ya da yönetim kurulu üyesi onaylar: kayıt iş listesine düşer, herkes görür.
       // Yapılma süresi onay gününden başlar.
-      if (!KAYIT_ONAYLAYAN.includes(rol)) throw new Hata("Kayıtları yalnızca yönetici ve yönetim kurulu onaylar.", 403);
+      // Ortağın kaydını yalnızca kendi parsel temsilcisi onaylar
+      await onayYetkisi(g.id);
       const { data, error } = await db.from("kayitlar").update({
         onay_durumu: "onayli", onaylayan: u.ad, onaylama_at: new Date().toISOString(),
         son_tarih: sonGun(new Date(), await varsayilanSure()),
@@ -782,11 +845,27 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "kayit_reddet": {
       // Onay bekleyen kaydı yönetici ya da yönetim kurulu reddeder: fotoğrafıyla silinir
-      if (!KAYIT_ONAYLAYAN.includes(rol)) throw new Hata("Kayıtları yalnızca yönetici ve yönetim kurulu reddeder.", 403);
-      const { data: k } = await db.from("kayitlar").select("id, foto_once, onay_durumu").eq("id", g.id).maybeSingle();
+      await onayYetkisi(g.id);
+      const { data: k } = await db.from("kayitlar").select("id, no, yer, cihaz, foto_once, onay_durumu, temsilci_id").eq("id", g.id).maybeSingle();
       if (!k || k.onay_durumu !== "bekliyor") throw new Hata("Kayıt bulunamadı ya da zaten onaylanmış.");
       if (k.foto_once) await db.storage.from(BUCKET).remove([k.foto_once]);
       await db.from("kayitlar").delete().eq("id", k.id);
+      // Temsilci onaylamadıysa kaydı yazan ortağa haber verilir
+      if (k.temsilci_id && k.cihaz) {
+        await duyur({ cihaz: k.cihaz }, `Kaydınız onaylanmadı ${k.no}`, `${k.yer}: parsel temsilciniz ${u.ad} bu kaydı onaylamadı. Kendisiyle görüşebilirsiniz.`.slice(0, 200), { sayfa: "parsel" });
+      }
+      return { tamam: true };
+    }
+
+    case "temsilci_resim": {
+      // Parsel temsilcisinin resmini yalnızca yönetici ekler / değiştirir
+      yonetici();
+      const yol = temiz(g.yol, 200);
+      if (!yol.startsWith("temsilci/")) throw new Hata("Resim yüklenemedi, tekrar deneyin.");
+      const { data: t } = await db.from("parsel_temsilcileri").select("id, resim").eq("id", g.id).maybeSingle();
+      if (!t) throw new Hata("Parsel temsilcisi bulunamadı.");
+      await db.from("parsel_temsilcileri").update({ resim: yol }).eq("id", t.id);
+      if (t.resim) await db.storage.from(BUCKET).remove([t.resim]);
       return { tamam: true };
     }
 

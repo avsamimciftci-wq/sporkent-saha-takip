@@ -19,6 +19,9 @@
   let oturum = sakla.al("sk_oturum");
   let kayitlar = [];
   let filtre = "acik";
+  // Parsel temsilcisi bilgisi: { ortak, temsilci } ortağa; { temsilciler, resimEkler } yöneticiye; { temsilcilik } temsilciye
+  let parsel = sakla.al("sk_parsel");
+  let parselModu = false; // Saha Takip "Parsel Temsilcisi" düğmesinden açıldı
 
   // ---------- Sunucu ----------
   class SunucuHatasi extends Error {
@@ -69,6 +72,9 @@
   // Yönetici ve yönetim kurulu, TG üyesi / muhasebe kayıtlarını onaylar; bu dört görevin kaydı onaysız düşer
   const kayitOnaylar = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const onayBekliyor = (k) => k.onay_durumu === "bekliyor";
+  // Bu kaydı ben onaylayabilir miyim (sunucu söyler: ortağın kaydını parsel temsilcisi, diğerlerini yönetim)
+  const benOnaylarim = (k) => onayBekliyor(k) && !!k.onaylayabilir;
+  const ortakMi = () => !!parsel?.ortak;
   // Yönetim Kurulu bölümüne girenler; muhasebe orada yalnızca YK Saha Takip'i görür
   const programGorur = () => ["baskan", "yonetim", "mudur", "sef", "muhasebe"].includes(oturum?.rol);
   const gorevGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
@@ -150,6 +156,7 @@
       ykUyeler = r.ykUyeler || [];
       if (r.varsayilan_sure) varsSure = r.varsayilan_sure;
       cevapKisiler = r.cevapKisiler || [];
+      parsel = r.parsel || null; sakla.koy("sk_parsel", parsel);
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
@@ -299,7 +306,7 @@
   const gorulduGonderilen = new Set();
 
   // Yönetici / yönetim kurulu için onay bekleyenler iş listesinde değil, ayrı düğmede
-  const listede = (k) => !(kayitOnaylar() && onayBekliyor(k));
+  const listede = (k) => !benOnaylarim(k);
   // Yönetici ve yönetim kurulunun verdiği iş emirleri (Yönetim İş Emri) genel listede değil, YK Saha Takip'te
   const genelde = (k) => !k.gizli;
 
@@ -307,12 +314,13 @@
     const saat = new Date().getHours();
     const selam = saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
     $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(hitap())} ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
-    const bekleyenKayit = kayitlar.filter(onayBekliyor);
+    parselUstCiz();
+    const bekleyenKayit = kayitlar.filter(benOnaylarim);
     const ou = $("#onay-uyari");
-    ou.hidden = !(kayitOnaylar() && bekleyenKayit.length);
+    ou.hidden = !bekleyenKayit.length;
     ou.classList.toggle("secili", filtre === "onay");
     ou.textContent = filtre === "onay" ? "⏳ Onay bekleyenler gösteriliyor · İş listesine dön" : `⏳ ${bekleyenKayit.length} kayıt onayınızı bekliyor`;
-    if (filtre === "onay" && !(kayitOnaylar() && bekleyenKayit.length)) filtre = "acik";
+    if (filtre === "onay" && !bekleyenKayit.length) filtre = "acik";
     const genel = kayitlar.filter(genelde);
     const acik = genel.filter((k) => k.durum !== "tamam" && listede(k)).length;
     const yapilan = genel.filter((k) => k.durum === "tamam").length;
@@ -335,7 +343,7 @@
     if (!$("#ekran-ana").hidden) anaAc(); // ana sayfadaki "onay bekliyor" sayısı güncellensin
 
     const gorunen = siraya(genel
-      .filter((k) => (filtre === "onay" ? onayBekliyor(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k))), filtre);
+      .filter((k) => (filtre === "onay" ? benOnaylarim(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k))), filtre);
 
     $("#liste").innerHTML = gorunen.length ? gorunen.map(satirHtml).join("") : `<p class="bos">${filtre === "tamam" ? "Henüz yapılan iş yok." : filtre === "onay" ? "Onay bekleyen kayıt yok." : "Henüz yapılmayan iş yok. 👍"}</p>`;
     if (!$("#ekran-yksaha").hidden) ykSahaCiz();
@@ -417,15 +425,17 @@
         ${k.gizli && programGorur() ? `<button class="geri" data-geri-yksaha>← Geri</button>` : `<button class="geri" data-geri>← İş Listesini Gör</button>`}
         ${k.durum === "tamam" ? `<span class="rozet ${DURUM_ROZET[k.durum]}">${DURUM[k.durum]}</span>` : ""}
       </div>
-      ${bekliyor && kayitOnaylar() ? `
+      ${benOnaylarim(k) ? `
       <div class="onay-kutu">
         <h2>⏳ Bu kayıt onayınızı bekliyor</h2>
-        <p style="margin:0 0 10px">Onaylarsanız iş listesine düşer ve herkes görür. Reddederseniz silinir.</p>
+        ${k.temsilci_id ? `<p style="margin:0 0 6px">Parsel temsilcisi olarak <b>${kac(k.bildiren)}</b> ortağımızın kaydı size düştü.</p>` : ""}
+        <p style="margin:0 0 10px">Onaylarsanız ${k.temsilci_id ? "genel Saha Takip'e" : "iş listesine"} düşer ve herkes görür. ${k.temsilci_id ? "Onaylamazsanız silinir, ortağa bildirilir." : "Reddederseniz silinir."}</p>
         <div class="dugmeler">
-          <button type="button" class="ikincil tehlike" id="kayit-reddet">✖ Reddet</button>
+          <button type="button" class="ikincil tehlike" id="kayit-reddet">${k.temsilci_id ? "✖ Onaylamıyorum" : "✖ Reddet"}</button>
           <button type="button" class="ana-dugme" id="kayit-onayla">✔ Onayla</button>
         </div>
-      </div>` : bekliyor ? `<p class="onay-kutu">⏳ Kaydınız yönetimin onayını bekliyor. Onaylanınca iş listesine düşer ve herkes görür.</p>` : ""}
+      </div>` : bekliyor && k.temsilci_id ? `<p class="onay-kutu">⏳ Kaydınız parsel temsilcinizin${parsel?.temsilci ? ` (<b>${kac(parsel.temsilci.ad)}</b>)` : ""} onayını bekliyor. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
+        : bekliyor ? `<p class="onay-kutu">⏳ Kaydınız yönetimin onayını bekliyor. Onaylanınca iş listesine düşer ve herkes görür.</p>` : ""}
       ${k.gizli ? `<p class="gizli-not">🔒 YK iş emri: yalnızca yönetici, yönetim kurulu, muhasebe, müdür ve şef görür.</p>` : ""}
       <h1>${kac(k.yer)}</h1>
       <p style="margin:0 0 6px">${kac(k.sorun)}</p>
@@ -690,7 +700,7 @@
 
   // ---------- Giriş / onay bekleme / çıkış ----------
   function cikisYap() {
-    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen");
+    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen"); sakla.sil("sk_parsel"); parsel = null;
     kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); girisEkrani(); goster("giris");
   }
 
@@ -881,6 +891,7 @@
     await yenile();
     if (!location.hash || location.hash === "#ana") return anaAc();
     if (location.hash === "#servis") return servisAc();
+    if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -1905,9 +1916,70 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   // ---------- Modüller: alt menü ----------
   function sahaAc() {
+    parselModu = false;
     history.replaceState(null, "", location.pathname);
     goster("liste"); listeCiz();
   }
+  // Parsel Temsilcisi düğmesi: Saha Takip, üstünde temsilcinin adı ve telefonu
+  function parselAc() {
+    parselModu = true;
+    if (location.hash !== "#parsel") history.replaceState(null, "", "#parsel");
+    goster("liste"); listeCiz();
+  }
+  const telefonYaz = (t) => {
+    const d = String(t || "").replace(/\D/g, "").replace(/^90(?=5\d{9}$)/, "");
+    return /^5\d{9}$/.test(d) ? `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}` : String(t || "");
+  };
+  const telefonUluslararasi = (t) => { const d = String(t || "").replace(/\D/g, ""); return d.startsWith("0") ? "90" + d.slice(1) : d.length === 10 ? "90" + d : d; };
+  const parselFotoHtml = (t) => t?.resim_url ? `<img src="${kac(t.resim_url)}" alt="${kac(t.ad)}">` : `<span>👤</span>`;
+  function temsilciKart(t, resimEkler) {
+    const tel = t.telefon ? telefonUluslararasi(t.telefon) : "";
+    return `
+      <div class="parsel-kart">
+        <div class="parsel-kimlik">
+          <div class="parsel-resim">${parselFotoHtml(t)}</div>
+          <div>
+            <small>${kac(t.baslik)}</small>
+            <b>${kac(t.ad)}</b>
+            ${t.telefon ? `<span class="parsel-tel">📞 ${kac(telefonYaz(t.telefon))}</span>` : ""}
+          </div>
+        </div>
+        ${tel ? `<div class="parsel-dugmeler">
+          <a class="parsel-ara" href="tel:+${kac(tel)}">📞 Ara</a>
+          <a class="parsel-wp" href="https://wa.me/${kac(tel)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+          <a class="parsel-sms" href="sms:+${kac(tel)}">✉️ Mesaj</a>
+        </div>` : ""}
+        ${resimEkler ? `<label class="foto-dugme parsel-resim-ekle"><input type="file" accept="image/*" data-temsilci-resim="${t.id}" hidden><span>📷 ${t.resim_url ? "Resmi değiştir" : "Resim ekle"}</span></label>
+          <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
+      </div>`;
+  }
+  function parselUstCiz() {
+    const kutu = $("#parsel-ust");
+    let html = "";
+    if (ortakMi()) {
+      html = parsel.temsilci
+        ? temsilciKart(parsel.temsilci) + `<p class="parsel-not">Yeni kaydınız önce parsel temsilcinize gider. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
+        : `<p class="parsel-not">Ortak numaranız için parsel temsilcisi henüz belirlenmedi. Yeni kaydınız yönetimin onayına gider.</p>`;
+    } else if (parselModu && parsel?.temsilciler) {
+      html = parsel.temsilciler.length ? parsel.temsilciler.map((t) => temsilciKart(t, parsel.resimEkler)).join("")
+        : `<p class="parsel-not">Henüz parsel temsilcisi tanımlanmadı.</p>`;
+    }
+    kutu.innerHTML = html;
+    kutu.hidden = !html;
+  }
+  $("#parsel-ust").addEventListener("change", async (e) => {
+    const id = e.target.dataset?.temsilciResim; if (!id) return;
+    const f = e.target.files?.[0]; if (!f) return;
+    const etiket = e.target.nextElementSibling;
+    etiket.textContent = "Yükleniyor…";
+    try {
+      const blob = await kucult(f, 1024);
+      const yol = await fotoYukle(blob, "temsilci");
+      await api("temsilci_resim", { id: Number(id), yol });
+      await yenile();
+      mesaj("Parsel temsilcisinin resmi eklendi.");
+    } catch (err) { mesaj(err.message); etiket.textContent = "📷 Resim ekle"; e.target.value = ""; }
+  });
   function yonetimIsleriAc() {
     if (!programGorur()) return;
     for (const id of ["#program-ac", "#gorevler-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
@@ -1930,7 +2002,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -1943,19 +2015,30 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    // Ortaklar Saha Takip'i görmez; onun yerine Parsel Temsilcisi düğmesi (yönetici de görür, resmi o ekler)
+    $("#ana-kutular [data-ac=saha]").hidden = ortakMi();
+    const pk = $("#ana-kutular [data-ac=parsel]");
+    pk.hidden = !(ortakMi() || yonetici());
+    const pt = ortakMi() ? parsel.temsilci : parsel?.temsilciler?.[0];
+    $("#ana-parsel-foto").innerHTML = pt?.resim_url ? `<img src="${kac(pt.resim_url)}" alt="">` : "👤";
+    pk.querySelector("small").textContent = ortakMi() ? (pt ? `${pt.ad} · ${telefonYaz(pt.telefon)}` : "Henüz belirlenmedi")
+      : parsel?.temsilciler?.length ? parsel.temsilciler.map((t) => t.ad).join(", ") : "";
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
-    // Görünen kutu sayısı tekse son kutu tam genişlik olsun
-    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu")].filter((k) => !k.hidden);
+    // Görünen kutu sayısı tekse son kutu tam genişlik olsun (Parsel Temsilcisi hep tam genişlik)
+    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
     for (const [kutu, rozet] of [["saha", "#saha-rozet"], ["yonetim", "#yk-rozet"]]) {
       const r = $(rozet), k = $(`#ana-kutular [data-ac=${kutu}] small`);
       k.textContent = r && !r.hidden && r.textContent ? r.textContent : "";
     }
+    // Onayımı bekleyen kayıt (parsel temsilcisi / yönetim) varsa Saha Takip düğmesinde yazsın
+    const onayimda = kayitlar.filter(benOnaylarim).length;
+    if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -2333,7 +2416,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         gizli: yonetimIsiGirebilir() && yeniTur === "yonetim",
         sure: yonetimIsiGirebilir() && yeniTur === "yonetim" && !sureGormez() ? emirGun : undefined,
       });
-      mesaj(r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
+      mesaj(r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad ? `Kayıt ${r.kayit.no} parsel temsilcinize (${r.temsilci_ad}) iletildi. Onaylarsa genel Saha Takip'e düşecek.`
+        : r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       // Kendi açtığımız kayıt için pencere açılmasın
       sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
@@ -2348,6 +2432,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   window.addEventListener("hashchange", async () => {
     if (!onayli()) return;
     if (location.hash === "#ana") return anaAc();
+    if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#saha" || (location.hash === "" && $("#ekran-liste").hidden)) return sahaAc();
     if (location.hash === "#servis" && $("#ekran-servis").hidden) return servisAc();
     if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();
