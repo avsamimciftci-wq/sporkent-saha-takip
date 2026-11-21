@@ -697,6 +697,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 
 /* ---------- Servis Güzergahı ---------- */
 .bant-servis { background: #e65100; }
+.bant-parsel { background: #ad1457; }
 .servis-harita { height: min(calc(100vh - 380px), 620px); min-height: 280px; border-radius: 12px; margin: 10px 0; position: relative; z-index: 0; border: 1px solid var(--cizgi); }
 .servis-kayit-bant { display: flex; align-items: center; justify-content: center; gap: 8px; background: #c62828; color: #fff; font-weight: 800; border-radius: 10px; padding: 6px; letter-spacing: .05em; }
 .kayit-nokta { width: 12px; height: 12px; border-radius: 50%; background: #fff; animation: kayit-yanip 1s infinite; }

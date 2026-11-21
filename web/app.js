@@ -21,7 +21,6 @@
   let filtre = "acik";
   // Parsel temsilcisi bilgisi: { ortak, temsilci } ortağa; { temsilciler, resimEkler } yöneticiye; { temsilcilik } temsilciye
   let parsel = sakla.al("sk_parsel");
-  let parselModu = false; // Saha Takip "Parsel Temsilcisi" düğmesinden açıldı
 
   // ---------- Sunucu ----------
   class SunucuHatasi extends Error {
@@ -167,6 +166,7 @@
       if (r.varsayilan_sure) varsSure = r.varsayilan_sure;
       cevapKisiler = r.cevapKisiler || [];
       parsel = r.parsel || null; sakla.koy("sk_parsel", parsel);
+      if (!$("#ekran-parsel").hidden) parselCiz();
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
@@ -1926,15 +1926,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   // ---------- Modüller: alt menü ----------
   function sahaAc() {
-    parselModu = false;
     history.replaceState(null, "", location.pathname);
     goster("liste"); listeCiz();
   }
-  // Parsel Temsilcisi düğmesi: Saha Takip, üstünde temsilcinin adı ve telefonu
+  // Parsel Temsilcisi: ayrı ekran; temsilcinin resmi, adı, telefonu ve iletişim düğmeleri
   function parselAc() {
-    parselModu = true;
     if (location.hash !== "#parsel") history.replaceState(null, "", "#parsel");
-    goster("liste"); listeCiz();
+    goster("parsel"); parselCiz();
   }
   const telefonYaz = (t) => {
     const d = String(t || "").replace(/\D/g, "").replace(/^90(?=5\d{9}$)/, "");
@@ -1960,24 +1958,30 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <a class="parsel-sms" href="sms:+${kac(tel)}">✉️ Mesaj</a>
         </div>` : ""}
         ${resimEkler ? `<label class="foto-dugme parsel-resim-ekle"><input type="file" accept="image/*" data-temsilci-resim="${t.id}" hidden><span>📷 ${t.resim_url ? "Resmi değiştir" : "Resim ekle"}</span></label>
-          <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilciliği-Saha Takip" düğmesinde görünür.</small>` : ""}
+          <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
-  function parselUstCiz() {
-    const kutu = $("#parsel-ust");
-    let html = "";
+  // Parsel Temsilcisi ekranı: ortağa kendi temsilcisi, yöneticiye bütün temsilciler (resim ekleyerek)
+  function parselCiz() {
+    let html;
     if (ortakMi()) {
       html = parsel.temsilci
-        ? temsilciKart(parsel.temsilci) + `<p class="parsel-not">Yeni kaydınız önce parsel temsilcinize gider. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
-        : `<p class="parsel-not">Ortak numaranız için parsel temsilcisi henüz belirlenmedi. Yeni kaydınız yönetimin onayına gider.</p>`;
-    } else if (parselModu && parsel?.temsilciler) {
+        ? temsilciKart(parsel.temsilci) + `<p class="parsel-not">Saha Takip'e yazdığınız yeni kayıt önce parsel temsilcinize gider. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
+        : `<p class="parsel-not">Ortak numaranız için parsel temsilcisi henüz belirlenmedi.</p>`;
+    } else if (parsel?.temsilciler) {
       html = parsel.temsilciler.length ? parsel.temsilciler.map((t) => temsilciKart(t, parsel.resimEkler)).join("")
         : `<p class="parsel-not">Henüz parsel temsilcisi tanımlanmadı.</p>`;
-    }
-    kutu.innerHTML = html;
-    kutu.hidden = !html;
+    } else html = `<p class="bos">Yükleniyor…</p>`;
+    $("#parsel-icerik").innerHTML = html;
   }
-  $("#parsel-ust").addEventListener("change", async (e) => {
+  // Saha Takip'te ortağa kısa hatırlatma: yeni kaydı önce temsilcisine gider
+  function parselUstCiz() {
+    const kutu = $("#parsel-ust");
+    const t = ortakMi() ? parsel.temsilci : null;
+    kutu.innerHTML = t ? `<p class="parsel-not">Yeni kaydınız önce parsel temsilciniz <b>${kac(t.ad)}</b> onaylayınca genel Saha Takip'e düşer.</p>` : "";
+    kutu.hidden = !t;
+  }
+  $("#parsel-icerik").addEventListener("change", async (e) => {
     const id = e.target.dataset?.temsilciResim; if (!id) return;
     const f = e.target.files?.[0]; if (!f) return;
     const etiket = e.target.nextElementSibling;
@@ -1987,6 +1991,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       const yol = await fotoYukle(blob, "temsilci");
       await api("temsilci_resim", { id: Number(id), yol });
       await yenile();
+      parselCiz();
       mesaj("Parsel temsilcisinin resmi eklendi.");
     } catch (err) { mesaj(err.message); etiket.textContent = "📷 Resim ekle"; e.target.value = ""; }
   });
@@ -2025,8 +2030,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
-    // Ortaklar Saha Takip'i görmez; onun yerine Parsel Temsilcisi düğmesi (yönetici de görür, resmi o ekler)
-    $("#ana-kutular [data-ac=saha]").hidden = ortakMi();
+    // Parsel Temsilcisi düğmesi ortaklarda ve yöneticide (resmi o ekler); Saha Takip herkeste ayrı düğme
     const pk = $("#ana-kutular [data-ac=parsel]");
     pk.hidden = !(ortakMi() || yonetici());
     const pt = ortakMi() ? parsel.temsilci : parsel?.temsilciler?.[0];
