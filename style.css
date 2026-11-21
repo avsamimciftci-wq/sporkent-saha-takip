@@ -490,7 +490,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .prog-is { display: flex; gap: 10px; align-items: flex-start; padding: 12px; margin-bottom: 8px; border: 2px solid var(--cizgi); border-left: 6px solid #00695c; border-radius: 12px; background: var(--kart); }
 .prog-is .saat { flex: none; font-weight: 800; color: #00695c; min-width: 52px; }
 .prog-is .icerik { flex: 1; min-width: 0; }
-.prog-is b { display: block; font-size: 17px; }
+.prog-is b { display: block; font-size: 17px; white-space: pre-line; overflow-wrap: anywhere; }
 .prog-is small { display: block; color: var(--soluk); font-size: 14px; margin-top: 2px; }
 .prog-is .sil { flex: none; background: var(--acil-zemin); color: var(--acil); border: 0; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 700; padding: 8px 10px; cursor: pointer; }
 .prog-bos { color: var(--soluk); font-size: 15px; margin: 0 0 4px 4px; }
@@ -502,6 +502,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .prog-ay button.dolu { background: #e0f2f1; border-color: #00695c; }
 .prog-ay button i { font-style: normal; font-size: 12px; font-weight: 800; color: #fff; background: #00695c; border-radius: 99px; padding: 0 6px; margin-top: 2px; }
 .prog-form { margin-top: 8px; padding: 14px; border: 2px solid #00695c; border-radius: 14px; }
+.prog-form .prog-is-yaz { min-height: 170px; font-size: 19px; line-height: 1.4; resize: vertical; }
 .tekrar-sec { border: 0; padding: 0; margin: 0 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tekrar-sec legend { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
 .tekrar-sec label { margin: 0; }
