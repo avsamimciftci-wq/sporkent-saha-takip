@@ -64,7 +64,7 @@ img { -webkit-user-drag: none; }
 }
 .ust-sol { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .ust-logo {
-  width: 70px; height: 70px; flex: none; border-radius: 14px;
+  width: 105px; height: 105px; flex: none; border-radius: 14px; /* Ana Sayfaya Dön düğmesiyle aynı yükseklik */
   background: #fff; object-fit: contain; padding: 2px;
   box-shadow: 0 0 0 2px rgba(255,255,255,.35);
   -webkit-user-drag: none; pointer-events: none;
@@ -640,7 +640,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 
 /* ---------- Ana sayfa ---------- */
 .ust-ana { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #1565c0;
-  color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 8px 12px; box-sizing: border-box; width: 159px; text-align: center; line-height: 1.15; min-height: 76px; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
+  color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 8px 12px; box-sizing: border-box; width: 159px; height: 105px; text-align: center; line-height: 1.15; min-height: 76px; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
   box-shadow: 0 4px 14px rgba(0,0,0,.35); text-shadow: 0 1px 2px rgba(0,0,0,.3); }
 .ust-ana:active { transform: scale(.96); background: #0d47a1; }
 .ust-ana span { font-size: 32px; line-height: 1; }
@@ -738,21 +738,20 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 @media (max-width: 430px) {
   .ust { padding: calc(8px + env(safe-area-inset-top)) 12px 8px; gap: 8px; }
   .ust-sol { gap: 9px; }
-  .ust-logo { width: 60px; height: 60px; }
-  .ust-baslik { font-size: 28.6px; white-space: nowrap; }
-  .ust-ana { padding: 6px 8px; width: 130px; min-height: 66px; font-size: 15px; border-radius: 14px; }
+  /* Logo, sağdaki "Ana Sayfaya Dön" düğmesiyle aynı yükseklikte (92 px) kare */
+  .ust-logo { width: 92px; height: 92px; }
+  /* Sığmadığı telefonda SAHA / TAKİP iki satıra bölünür, düğmenin altına girmez */
+  .ust-baslik { font-size: 28.6px; line-height: 1.05; white-space: normal; }
+  .ust-ana { padding: 6px 8px; width: 130px; height: 92px; min-height: 0; font-size: 15px; border-radius: 14px; }
   .ust-ana span { font-size: 28px; }
 }
-/* 375 px telefonlar (çoğu iPhone): başlık sağdaki Ana Sayfaya Dön düğmesinin altına girmesin */
-@media (min-width: 361px) and (max-width: 400px) {
-  .ust-logo { width: 56px; height: 56px; }
-  .ust-baslik { font-size: 26px; }
+/* En dar telefonlar (iPhone SE 1. nesil, 320 px): TAKİP düğmenin altına girmesin */
+@media (max-width: 340px) {
+  .ust-baslik { font-size: 22px; }
 }
 @media (max-width: 360px) {
   .alt-menu .ad-uzun { display: none; }
   .alt-menu .ad-kisa { display: inline; }
-  .ust-logo { width: 52px; height: 52px; }
-  .ust-baslik { font-size: 24.7px; }
   .alt-menu { gap: 2px; padding-left: 3px; padding-right: 3px; }
   .alt-menu button, .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button { font-size: 10.5px; padding: 5px 1px 6px; border-radius: 10px; min-height: 60px; }
   .alt-menu button span, .alt-menu:has(> [data-modul="yonetim"]:not([hidden])) button span { font-size: 20px; }
