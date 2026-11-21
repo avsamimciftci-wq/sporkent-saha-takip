@@ -129,6 +129,16 @@
     const m = $("#alt-menu"); if (!m.hidden) document.documentElement.style.setProperty("--menu-h", m.offsetHeight + "px");
   }).observe($("#alt-menu"));
 
+  // Ana sayfa düğmeleri ekrana kaydırmadan sığsın: üst bandın (ve devriye çubuğunun) gerçek yüksekliği
+  function ustYukseklik() {
+    const iz = $("#iz-cubuk");
+    const h = $(".ust").offsetHeight + (iz && !iz.hidden ? iz.offsetHeight : 0);
+    document.documentElement.style.setProperty("--ust-h", h + "px");
+  }
+  if ("ResizeObserver" in window) { const ro = new ResizeObserver(ustYukseklik); ro.observe($(".ust")); ro.observe($("#iz-cubuk")); }
+  window.addEventListener("resize", ustYukseklik);
+  ustYukseklik();
+
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     if (ad !== "servis" && typeof servisHaritaKapat === "function") servisHaritaKapat();
@@ -1950,7 +1960,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <a class="parsel-sms" href="sms:+${kac(tel)}">✉️ Mesaj</a>
         </div>` : ""}
         ${resimEkler ? `<label class="foto-dugme parsel-resim-ekle"><input type="file" accept="image/*" data-temsilci-resim="${t.id}" hidden><span>📷 ${t.resim_url ? "Resmi değiştir" : "Resim ekle"}</span></label>
-          <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
+          <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilciliği-Saha Takip" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
   function parselUstCiz() {
