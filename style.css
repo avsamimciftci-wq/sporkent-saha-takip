@@ -840,3 +840,7 @@ body.gorucu-acik { overflow: hidden; }
 .cevap-ozet { display: block; margin-top: 4px; font-size: 13px; color: #5d4037; font-weight: 700; }
 
 .ak-uyeler { background: linear-gradient(145deg, #546e7a, #263238); }
+
+/* İş Programı: kazma ile çalışan işçi */
+.isci-ikon { position: relative; display: inline-block; transform: translateX(-12px); }
+.isci-ikon b { position: absolute; right: -24px; bottom: -4px; font-size: 34px; font-weight: normal; transform: rotate(-20deg); }
