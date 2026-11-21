@@ -639,11 +639,11 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 }
 
 /* ---------- Ana sayfa ---------- */
-.ust-ana { flex: none; display: flex; flex-direction: column; align-items: center; gap: 0; background: #ffc107;
-  color: #1b2421; border: 2px solid #fff; border-radius: 12px; padding: 4px 10px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
-  box-shadow: 0 3px 10px rgba(0,0,0,.3); }
-.ust-ana:active { transform: scale(.96); }
-.ust-ana span { font-size: 22px; line-height: 1.1; }
+.ust-ana { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #ff6d00;
+  color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 8px 16px; min-width: 96px; min-height: 76px; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.ust-ana:active { transform: scale(.96); background: #e65100; }
+.ust-ana span { font-size: 32px; line-height: 1; }
 .ust-ana[hidden] { display: none; }
 .ana-karsilama { margin: 0 0 12px; font-size: 18px; color: var(--soluk); }
 .ana-karsilama b { color: var(--yazi); }
@@ -712,8 +712,8 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
   .ust-logo { width: 46px; height: 46px; }
   .ust-kurum { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ust-baslik { font-size: 22px; white-space: nowrap; }
-  .ust-ana { padding: 3px 8px; font-size: 11px; border-radius: 10px; }
-  .ust-ana span { font-size: 18px; }
+  .ust-ana { padding: 6px 10px; min-width: 84px; min-height: 66px; font-size: 15px; border-radius: 14px; }
+  .ust-ana span { font-size: 28px; }
 }
 @media (max-width: 360px) {
   .alt-menu .ad-uzun { display: none; }

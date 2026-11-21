@@ -131,8 +131,9 @@
     // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
     const menulu = !["giris", "bekle", "ana"].includes(ad) && onayli();
     $("#ana-don").hidden = !menulu;
-    $("#alt-menu").hidden = !menulu;
-    document.body.classList.toggle("menulu", menulu);
+    // Alt menü kaldırıldı: bölümlere Ana Sayfa'dan geçilir
+    $("#alt-menu").hidden = true;
+    document.body.classList.toggle("menulu", false);
     const modul = MODUL[ad] ?? "saha";
     $("#alt-menu [data-modul=yonetim]").hidden = !programGorur();
     for (const b of document.querySelectorAll("#alt-menu [data-modul]")) b.classList.toggle("secili", b.dataset.modul === modul);
