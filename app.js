@@ -1247,9 +1247,36 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const izSuruyor = () => !!iz && !iz.bitis;
   const izYapar = () => ["mudur", "sef"].includes(oturum?.rol);
 
-  async function izEkranAcik() {
-    try { if ("wakeLock" in navigator && !izKilit && document.visibilityState === "visible") { izKilit = await navigator.wakeLock.request("screen"); izKilit.addEventListener("release", () => { izKilit = null; }); } } catch {}
+  // Ekranı açık tutma: önce Wake Lock. iPhone'da ana ekran uygulamasında Wake Lock eski iOS sürümlerinde
+  // hata vermeden çalışmayabildiği için ayrıca görünmez, sessiz, döngüde oynayan küçük bir video da çalışır.
+  let izUyanik = null, izEkranYontemi = "";
+  const iPhoneMu = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  function izVideoBaslat() {
+    if (!izUyanik) {
+      const v = document.createElement("video");
+      v.src = "veri/uyanik.mp4"; v.muted = true; v.loop = true; v.playsInline = true;
+      v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
+      v.className = "iz-uyanik"; document.body.appendChild(v); izUyanik = v;
+    }
+    const p = izUyanik.play();
+    if (p) p.then(() => { if (!izKilit || iPhoneMu()) izEkranYontemi = izKilit ? "kilit" : "video"; izDurumYaz(); }).catch(() => {});
   }
+  async function izEkranAcik() {
+    if (document.visibilityState !== "visible") return;
+    try {
+      if ("wakeLock" in navigator && !izKilit) {
+        izKilit = await navigator.wakeLock.request("screen");
+        izKilit.addEventListener("release", () => { izKilit = null; if (!izUyanik || izUyanik.paused) izEkranYontemi = ""; izDurumYaz(); });
+      }
+    } catch { izKilit = null; }
+    if (izKilit) izEkranYontemi = "kilit";
+    if (!izKilit || iPhoneMu()) izVideoBaslat();
+    izDurumYaz();
+  }
+  const cihazTuru = () => {
+    const u = navigator.userAgent, ios = u.match(/OS (\d+)[_.](\d+)/), an = u.match(/Android (\d+(?:\.\d+)?)/);
+    return iPhoneMu() ? `iPhone · iOS ${ios ? ios[1] + "." + ios[2] : "?"}` : an ? `Android ${an[1]}` : "Diğer";
+  };
   function izKonum(p) {
     if (!izSuruyor()) return;
     const { latitude: lat, longitude: lng, accuracy } = p.coords;
@@ -1302,14 +1329,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (izIzle != null) navigator.geolocation.clearWatch(izIzle);
     izIzle = null;
     try { izKilit?.release(); } catch {} izKilit = null;
+    if (izUyanik) { izUyanik.pause(); izUyanik.remove(); izUyanik = null; }
     if (izCanli.ben) { izCanli.ben.remove(); izCanli.ben = null; }
   }
   async function devriyeBaslat(b) {
     if (!navigator.geolocation) return mesaj("Bu telefon konum vermiyor.");
     if (!mesaideMi()) return mesaj(`Devriye yalnızca mesai saatlerinde (${mesaiBilgi().metin}) başlatılabilir.`);
     b.disabled = true; b.textContent = "Başlatılıyor…";
+    if (iPhoneMu()) izVideoBaslat(); // iPhone: dokunma anında başlatılmalı
     try {
-      const r = await api("tur_basla");
+      const r = await api("tur_basla", { cihaz_turu: cihazTuru() });
       iz = { tur: r.tur.id, basla: Date.parse(r.tur.basla), son: null, kuyruk: [], cizgi: [], mesafe: 0, sayi: 0,
         kopukSonraki: !!r.devam, kesinti: 0, gizli: null, bitis: null, neden: null, uyarilar: [] };
       izSakla(); izIzlemeyiAc();
@@ -1320,7 +1349,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   async function devriyeBitir(neden = "kullanici") {
     if (!izSuruyor()) return;
     izIzlemeyiKapat();
-    iz.bitis = Date.now(); iz.neden = neden; izSakla();
+    iz.bitis = Date.now(); iz.neden = neden; iz.ekran = iz.ekranGordu ? (iz.ekranGordu === "video" ? "video" : "kilit") : "yok"; izSakla();
     if (neden === "mesai") mesaj("Mesai saati bitti; devriye kaydı kendiliğinden durduruldu.");
     await izTamamla(true);
   }
@@ -1330,7 +1359,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     for (let i = 0; i < 10 && iz?.kuyruk.length; i++) if (!(await izGonder())) break;
     if (iz?.kuyruk.length) { izZamanlayici(); izCubuk(); if (ekrandan) mesaj("Devriye bitti. İnternet gelince bilgiler kendiliğinden gönderilecek."); return gorevCizGuvenli(); }
     try {
-      const r = await api("tur_bitir", { tur_id: iz.tur, bitis: iz.bitis, neden: iz.neden, kesinti_sn: Math.round(iz.kesinti) });
+      const r = await api("tur_bitir", { tur_id: iz.tur, bitis: iz.bitis, neden: iz.neden, kesinti_sn: Math.round(iz.kesinti), ekran: iz.ekran || "yok" });
       iz = null; izSakla(); clearInterval(izZaman); izCubuk();
       mesaj(`✓ Devriye kaydedildi: ${izSure(Date.parse(r.tur.bitis) - Date.parse(r.tur.basla))} · ${kmYazisi(r.tur.mesafe_m)}. Yöneticiye bildirildi.`);
       if (!$("#ekran-gorevler").hidden) gorevlerAc("gunluk");
@@ -1384,7 +1413,12 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     k.innerHTML = `<b>${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}</b>
       <span>${kmYazisi(iz.mesafe)} · ${iz.sayi} nokta${iz.kuyruk.length ? ` · ${iz.kuyruk.length} gönderilmeyi bekliyor` : ""}</span>
       ${izSonDurum ? `<small class="iz-uyari-satir">${kac(izSonDurum)}</small>` : !iz.son ? `<small>Konum bekleniyor… İlk seferde telefon izin sorarsa <b>İzin ver</b>'e dokunun.</small>` : ""}
-      ${iz.cevrimdisi ? `<small class="iz-uyari-satir">İnternet yok: noktalar telefonda saklanıyor, bağlantı gelince gönderilecek.</small>` : ""}`;
+      ${iz.cevrimdisi ? `<small class="iz-uyari-satir">İnternet yok: noktalar telefonda saklanıyor, bağlantı gelince gönderilecek.</small>` : ""}
+      ${iz.bitis ? "" : izEkranYontemi ? `<small class="iz-ekran-ok">🔆 Ekran açık tutuluyor</small>`
+        : `<small class="iz-uyari-satir">⚠ Bu telefon ekranı kendiliğinden açık tutamadı. ${iPhoneMu()
+          ? "Ayarlar › Ekran ve Parlaklık › Otomatik Kilit › <b>Hiçbir Zaman</b> yapın (devriyeden sonra eski haline alabilirsiniz)."
+          : "Ayarlar › Ekran › Ekran zaman aşımı › <b>10 dakika</b> yapın."}</small>`}`;
+    if (izSuruyor() && izEkranYontemi && iz.ekranGordu !== izEkranYontemi && iz.ekranGordu !== "kilit") { iz.ekranGordu = izEkranYontemi; izSakla(); }
   }
   setInterval(() => { if (izSuruyor()) izDurumYaz(); }, 1000);
   $("#iz-uyari-tamam").addEventListener("click", () => { $("#iz-uyari-perde").hidden = true; });
@@ -1511,8 +1545,22 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
         <span class="iz-tur-saat">${saatYazisi(bas)} – ${bit ? saatYazisi(bit) : "sürüyor"}</span></div>
       <div class="iz-tur-alt">${bit ? `⏱ ${izSure(bit - bas)} · 🚶 ${kmYazisi(t.mesafe_m)}` : `● Devam ediyor · ${t.iz.length} nokta`}
         ${t.kesinti_sn >= 30 ? ` · <span class="iz-kesinti">⚠ ${izSure(t.kesinti_sn * 1000)} kayıt yapılamadı</span>` : ""}${kac(neden)}</div>
+      ${izleyen && t.cihaz_turu ? `<div class="iz-tur-cihaz">📱 ${kac(t.cihaz_turu)}${t.ekran ? ` · ${t.ekran === "yok" ? "⚠ ekran açık tutulamadı" : "🔆 ekran açık tutuldu"}` : ""}</div>` : ""}
     </div>`;
   };
+  // Telefona göre bir kerelik ayar bilgisi (iPhone ya da Android)
+  const telefonAyarlari = () => iPhoneMu() ? `
+    <details class="tel-ayar"><summary>📱 iPhone ayarları (ilk kullanımda bir kez)</summary><ol>
+      <li>"Devriyeyi Başlat"a ilk basışta konum izni sorulur: <b>İzin Ver</b>'e dokunun.</li>
+      <li>Konum gelmiyorsa: Ayarlar › Gizlilik ve Güvenlik › Konum Servisleri açık olsun; aynı yerde <b>Safari Web Siteleri</b> › <b>Uygulamayı Kullanırken</b> ve <b>Kesin Konum</b> açık olsun.</li>
+      <li>Devriyede ekran kararırsa: Ayarlar › Ekran ve Parlaklık › Otomatik Kilit › <b>Hiçbir Zaman</b>.</li>
+      <li>Düşük Güç Modu açıksa devriye süresince kapatın (pil simgesi sarıysa açıktır).</li>
+      <li>Devriye sürerken başka uygulamaya geçmeyin, telefonu kilitlemeyin.</li></ol></details>` : `
+    <details class="tel-ayar"><summary>📱 Android ayarları (ilk kullanımda bir kez)</summary><ol>
+      <li>"Devriyeyi Başlat"a ilk basışta konum izni sorulur: <b>Uygulamayı kullanırken</b> ve <b>Tam konum</b>'u seçin.</li>
+      <li>Telefonun üstten açılan menüsünde <b>Konum</b> açık olsun.</li>
+      <li>Güç tasarrufu modu açıksa devriye süresince kapatın.</li>
+      <li>Devriye sürerken başka uygulamaya geçmeyin, telefonu kilitlemeyin.</li></ol></details>`;
   function devriyeGovde(v) {
     if (!v) return `<p class="bos">Yükleniyor…</p>`;
     sakla.koy("sk_mesai", v.mesai); if (v.noktalar.length) sakla.koy("sk_alan", v.noktalar.map(({ lat, lng }) => ({ lat, lng })));
@@ -1530,7 +1578,8 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
           <div class="iz-bekliyor">⏳ Devriye bitti. Bilgiler internet gelince kendiliğinden gönderilecek.</div>
           <div id="iz-durum" class="iz-durum"></div>`
         : mesaideMi() ? `<button id="iz-basla" class="ana-dugme iz-basla" type="button">▶ Devriyeyi Başlat</button>
-          <p class="iz-not">Devriyeye çıkarken basın. Bitirince "Devriyeyi Bitir"e basın; konum yalnızca bu arada alınır.</p>`
+          <p class="iz-not">Devriyeye çıkarken basın. Bitirince "Devriyeyi Bitir"e basın; konum yalnızca bu arada alınır.</p>
+          ${telefonAyarlari()}`
         : `<button class="ana-dugme iz-basla" type="button" disabled>🔒 Devriyeyi Başlat</button>
           <p class="iz-neden">Devriye yalnızca mesai saatlerinde (<b>${kac(v.mesai.metin)}</b>) başlatılabilir. Şu an mesai dışı.</p>`}
       </div>
