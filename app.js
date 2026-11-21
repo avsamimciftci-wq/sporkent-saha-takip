@@ -1197,45 +1197,20 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     try { gorevVeri = await api("gorev_isaretle", { kalem: b.dataset.kalem, yapildi }); gorevCiz(); }
     catch (err) { mesaj(err.message); b.disabled = false; }
   });
-  // ---------- Devriye kontrol noktaları ----------
-  const haritaLink = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
-  // Eski "#devriye" adresi: Görev Takibi › Günlük sekmesine gider
+  // Eski "#devriye" adresi: Günlük Devriye'ye gider
   const devriyeAc = (gun) => gorevlerAc("gunluk", gun);
-
-  // ---------- Devriye haritası (Google Maps ile rota) ----------
-  // Rota Google Maps'te: başlangıç Nizamiye, ara duraklar sırayla, bitiş son nokta. Uygulama içi harita OpenStreetMap.
-  const gmNokta = (n) => `${n.lat},${n.lng}`;
-  const rotaLinki = (ns) => ns.length < 2 ? haritaLink(ns[0].lat, ns[0].lng)
-    : `https://www.google.com/maps/dir/?api=1&origin=${gmNokta(ns[0])}&destination=${gmNokta(ns[ns.length - 1])}`
-      + (ns.length > 2 ? `&waypoints=${ns.slice(1, -1).map(gmNokta).join("%7C")}` : "") + "&travelmode=driving";
-  const yolTarifi = (n) => `https://www.google.com/maps/dir/?api=1&destination=${gmNokta(n)}&travelmode=driving`;
 
   // ---------- Devriye izi: "Devriyeyi Başlat" ile "Devriyeyi Bitir" arasında konum kaydı ----------
   // Konum yalnızca bu aralıkta, mesai saatinde ve devriye alanında alınır. Noktalar telefonda birikir,
   // internet olunca topluca gönderilir. Ekran açık tutulur; uygulama arka plana düşerse kesinti kaydedilir.
-  const ALAN_PAYI_M = 200;
   const IZ_ANAHTAR = "sk_devriye_izi", IZ_ARALIK_MS = 12000, IZ_ADIM_M = 10, IZ_DOGRULUK_M = 30, IZ_KOPUK_MS = 90000, IZ_GIZLI_MS = 15000;
   const trSaat = () => { const p = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
     return Number(p.find((x) => x.type === "hour").value) % 24 + Number(p.find((x) => x.type === "minute").value) / 60; };
   const mesaiBilgi = () => gorevVeri?.devriye?.mesai || sakla.al("sk_mesai") || { bas: 8, bit: 18, metin: "08:00–18:00" };
   const mesaideMi = () => { const m = mesaiBilgi(), h = trSaat(); return h >= m.bas && h < m.bit; };
-  function alanaUzaklik(lat, lng, ns) {
-    const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
-    const xy = (n) => [(n.lng - lng) * kx, (n.lat - lat) * ky];
-    let en = Infinity;
-    for (let i = 0; i < ns.length; i++) {
-      const [ax, ay] = xy(ns[i]);
-      en = Math.min(en, Math.hypot(ax, ay));
-      if (i + 1 < ns.length) {
-        const [bx, by] = xy(ns[i + 1]); const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy;
-        const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
-        en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
-      }
-    }
-    return en;
-  }
-  const alanNoktalari = () => gorevVeri?.devriye?.noktalar || sakla.al("sk_alan") || [];
-  const alanIcinde = (lat, lng) => { const ns = alanNoktalari(); return !ns.length || alanaUzaklik(lat, lng, ns) <= ALAN_PAYI_M; };
+  // Site sınırı [güneyLat, batıLng, kuzeyLat, doğuLng]: dışındaki konum kaydedilmez
+  const siteAlani = () => gorevVeri?.devriye?.alan || sakla.al("sk_alan2") || null;
+  const alanIcinde = (lat, lng) => { const a = siteAlani(); return !a || (lat >= a[0] && lat <= a[2] && lng >= a[1] && lng <= a[3]); };
   const metre = (a, b) => { const kx = 111320 * Math.cos((a[0] * Math.PI) / 180); return Math.hypot((b[1] - a[1]) * kx, (b[0] - a[0]) * 110540); };
   const izSure = (ms) => { const dk = Math.max(0, Math.round(ms / 60000)); return dk < 60 ? `${dk} dk` : `${Math.floor(dk / 60)} sa ${dk % 60} dk`; };
   const kmYazisi = (m) => m >= 1000 ? (m / 1000).toFixed(2).replace(".", ",") + " km" : Math.round(m) + " m";
@@ -1433,9 +1408,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
   let devHarita = null;
   const izCanli = { cizgi: null, ben: null };
-  let sokakEtiketleri = null;
-  // Kooperatif sokakları: { "12": { c: [[[lat,lng],...], ...], b: [lat,lng] (sokak başı) } }
-  const sokaklariAl = async () => sokakEtiketleri ??= await fetch("veri/sokaklar.json").then((r) => r.json()).catch(() => { sokakEtiketleri = null; return {}; });
   function haritaKapat() {
     if (devHarita) { devHarita.remove(); devHarita = null; }
     izCanli.cizgi = null; izCanli.ben = null;
@@ -1476,13 +1448,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       return d;
     };
     secici.addTo(h);
-    const ns = v.noktalar, sinir = [];
-    // Rota ve noktalar yalnızca yol gösterici: soluk kesik çizgi
-    if (ns.length) {
-      L.polyline(ns.map((n) => [n.lat, n.lng]), { color: "#607d8b", weight: 3, dashArray: "6 8", opacity: .7 }).addTo(h);
-      ns.forEach((n, i) => L.marker([n.lat, n.lng], { icon: L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="hn hn-rehber">${i + 1}</div>` }), title: n.ad })
-        .addTo(h).bindPopup(`<b>${i + 1}. ${kac(n.ad)}</b>`));
-    }
+    const sinir = [];
     // Devriye izleri: mavi çizgi, kesintiler boş
     for (const t of izGorunen(v)) {
       const canli = izSuruyor() && t.benim && t.id === iz.tur;
@@ -1499,7 +1465,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       if (canli) { izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); izCanli.son = nokta.length ? [nokta[nokta.length - 1][1], nokta[nokta.length - 1][2]] : null; }
     }
     if (izSuruyor() && v.isaretleyebilir && !izCanli.cizgi) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h);
-    const hedef = sinir.length ? sinir : ns.map((n) => [n.lat, n.lng]);
+    const a = v.alan, hedef = sinir.length ? sinir : a ? [[a[0], a[1]], [a[2], a[3]]] : [];
     const sigdir = () => { h.invalidateSize(); if (hedef.length) h.fitBounds(hedef, { padding: [28, 28], maxZoom: 18 }); else h.setView([37.136, 27.322], 16); };
     sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
     devHarita = h;
@@ -1517,24 +1483,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     else izCanli.ben = L.circleMarker([lat, lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).addTo(devHarita).bindPopup("Buradasınız");
     devHarita.panTo([lat, lng], { animate: true });
   }
-  async function kmlIndir(v) {
-    const sokaklar = await sokaklariAl();
-    const x = (t) => String(t).replace(/[<&>]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;" })[c]);
-    const kml = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sporkent Devriye Rotası</name>
-${v.noktalar.map((n, i) => `<Placemark><name>${i + 1} - ${x(n.ad)}</name><Point><coordinates>${n.lng},${n.lat},0</coordinates></Point></Placemark>`).join("\n")}
-<Placemark><name>Devriye rotası</name><LineString><coordinates>${v.noktalar.map((n) => `${n.lng},${n.lat},0`).join(" ")}</coordinates></LineString></Placemark>
-<Style id="sokak"><LineStyle><color>ff00e6ff</color><width>5</width></LineStyle></Style>
-<Folder><name>Sokaklar</name>
-${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name><Placemark><name>${x(no)}. Sokak</name><styleUrl>#sokak</styleUrl><MultiGeometry>${v.c.map((c) => `<LineString><tessellate>1</tessellate><coordinates>${c.map(([a, b]) => `${b},${a},0`).join(" ")}</coordinates></LineString>`).join("")}</MultiGeometry></Placemark><Placemark><name>${x(no)}. Sokak</name><Point><coordinates>${v.b[1]},${v.b[0]},0</coordinates></Point></Placemark></Folder>`).join(String.fromCharCode(10))}
-</Folder>
-</Document></kml>`;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
-    a.download = "Devriye_Rotasi.kml"; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  }
-
   // ---------- Günlük Devriye ekranı ----------
   let izKisi = "";
   const turSatiri = (t, izleyen) => {
@@ -1563,7 +1511,7 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       <li>Devriye sürerken başka uygulamaya geçmeyin, telefonu kilitlemeyin.</li></ol></details>`;
   function devriyeGovde(v) {
     if (!v) return `<p class="bos">Yükleniyor…</p>`;
-    sakla.koy("sk_mesai", v.mesai); if (v.noktalar.length) sakla.koy("sk_alan", v.noktalar.map(({ lat, lng }) => ({ lat, lng })));
+    sakla.koy("sk_mesai", v.mesai); if (v.alan) sakla.koy("sk_alan2", v.alan);
     if (v.isaretleyebilir) {
       // Müdür ve şef: yalnızca Başlat / Bitir, harita ve bugünkü kendi devriyeleri
       const kendi = v.turlar.filter((t) => t.benim && !(izSuruyor() && t.id === iz.tur));
@@ -1600,9 +1548,9 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
         <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)}${izKisi ? ` · ${kac(izKisi)}` : ""}</span>
       </div>
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
-      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık · Gri kesik çizgi: önerilen rota. Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
+      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık. Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
       ${gorunen.map((t) => turSatiri(t, true)).join("") || `<p class="bos">Bu gün ${izKisi ? kac(izKisi) + " için " : ""}devriye kaydı yok.</p>`}
-      ${v.noktaYonetir ? `
+      ${v.mesaiAyarlar ? `
       <details class="nokta-yonet"><summary>⏰ Devriye mesai saatleri: ${kac(v.mesai.metin)}</summary>
         <form id="mesai-form" class="mesai-form">
           <label>Başlangıç<input type="time" name="bas" value="${v.mesai.ham.slice(0, 5)}" required></label>
@@ -1611,18 +1559,6 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
         </form>
         <small class="ipucu">Bu saatlerin dışında devriye başlatılamaz; süren devriye bitişte kendiliğinden durur.</small>
       </details>
-      <details class="nokta-yonet"><summary>⚙️ Rota noktalarını düzenle (${v.noktalar.length})</summary>
-      <button type="button" class="ikincil" id="kml-indir" style="width:100%;margin:8px 0">📥 Rotayı KML olarak indir (Google My Maps)</button>
-      <form class="nokta-ekle" id="nokta-ekle">
-        <label>Noktanın adı<input name="ad" required maxlength="80" placeholder="Örn. Ana giriş kapısı"></label>
-        <label>Google Haritalar bağlantısı ya da koordinat
-          <input name="konum" placeholder="https://maps.app.goo.gl/… ya da 37.1329, 27.3245">
-          <small class="ipucu">Google Haritalar'da noktaya basılı tutun → “Paylaş” ile bağlantıyı kopyalayın ya da üstte çıkan koordinatı yapıştırın.</small></label>
-        <input type="hidden" name="yaricap" value="50">
-        <div class="dugmeler"><button class="ana-dugme" type="submit">➕ Noktayı ekle</button></div>
-      </form>
-      ${v.noktalar.map((n) => `<div class="uye"><div><b>${kac(n.ad)}</b><br><small>${n.lat.toFixed(5)}, ${n.lng.toFixed(5)} · <a href="${haritaLink(n.lat, n.lng)}" target="_blank" rel="noopener">haritada gör</a></small></div>
-        <div class="uye-dugmeler"><button type="button" class="kucuk-dugme" data-nokta-ad="${n.id}" data-ad="${kac(n.ad)}">Adını değiştir</button><button type="button" class="kucuk-dugme tehlike" data-nokta-sil="${n.id}">Kaldır</button></div></div>`).join("")}
       </details>` : ""}`;
   }
 
@@ -1637,19 +1573,6 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       if (!confirm("Devriye bitirilsin mi? Konum kaydı durur.")) return;
       return devriyeBitir("kullanici");
     }
-    if (e.target.closest("#kml-indir")) return kmlIndir(gorevVeri.devriye);
-    const yeniAd = e.target.closest("[data-nokta-ad]");
-    if (yeniAd) {
-      const ad = prompt("Noktanın yeni adı:", yeniAd.dataset.ad);
-      if (!ad || !ad.trim()) return;
-      try { await api("nokta_adi", { id: Number(yeniAd.dataset.noktaAd), ad: ad.trim() }); mesaj("Nokta adı değiştirildi."); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
-      return;
-    }
-    const sil = e.target.closest("[data-nokta-sil]");
-    if (sil) {
-      if (!confirm("Bu rota noktası kaldırılsın mı?")) return;
-      try { await api("nokta_sil", { id: Number(sil.dataset.noktaSil) }); devriyeAc(gorevVeri?.gun); } catch (err) { mesaj(err.message); }
-    }
   });
 
   $("#gorevler").addEventListener("submit", async (e) => {
@@ -1660,10 +1583,6 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
       if (e.target.id === "mesai-form") {
         await api("devriye_mesai", { bas: f.get("bas"), bit: f.get("bit") });
         mesaj("Mesai saatleri kaydedildi."); return devriyeAc(gorevVeri?.gun);
-      }
-      if (e.target.id === "nokta-ekle") {
-        await api("nokta_ekle", { ad: f.get("ad"), konum: f.get("konum"), yaricap: Number(f.get("yaricap")) || 50 });
-        mesaj("Rota noktası eklendi."); devriyeAc(gorevVeri?.gun);
       }
     } catch (err) { mesaj(err.message); d.disabled = false; }
   });
@@ -1712,14 +1631,8 @@ ${Object.entries(sokaklar).map(([no, v]) => `<Folder><name>${x(no)}. Sokak</name
     return ns.filter((_, i) => tut[i]);
   }
   var toplamMesafe = (ns) => ns.reduce((t, p, i) => i ? t + metreArasi(ns[i - 1], p) : 0, 0);
-  async function durakAdi(lat, lng, sira) {
-    const sk = await sokaklariAl(); let en = 35, ad = "";
-    for (const [no, v] of Object.entries(sk || {})) for (const c of v.c) {
-      const d = alanaUzaklik(lat, lng, c.map(([a, b]) => ({ lat: a, lng: b })));
-      if (d < en) { en = d; ad = `${no}. Sokak`; }
-    }
-    return ad || `Durak ${sira}`;
-  }
+  const durakAdi = async (lat, lng, sira) => `Durak ${sira}`;
+
   var servisSakla = () => sakla.koy(SERVIS_ANAHTAR, servisKayit);
 
   async function ekranAcikTut() {
