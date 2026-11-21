@@ -266,28 +266,10 @@ async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
   };
 }
 
-// ---------- Devriye kontrol noktaları ----------
+// ---------- Devriye ----------
 const DEVRIYE_ISARETLEYEN: Rol[] = ["mudur", "sef"];
 const DEVRIYE_SAKLAMA_GUN = 365;
-// Konum yalnızca mesai saatinde (08:00-17:00, Türkiye) ve devriye alanında (noktalar + rota çevresi 200 m) işlenir
-const MESAI_BAS = 8, MESAI_BIT = 17, ALAN_PAYI_M = 200;
 const trSaati = () => { const d = new Date(Date.now() + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
-const mesaideMi = () => { const h = trSaati(); return h >= MESAI_BAS && h < MESAI_BIT; };
-function alanaUzaklik(lat: number, lng: number, ns: { lat: number; lng: number }[]) {
-  const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
-  const xy = (n: { lat: number; lng: number }) => [(n.lng - lng) * kx, (n.lat - lat) * ky];
-  let en = Infinity;
-  for (let i = 0; i < ns.length; i++) {
-    const [ax, ay] = xy(ns[i]);
-    en = Math.min(en, Math.hypot(ax, ay));
-    if (i + 1 < ns.length) {
-      const [bx, by] = xy(ns[i + 1]); const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy;
-      const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
-      en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
-    }
-  }
-  return en;
-}
 // İki konum arası mesafe (metre)
 function mesafeM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000, r = (x: number) => (x * Math.PI) / 180;
@@ -295,30 +277,6 @@ function mesafeM(a: { lat: number; lng: number }, b: { lat: number; lng: number 
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
-const koordinatBul = (m: string) => {
-  const kal = [/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&](?:q|query|ll|destination)=(-?\d+\.\d+)(?:,|%2C)\s*\+?(-?\d+\.\d+)/i,
-    /(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/];
-  for (const k of kal) { const x = m.match(k); if (x) return { lat: Number(x[1]), lng: Number(x[2]) }; }
-  return null;
-};
-// Google Maps bağlantısı (kısa bağlantı dahil) ya da "41.1, 29.1" biçiminden koordinat çıkarır
-async function konumCoz(metin: string) {
-  let m = temiz(metin, 2000);
-  const coz = (x: string) => { try { return decodeURIComponent(x); } catch { return x; } };
-  let k = koordinatBul(coz(m));
-  for (let i = 0; !k && i < 4 && /^https?:\/\//i.test(m); i++) {
-    const r = await fetch(m, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0" } });
-    const yer = r.headers.get("location");
-    if (yer) { m = new URL(yer, m).toString(); k = koordinatBul(coz(m)); continue; }
-    k = koordinatBul(coz((await r.text()).slice(0, 300000)));
-    break;
-  }
-  if (!k || Math.abs(k.lat) > 90 || Math.abs(k.lng) > 180) {
-    throw new Hata("Bağlantıdan konum çıkarılamadı. Google Haritalar'da noktaya basılı tutup çıkan koordinatı (örn. 40.97, 29.05) yapıştırın.");
-  }
-  return k;
-}
-
 // ---------- Devriye izi: "Devriyeyi Başlat" ile "Devriyeyi Bitir" arası konum ----------
 const IZ_DOGRULUK_M = 30;     // bundan kötü doğruluktaki nokta kaydedilmez
 const IZ_KOPUK_SN = 90;       // iki nokta arası bundan uzunsa çizgi kopuk çizilir, mesafeye katılmaz
@@ -334,8 +292,13 @@ async function mesaiAraligi() {
   return { bas: a + b / 60, bit: c + d / 60, metin: `${iki(a)}:${iki(b)}–${iki(c)}:${iki(d)}`, ham: `${iki(a)}:${iki(b)}-${iki(c)}:${iki(d)}` };
 }
 const mesaiIcinde = (m: { bas: number; bit: number }) => { const h = trSaati(); return h >= m.bas && h < m.bit; };
-// Devriye alanı: kontrol noktaları ve aralarındaki rota çevresi (alan dışındaki konum kaydedilmez)
-const alanNoktalari = async () => (await db.from("devriye_noktalari").select("lat, lng").eq("aktif", true).order("sira").order("id")).data ?? [];
+// Site sınırı (ayarlar: devriye_alan = "güneyLat,batıLng,kuzeyLat,doğuLng"); dışındaki konum kaydedilmez
+async function siteAlani() {
+  const { data } = await db.from("ayarlar").select("deger").eq("ad", "devriye_alan").maybeSingle();
+  const d = String(data?.deger ?? "").split(",").map(Number);
+  return d.length === 4 && d.every(Number.isFinite) ? d : null;
+}
+const alanda = (a: number[] | null, lat: number, lng: number) => !a || (lat >= a[0] && lat <= a[2] && lng >= a[1] && lng <= a[3]);
 async function turIzleri(ids: number[]) {
   const tum: any[] = [];
   for (let i = 0; ; i += 1000) {
@@ -389,14 +352,12 @@ async function acikTurlariKapat() {
   }
 }
 
-// Günlük devriye ekranı: rota noktaları (yol gösterici) ve devriye izleri
+// Günlük devriye ekranı: devriye izleri
 async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
   const bugun = sonGun(new Date(), 0);
   const gun = /^\d{4}-\d{2}-\d{2}$/.test(istenen) && istenen <= bugun ? istenen : bugun;
   const izleyen = IZ_IZLEYEN.includes(u.rol), yapan = DEVRIYE_ISARETLEYEN.includes(u.rol);
   await acikTurlariKapat().catch(() => {});
-  const { data: noktalar, error: e1 } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap, sira").eq("aktif", true).order("sira").order("id");
-  if (e1) throw e1;
   let q = db.from("devriye_turlari").select("id, cihaz, ad, rol, basla, bitis, bitis_nedeni, mesafe_m, nokta_sayisi, kesinti_sn, cihaz_turu, ekran").eq("gun", gun).order("basla");
   if (!izleyen) q = q.eq("cihaz", u.cihaz); // müdür ve şef yalnızca kendi devriyesini görür
   const { data: turlar, error: e2 } = (izleyen || yapan) ? await q : { data: [], error: null };
@@ -405,7 +366,7 @@ async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
   const m = await mesaiAraligi();
   const { data: kisiler } = izleyen ? await db.from("uyeler").select("ad, rol").in("rol", DEVRIYE_ISARETLEYEN).eq("durum", "onayli").order("rol").order("ad") : { data: [] };
   return {
-    gun, bugun, noktalar: noktalar ?? [],
+    gun, bugun, alan: await siteAlani(),
     turlar: (turlar ?? []).map(({ cihaz: c, ...t }: any) => ({
       ...t, benim: c === u.cihaz,
       iz: izler.filter((x: any) => x.tur_id === t.id).map((x: any) => [Date.parse(x.zaman), x.lat, x.lng, x.kopuk ? 1 : 0]),
@@ -413,7 +374,7 @@ async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
     kisiler: [...new Map((kisiler ?? []).map((k: any) => [k.ad, k])).values()],
     mesai: { metin: m.metin, ham: m.ham, bas: m.bas, bit: m.bit }, mesaide: mesaiIcinde(m),
     isaretleyebilir: yapan && gun === bugun, izleyen,
-    noktaYonetir: u.rol === "baskan",
+    mesaiAyarlar: u.rol === "baskan",
   };
 }
 
@@ -900,36 +861,6 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { sonuc: (data ?? []).map((r: any) => ({ ...r, durum: durum.get(r.no) ?? null })) };
     }
 
-    case "devriye": {
-      if (!GOREV_GOREN.includes(rol)) throw new Hata("Bu bölümü yalnızca yönetim, müdür ve şef görür.", 403);
-      return await devriyeVerisi(temiz(g.gun, 10), u);
-    }
-
-    case "devriye_isaretle": {
-      if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("\"Kontrol edildi\" işaretini yalnızca müdür ve şef verir.", 403);
-      if (!mesaideMi()) throw new Hata("Mesai saatleri (08:00–17:00) dışında konum işlenmez; kontrol yapılamaz.", 403);
-      const lat = Number(g.lat), lng = Number(g.lng), dogruluk = Math.round(Number(g.dogruluk) || 0);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Hata("Konum alınamadı. Telefonun konum iznini açıp tekrar deneyin.");
-      if (dogruluk > 150) throw new Hata(`Konum net alınamadı (±${dogruluk} m). Açık alanda birkaç saniye bekleyip tekrar deneyin.`);
-      const { data: tum } = await db.from("devriye_noktalari").select("id, ad, lat, lng, yaricap").eq("aktif", true).order("sira").order("id");
-      if (alanaUzaklik(lat, lng, tum ?? []) > ALAN_PAYI_M) throw new Hata("Devriye alanının dışındasınız. Konumunuz kaydedilmedi.", 403);
-      const n = (tum ?? []).find((x: any) => x.id === Number(g.nokta_id));
-      if (!n) throw new Hata("Kontrol noktası bulunamadı.");
-      const mesafe = mesafeM({ lat, lng }, n);
-      if (mesafe > n.yaricap + Math.min(dogruluk, 25)) {
-        throw new Hata(`${n.ad} noktasına yaklaşık ${mesafe} m uzaktasınız. Noktaya gidip tekrar deneyin.`, 403);
-      }
-      const gun = sonGun(new Date(), 0);
-      const { data: var_ } = await db.from("devriye_kayitlari").select("id").eq("gun", gun).eq("nokta_id", n.id).eq("cihaz", u.cihaz).maybeSingle();
-      if (var_) throw new Hata(`${n.ad} noktası bugün zaten kontrol edildi olarak işaretlendi.`);
-      const { error } = await db.from("devriye_kayitlari").insert({
-        nokta_id: n.id, gun, cihaz: u.cihaz, ad: u.ad, rol, lat, lng, dogruluk: dogruluk || null, mesafe,
-        foto: temiz(g.foto, 200) || null,
-      });
-      if (error) throw error;
-      return { tamam: true, mesafe, ad: n.ad };
-    }
-
     case "tur_basla": {
       if (!DEVRIYE_ISARETLEYEN.includes(rol)) throw new Hata("Devriyeyi yalnızca müdür ve şef başlatır.", 403);
       const m = await mesaiAraligi();
@@ -948,11 +879,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: tur } = await db.from("devriye_turlari").select("*").eq("id", Number(g.tur_id)).eq("cihaz", u.cihaz).maybeSingle();
       if (!tur) throw new Hata("Devriye bulunamadı.", 404);
       const alt = Date.parse(tur.basla) - 60000, ust = (tur.bitis ? Date.parse(tur.bitis) : Date.now()) + 60000;
-      const alan = await alanNoktalari();
+      const alan = await siteAlani();
       const satirlar = (Array.isArray(g.noktalar) ? g.noktalar : []).slice(0, 1000).map((n: any) => ({
         tur_id: tur.id, zaman: Number(n?.z), lat: Number(n?.lat), lng: Number(n?.lng), dogruluk: Math.round(Number(n?.d) || 0), kopuk: !!n?.k,
       })).filter((n: any) => Number.isFinite(n.zaman) && n.zaman >= alt && n.zaman <= ust && Number.isFinite(n.lat) && Number.isFinite(n.lng)
-        && n.dogruluk <= IZ_DOGRULUK_M && (!alan.length || alanaUzaklik(n.lat, n.lng, alan) <= ALAN_PAYI_M))
+        && n.dogruluk <= IZ_DOGRULUK_M && alanda(alan, n.lat, n.lng))
         .map((n: any) => ({ ...n, zaman: new Date(n.zaman).toISOString() }));
       if (satirlar.length) {
         const { error } = await db.from("devriye_izleri").upsert(satirlar, { onConflict: "tur_id,zaman", ignoreDuplicates: true });
@@ -975,60 +906,6 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const bas = temiz(g.bas, 5), bit = temiz(g.bit, 5);
       if (!/^\d{2}:\d{2}$/.test(bas) || !/^\d{2}:\d{2}$/.test(bit) || bas >= bit) throw new Hata("Mesai saatlerini 08:00 ve 18:00 biçiminde, başlangıç bitişten önce olacak şekilde yazın.");
       const { error } = await db.from("ayarlar").upsert({ ad: "devriye_mesai", deger: `${bas}-${bit}` });
-      if (error) throw error;
-      return { tamam: true };
-    }
-
-    case "nokta_ekle": {
-      yonetici();
-      const ad = temiz(g.ad, 80);
-      if (!ad) throw new Hata("Noktanın adını yazın.");
-      const k = g.lat != null && g.lng != null ? { lat: Number(g.lat), lng: Number(g.lng) } : await konumCoz(g.konum);
-      if (!Number.isFinite(k.lat) || !Number.isFinite(k.lng)) throw new Hata("Konum geçersiz.");
-      const yaricap = Math.min(300, Math.max(25, Math.round(Number(g.yaricap) || 75)));
-      const { data: son } = await db.from("devriye_noktalari").select("sira").order("sira", { ascending: false }).limit(1).maybeSingle();
-      const { error } = await db.from("devriye_noktalari").insert({ ad, lat: k.lat, lng: k.lng, yaricap, sira: (son?.sira ?? 0) + 1 });
-      if (error) throw error;
-      return { tamam: true, ...k };
-    }
-
-    case "nokta_adi": {
-      yonetici();
-      const ad = temiz(g.ad, 80);
-      if (!ad) throw new Hata("Noktanın adını yazın.");
-      const { error } = await db.from("devriye_noktalari").update({ ad }).eq("id", g.id);
-      if (error) throw error;
-      return { tamam: true };
-    }
-
-    case "nokta_sil": {
-      // Geçmiş kayıtlar bozulmasın diye nokta silinmez, pasif yapılır
-      yonetici();
-      const { error } = await db.from("devriye_noktalari").update({ aktif: false }).eq("id", g.id);
-      if (error) throw error;
-      return { tamam: true };
-    }
-
-    case "servis": {
-      const { data } = await db.from("servis_guzergah").select("id, cizgi, duraklar, sure_sn, mesafe_m, kaydeden, created_at")
-        .eq("aktif", true).order("id", { ascending: false }).limit(1).maybeSingle();
-      return { guzergah: data ?? null };
-    }
-
-    case "servis_kaydet": {
-      yonetici();
-      const sayi = (x: any) => Number.isFinite(Number(x)) ? Number(x) : NaN;
-      const cizgi = (Array.isArray(g.cizgi) ? g.cizgi : []).slice(0, 5000)
-        .map((p: any) => [Math.round(sayi(p?.[0]) * 1e6) / 1e6, Math.round(sayi(p?.[1]) * 1e6) / 1e6])
-        .filter(([a, b]: number[]) => Math.abs(a) <= 90 && Math.abs(b) <= 180);
-      if (cizgi.length < 2) throw new Hata("Güzergah çok kısa; kaydedilemedi.");
-      const duraklar = (Array.isArray(g.duraklar) ? g.duraklar : []).slice(0, 60).map((d: any, i: number) => ({
-        ad: temiz(d?.ad, 60) || `Durak ${i + 1}`, lat: sayi(d?.lat), lng: sayi(d?.lng), sn: Math.max(0, Math.round(sayi(d?.sn) || 0)),
-      })).filter((d: any) => Number.isFinite(d.lat) && Number.isFinite(d.lng)).sort((a: any, b: any) => a.sn - b.sn);
-      const sure_sn = Math.max(60, Math.min(6 * 3600, Math.round(sayi(g.sure_sn) || 0)));
-      const mesafe_m = Math.max(0, Math.min(200000, Math.round(sayi(g.mesafe_m) || 0)));
-      await db.from("servis_guzergah").update({ aktif: false }).eq("aktif", true);
-      const { error } = await db.from("servis_guzergah").insert({ cizgi, duraklar, sure_sn, mesafe_m, kaydeden: u.ad });
       if (error) throw error;
       return { tamam: true };
     }
@@ -1175,14 +1052,7 @@ async function eskiUyeleriSil() {
 async function eskiDevriyeSil() {
   const sinir = sonGun(new Date(Date.now() - DEVRIYE_SAKLAMA_GUN * 864e5), 0);
   await db.from("devriye_turlari").delete().lt("gun", sinir); // izleri de birlikte silinir
-  const { data } = await db.from("devriye_kayitlari").select("id, foto").lt("gun", sinir);
-  if (!data?.length) return 0;
-  const fotolar = data.map((x: any) => x.foto).filter(Boolean);
-  if (fotolar.length) await db.storage.from(BUCKET).remove(fotolar);
-  await db.from("devriye_kayitlari").delete().in("id", data.map((x: any) => x.id));
-  return data.length;
 }
-
 async function gunlukGecikme() {
   await eskiUyeleriSil().catch(() => {});
   await eskiDevriyeSil().catch(() => {});
