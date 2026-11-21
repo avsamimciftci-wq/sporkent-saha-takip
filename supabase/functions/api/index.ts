@@ -581,8 +581,21 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           ykUyeler = (yk ?? []).map((x: any) => x.ad);
         }
       }
+      // YK iş emri cevaplarını kimin gördüğü (Yönetim Kurulu bölümündeki herkes görür)
+      let cevapKisiler: any[] | undefined;
+      if (YONETIM_ISI_GOREN.includes(rol)) {
+        const cevapli = (kayitlar as any[]).filter((k) => k.gizli && Array.isArray(k.cevaplar) && k.cevaplar.length);
+        if (cevapli.length) {
+          const { data: cg } = await db.from("cevap_gorulme").select("kayit_id, sira, ad, rol, ilk_at").in("kayit_id", cevapli.map((k) => k.id)).order("ilk_at");
+          for (const k of cevapli) k.cevap_gorenler = (cg ?? []).filter((x: any) => x.kayit_id === k.id).map(({ kayit_id: _i, ...x }: any) => x);
+          const { data: kl } = await db.from("uyeler").select("ad, rol, cihaz").in("rol", YONETIM_ISI_GOREN).eq("durum", "onayli");
+          const goruldu = new Set<string>();
+          cevapKisiler = (kl ?? []).filter((x: any) => !String(x.cihaz).startsWith("test-") && !goruldu.has(x.ad) && goruldu.add(x.ad))
+            .map(({ ad, rol }: any) => ({ ad, rol }));
+        }
+      }
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler };
     }
 
     case "yukleme_adresi": {
@@ -668,6 +681,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       await db.from("goruntulemeler").upsert(
         { kayit_id: Number(g.id), cihaz: u.cihaz, ad: u.ad, rol },
         { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
+      );
+      return { tamam: true };
+    }
+
+    case "cevap_goruldu": {
+      // YK iş emrini açan kişi o ana kadarki cevapları görmüş sayılır; ilk görme zamanı saklanır
+      if (!YONETIM_ISI_GOREN.includes(rol)) return { tamam: true };
+      const sira = Number(g.sira);
+      if (!Number.isInteger(sira) || sira < 1) return { tamam: true };
+      await db.from("cevap_gorulme").upsert(
+        { kayit_id: Number(g.id), sira, cihaz: u.cihaz, ad: u.ad, rol },
+        { onConflict: "kayit_id,sira,cihaz", ignoreDuplicates: true },
       );
       return { tamam: true };
     }

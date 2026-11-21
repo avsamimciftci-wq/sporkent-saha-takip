@@ -831,3 +831,9 @@ body.gorucu-acik { overflow: hidden; }
 }
 
 .cevap-verildi { display: block; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dashed #f9a825; color: #1b5e20; font-weight: 900; font-size: 15px; letter-spacing: .3px; }
+
+.cevap-gorulme { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #f9a825; display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 14px; line-height: 1.35; }
+.cevap-gorulme span { padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+.cg-gordu { background: #c8e6c9; color: #1b5e20; }
+.cg-gormedi { background: #ffcdd2; color: #b71c1c; }
+.cevap-ozet { display: block; margin-top: 4px; font-size: 13px; color: #5d4037; font-weight: 700; }

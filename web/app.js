@@ -148,6 +148,7 @@
       kayitlar = r.kayitlar || [];
       ykUyeler = r.ykUyeler || [];
       if (r.varsayilan_sure) varsSure = r.varsayilan_sure;
+      cevapKisiler = r.cevapKisiler || [];
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
@@ -168,7 +169,33 @@
   // YK iş emrine gelen cevabı bu telefonda açıp okudu mu (okunmadıysa kırmızı yanıp söner)
   const cevapOkunan = () => sakla.al("sk_cevap_okunan") || {};
   const cevapOkunmadi = (k) => k.gizli && (k.cevaplar?.length || 0) > (cevapOkunan()[k.id] || 0);
+  // Cevabı kim gördü: Yönetim Kurulu bölümündeki herkes (cevabı yazan hariç). i: cevabın sırası (1'den)
+  let cevapKisiler = [];
+  const ROL_KISA = { baskan: "Yönetici", yonetim: "YK", muhasebe: "Muhasebe", mudur: "Müdür", sef: "Şef" };
+  const ROL_SIRA = ["mudur", "sef", "muhasebe", "yonetim", "baskan"];
+  function cevapGorulme(k, i) {
+    const c = k.cevaplar[i - 1];
+    return cevapKisiler.filter((x) => x.ad !== c.ad)
+      .sort((a, b) => ROL_SIRA.indexOf(a.rol) - ROL_SIRA.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"))
+      .map((x) => ({ ...x, gordu: (k.cevap_gorenler || []).find((g) => g.ad === x.ad && g.sira >= i) }));
+  }
+  const cevapGorulmeHtml = (k, i) => {
+    const l = cevapGorulme(k, i); if (!l.length) return "";
+    return `<div class="cevap-gorulme">👁 ${l.map((x) => x.gordu
+      ? `<span class="cg-gordu">${kac(x.ad)} (${ROL_KISA[x.rol]}) gördü ✓ ${tarihSaat(x.gordu.ilk_at)}</span>`
+      : `<span class="cg-gormedi">${kac(x.ad)} (${ROL_KISA[x.rol]}) henüz görmedi</span>`).join("")}</div>`;
+  };
+  const cevapGorulmeOzet = (k) => {
+    const l = cevapGorulme(k, k.cevaplar.length); if (!l.length) return "";
+    const n = l.filter((x) => x.gordu).length;
+    return `<span class="cevap-ozet">👁 ${n}/${l.length} kişi gördü${n < l.length ? ` · görmeyen: ${l.filter((x) => !x.gordu).map((x) => kac(x.ad)).join(", ")}` : ""}</span>`;
+  };
+  const cevapGorulduGonderilen = new Set();
   function cevapOkundu(k) {
+    if (k.gizli && k.cevaplar?.length && !cevapGorulduGonderilen.has(k.id + ":" + k.cevaplar.length)) {
+      const a = k.id + ":" + k.cevaplar.length; cevapGorulduGonderilen.add(a);
+      api("cevap_goruldu", { id: k.id, sira: k.cevaplar.length }).catch(() => cevapGorulduGonderilen.delete(a));
+    }
     if (!k.gizli || !k.cevaplar?.length) return;
     const o = cevapOkunan(); if ((o[k.id] || 0) >= k.cevaplar.length) return;
     o[k.id] = k.cevaplar.length; sakla.koy("sk_cevap_okunan", o);
@@ -340,7 +367,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
-          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi"><span class="cevap-verildi">✅ CEVAP VERİLDİ${k.cevaplar.length > 1 ? ` (${k.cevaplar.length})` : ""}${cevapOkunmadi(k) ? " · YENİ" : ""}</span>💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}</span>` : ""}
+          ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi"><span class="cevap-verildi">✅ CEVAP VERİLDİ${k.cevaplar.length > 1 ? ` (${k.cevaplar.length})` : ""}${cevapOkunmadi(k) ? " · YENİ" : ""}</span>💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}${cevapGorulmeOzet(k)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`;
@@ -422,8 +449,8 @@
       ${k.gizli ? `
       <div class="islem yk-cevaplar">
         <h2>💬 Cevaplar</h2>
-        ${(k.cevaplar || []).length ? k.cevaplar.map((c) => `
-        <div class="yk-cevap"><span class="cevap-verildi">✅ CEVAP VERİLDİ</span><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
+        ${(k.cevaplar || []).length ? k.cevaplar.map((c, i) => `
+        <div class="yk-cevap"><span class="cevap-verildi">✅ CEVAP VERİLDİ</span><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small>${cevapGorulmeHtml(k, i + 1)}</div>`).join("")
           : `<p class="ipucu" style="margin:0">Henüz cevap yazılmadı.</p>`}
         ${kayitOnaylar() ? `
         <button type="button" class="ana-dugme" id="yk-cevap-ac">💬 Cevap Ver</button>
