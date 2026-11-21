@@ -880,11 +880,16 @@ body.gorucu-acik { overflow: hidden; }
 /* ---------- Ana sayfa: bütün düğmeler her telefonda tek ekrana sığar, kaydırma gerekmez ----------
    Ana sayfa, üst banttan geri kalan ekran yüksekliğini tam doldurur; düğmeler eşit satırlara bölünür,
    simge ve yazı boyu ekran yüksekliğine göre küçülüp büyür. --ust-h uygulamada ölçülür. */
+:root { --alt-bosluk: env(safe-area-inset-bottom, 0px); }
+/* Ana sayfa açıkken sayfa kaymaz; telefonun alt çubuğu boşluğu yalnızca bir kez (ana sayfanın içinde) bırakılır */
+html.ana-acik, html.ana-acik body { overflow: hidden; overscroll-behavior: none; }
+html.ana-acik body { padding-bottom: 0; }
 #ekran-ana:not([hidden]) {
   display: flex; flex-direction: column;
   height: calc(100vh - var(--ust-h, 80px));
   height: calc(100dvh - var(--ust-h, 80px));
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  height: calc(var(--ekran-h, 100dvh) - var(--ust-h, 80px));
+  padding: 10px 12px calc(10px + var(--alt-bosluk));
   overflow: hidden;
 }
 #ekran-ana .ana-karsilama { flex: none; margin: 0 0 8px; font-size: clamp(14px, 2.3dvh, 18px); line-height: 1.3; }

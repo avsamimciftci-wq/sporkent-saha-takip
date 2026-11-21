@@ -133,6 +133,8 @@
     const iz = $("#iz-cubuk");
     const h = $(".ust").offsetHeight + (iz && !iz.hidden ? iz.offsetHeight : 0);
     document.documentElement.style.setProperty("--ust-h", h + "px");
+    // Ekranın gerçek yüksekliği (bazı Android'lerde 100dvh alt çubuğun altını da sayıyor)
+    document.documentElement.style.setProperty("--ekran-h", window.innerHeight + "px");
   }
   if ("ResizeObserver" in window) { const ro = new ResizeObserver(ustYukseklik); ro.observe($(".ust")); ro.observe($("#iz-cubuk")); }
   window.addEventListener("resize", ustYukseklik);
@@ -143,6 +145,8 @@
     if (ad !== "servis" && typeof servisHaritaKapat === "function") servisHaritaKapat();
     setTimeout(() => { if (typeof izCubuk === "function") izCubuk(); }, 0);
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
+    document.documentElement.classList.toggle("ana-acik", ad === "ana");
+    if (ad === "ana") ustYukseklik();
     // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
     const menulu = !["giris", "bekle", "ana"].includes(ad) && onayli();
     $("#ana-don").hidden = !menulu;
