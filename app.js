@@ -179,11 +179,12 @@
       .sort((a, b) => ROL_SIRA.indexOf(a.rol) - ROL_SIRA.indexOf(b.rol) || a.ad.localeCompare(b.ad, "tr"))
       .map((x) => ({ ...x, gordu: (k.cevap_gorenler || []).find((g) => g.ad === x.ad && g.sira >= i) }));
   }
+  const kisiAdi = (x) => x.ad === ROL_KISA[x.rol] ? kac(x.ad) : `${kac(x.ad)} (${ROL_KISA[x.rol]})`;
   const cevapGorulmeHtml = (k, i) => {
     const l = cevapGorulme(k, i); if (!l.length) return "";
     return `<div class="cevap-gorulme">👁 ${l.map((x) => x.gordu
-      ? `<span class="cg-gordu">${kac(x.ad)} (${ROL_KISA[x.rol]}) gördü ✓ ${tarihSaat(x.gordu.ilk_at)}</span>`
-      : `<span class="cg-gormedi">${kac(x.ad)} (${ROL_KISA[x.rol]}) henüz görmedi</span>`).join("")}</div>`;
+      ? `<span class="cg-gordu">${kisiAdi(x)} gördü ✓ ${tarihSaat(x.gordu.ilk_at)}</span>`
+      : `<span class="cg-gormedi">${kisiAdi(x)} henüz görmedi</span>`).join("")}</div>`;
   };
   const cevapGorulmeOzet = (k) => {
     const l = cevapGorulme(k, k.cevaplar.length); if (!l.length) return "";
