@@ -1442,7 +1442,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (p.length) parcalar.push(p);
     return parcalar;
   }
-  const izGorunen = (v) => v.turlar.filter((t) => !v.izleyen || !izKisi || t.ad === izKisi);
+  const izGorunen = (v) => v.turlar;
+  // İz rengi göreve göre: müdür mavi, şef mor
+  const izRengi = (rol) => rol === "sef" ? "#8e24aa" : "#1565c0";
   async function devriyeHaritaKur(v) {
     haritaKapat();
     const kutu = document.getElementById("devriye-harita");
@@ -1477,7 +1479,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       const canli = izSuruyor() && t.benim && t.id === iz.tur;
       const nokta = canli ? [...t.iz, ...iz.kuyruk.map((x) => [x.z, x.lat, x.lng, x.k])] : t.iz;
       const parcalar = izParcalari(nokta.sort((a, b) => a[0] - b[0]));
-      parcalar.forEach((p) => { L.polyline(p, { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); sinir.push(...p); });
+      parcalar.forEach((p) => { L.polyline(p, { color: izRengi(t.rol), weight: 5, opacity: .9 }).addTo(h); sinir.push(...p); });
       if (nokta.length) {
         L.circleMarker([nokta[0][1], nokta[0][2]], { radius: 7, color: "#fff", weight: 2, fillColor: "#2e7d32", fillOpacity: 1 }).addTo(h)
           .bindPopup(`<b>${kac(t.ad)}</b><br>Başladı: ${saatYazisi(t.basla)}`);
@@ -1485,9 +1487,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         if (t.bitis) L.circleMarker([s[1], s[2]], { radius: 7, color: "#fff", weight: 2, fillColor: "#c62828", fillOpacity: 1 }).addTo(h)
           .bindPopup(`<b>${kac(t.ad)}</b><br>Bitti: ${saatYazisi(t.bitis)}`);
       }
-      if (canli) { izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); izCanli.son = nokta.length ? [nokta[nokta.length - 1][1], nokta[nokta.length - 1][2]] : null; }
+      if (canli) { izCanli.cizgi = L.polyline([], { color: izRengi(t.rol), weight: 5, opacity: .9 }).addTo(h); izCanli.son = nokta.length ? [nokta[nokta.length - 1][1], nokta[nokta.length - 1][2]] : null; }
     }
-    if (izSuruyor() && v.isaretleyebilir && !izCanli.cizgi) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h);
+    if (izSuruyor() && v.isaretleyebilir && !izCanli.cizgi) izCanli.cizgi = L.polyline([], { color: izRengi(oturum?.rol), weight: 5, opacity: .9 }).addTo(h);
     const hedef = sinir.length ? sinir : v.sinir || [];
     const sigdir = () => { h.invalidateSize(); if (hedef.length) h.fitBounds(hedef, { padding: [28, 28], maxZoom: 18 }); else h.setView([37.136, 27.322], 16); };
     sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
@@ -1499,7 +1501,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (!devHarita || !izCanli.cizgi) return;
     const L = window.L;
     if (!yalnizIsaret) {
-      if (kopuk) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(devHarita);
+      if (kopuk) izCanli.cizgi = L.polyline([], { color: izRengi(oturum?.rol), weight: 5, opacity: .9 }).addTo(devHarita);
       izCanli.cizgi.addLatLng([lat, lng]);
     }
     if (izCanli.ben) izCanli.ben.setLatLng([lat, lng]);
@@ -1507,12 +1509,11 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     devHarita.panTo([lat, lng], { animate: true });
   }
   // ---------- Günlük Devriye ekranı ----------
-  let izKisi = "";
   const turSatiri = (t, izleyen) => {
     const bas = Date.parse(t.basla), bit = t.bitis ? Date.parse(t.bitis) : null;
     const neden = t.bitis_nedeni === "mesai" ? " · mesai bitince kendiliğinden durdu" : t.bitis_nedeni === "otomatik" ? " · uzun süre konum gelmediği için kapandı" : "";
     return `<div class="iz-tur ${bit ? "" : "suruyor"}">
-      <div class="iz-tur-ust">${izleyen ? `<b>${kac(t.ad)}</b> <small>${kac(ROL_ADI[t.rol] || t.rol)}</small>` : `<b>Devriye</b>`}
+      <div class="iz-tur-ust"><span class="iz-renk" style="background:${izRengi(t.rol)}"></span>${izleyen ? `<b>${kac(t.ad)}</b> <small>${kac(ROL_ADI[t.rol] || t.rol)}</small>` : `<b>Devriye</b>`}
         <span class="iz-tur-saat">${saatYazisi(bas)} – ${bit ? saatYazisi(bit) : "sürüyor"}</span></div>
       <div class="iz-tur-alt">${bit ? `⏱ ${izSure(bit - bas)} · 🚶 ${kmYazisi(t.mesafe_m)}` : `● Devam ediyor · ${t.iz.length} nokta`}
         ${t.kesinti_sn >= 30 ? ` · <span class="iz-kesinti">⚠ ${izSure(t.kesinti_sn * 1000)} kayıt yapılamadı</span>` : ""}${kac(neden)}</div>
@@ -1559,26 +1560,12 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }
     // Yönetici ve yönetim kurulu: gün ve kişi seçilir, iz haritada mavi çizgi
     const gorunen = izGorunen(v);
-    const toplam = gorunen.reduce((a, t) => a + (t.mesafe_m || 0), 0);
-    const adlar = [...new Set([...v.kisiler.map((k) => k.ad), ...v.turlar.map((t) => t.ad)])];
     return `
-      <div class="iz-secim">
-        <label>Gün<input type="date" id="iz-gun" value="${v.gun}" max="${v.bugun}"></label>
-        <label>Kişi<select id="iz-kisi"><option value="">Hepsi</option>${adlar.map((a) => `<option ${a === izKisi ? "selected" : ""}>${kac(a)}</option>`).join("")}</select></label>
-      </div>
-      <div class="devriye-ozet ${gorunen.length ? "tam" : "hic"}">
-        <b>🚶 ${gorunen.length ? `${gorunen.length} devriye · ${kmYazisi(toplam)}` : "Devriye yapılmadı"}</b>
-        <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)}${izKisi ? ` · ${kac(izKisi)}` : ""}</span>
-      </div>
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
       ${gorunen.map((t) => turSatiri(t, true)).join("")}
 `;
   }
 
-  $("#gorevler").addEventListener("change", (e) => {
-    if (e.target.id === "iz-gun" && e.target.value) return gorevlerAc("gunluk", e.target.value);
-    if (e.target.id === "iz-kisi") { izKisi = e.target.value; gorevCiz(); }
-  });
 
   $("#gorevler").addEventListener("click", async (e) => {
     const bas = e.target.closest("#iz-basla"); if (bas && !bas.disabled) return devriyeBaslat(bas);
