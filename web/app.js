@@ -1208,9 +1208,29 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     return Number(p.find((x) => x.type === "hour").value) % 24 + Number(p.find((x) => x.type === "minute").value) / 60; };
   const mesaiBilgi = () => gorevVeri?.devriye?.mesai || sakla.al("sk_mesai") || { bas: 8, bit: 18, metin: "08:00–18:00" };
   const mesaideMi = () => { const m = mesaiBilgi(), h = trSaat(); return h >= m.bas && h < m.bit; };
-  // Site sınırı [güneyLat, batıLng, kuzeyLat, doğuLng]: dışındaki konum kaydedilmez
-  const siteAlani = () => gorevVeri?.devriye?.alan || sakla.al("sk_alan2") || null;
-  const alanIcinde = (lat, lng) => { const a = siteAlani(); return !a || (lat >= a[0] && lat <= a[2] && lng >= a[1] && lng <= a[3]); };
+  // Site sınırı: yöneticinin çizdiği çokgen [[enlem, boylam], ...]; içinde ya da kenara 30 m'den yakınsa kaydedilir
+  const SINIR_PAYI_M = 30;
+  const siteSiniri = () => gorevVeri?.devriye?.sinir || sakla.al("sk_sinir") || null;
+  function sinirIcinde(sn, lat, lng) {
+    let ic = false;
+    for (let i = 0, j = sn.length - 1; i < sn.length; j = i++) {
+      const [yi, xi] = sn[i], [yj, xj] = sn[j];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) ic = !ic;
+    }
+    return ic;
+  }
+  function sinirKenari(sn, lat, lng) {
+    const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
+    let en = Infinity;
+    for (let i = 0; i < sn.length; i++) {
+      const a = sn[i], b = sn[(i + 1) % sn.length];
+      const ax = (a[1] - lng) * kx, ay = (a[0] - lat) * ky, dx = (b[1] - a[1]) * kx, dy = (b[0] - a[0]) * ky, L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+      en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
+    }
+    return en;
+  }
+  const alanIcinde = (lat, lng) => { const sn = siteSiniri(); return !sn || sinirIcinde(sn, lat, lng) || sinirKenari(sn, lat, lng) <= SINIR_PAYI_M; };
   const metre = (a, b) => { const kx = 111320 * Math.cos((a[0] * Math.PI) / 180); return Math.hypot((b[1] - a[1]) * kx, (b[0] - a[0]) * 110540); };
   const izSure = (ms) => { const dk = Math.max(0, Math.round(ms / 60000)); return dk < 60 ? `${dk} dk` : `${Math.floor(dk / 60)} sa ${dk % 60} dk`; };
   const kmYazisi = (m) => m >= 1000 ? (m / 1000).toFixed(2).replace(".", ",") + " km" : Math.round(m) + " m";
@@ -1256,7 +1276,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (!izSuruyor()) return;
     const { latitude: lat, longitude: lng, accuracy } = p.coords;
     if (accuracy > IZ_DOGRULUK_M) { izSonDurum = `Konum zayıf (±${Math.round(accuracy)} m); açık alanda düzelir.`; return izDurumYaz(); }
-    if (!alanIcinde(lat, lng)) { iz.kopukSonraki = true; izSonDurum = "Devriye alanının dışındasınız; burada konum kaydedilmiyor."; izSakla(); return izDurumYaz(); }
+    if (!alanIcinde(lat, lng)) { iz.kopukSonraki = true; izSonDurum = "Site sınırının dışındasınız; burada konum kaydedilmiyor."; izSakla(); return izDurumYaz(); }
     izSonDurum = "";
     const t = Date.now(), son = iz.son, d = son ? metre(son, [lat, lng]) : Infinity, dt = son ? t - son[2] : Infinity;
     if (!son || (d >= IZ_ADIM_M && dt >= 3000) || dt >= IZ_ARALIK_MS) {
@@ -1449,6 +1469,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     };
     secici.addTo(h);
     const sinir = [];
+    // Site sınırı: ince turuncu kesik çizgi
+    if (v.sinir) L.polygon(v.sinir, { color: "#ef6c00", weight: 2, dashArray: "6 6", fill: false, interactive: false }).addTo(h);
     // Devriye izleri: mavi çizgi, kesintiler boş
     for (const t of izGorunen(v)) {
       const canli = izSuruyor() && t.benim && t.id === iz.tur;
@@ -1465,7 +1487,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       if (canli) { izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h); izCanli.son = nokta.length ? [nokta[nokta.length - 1][1], nokta[nokta.length - 1][2]] : null; }
     }
     if (izSuruyor() && v.isaretleyebilir && !izCanli.cizgi) izCanli.cizgi = L.polyline([], { color: "#1565c0", weight: 5, opacity: .9 }).addTo(h);
-    const a = v.alan, hedef = sinir.length ? sinir : a ? [[a[0], a[1]], [a[2], a[3]]] : [];
+    const hedef = sinir.length ? sinir : v.sinir || [];
     const sigdir = () => { h.invalidateSize(); if (hedef.length) h.fitBounds(hedef, { padding: [28, 28], maxZoom: 18 }); else h.setView([37.136, 27.322], 16); };
     sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
     devHarita = h;
@@ -1511,7 +1533,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       <li>Devriye sürerken başka uygulamaya geçmeyin, telefonu kilitlemeyin.</li></ol></details>`;
   function devriyeGovde(v) {
     if (!v) return `<p class="bos">Yükleniyor…</p>`;
-    sakla.koy("sk_mesai", v.mesai); if (v.alan) sakla.koy("sk_alan2", v.alan);
+    sakla.koy("sk_mesai", v.mesai); if (v.sinir) sakla.koy("sk_sinir", v.sinir);
     if (v.isaretleyebilir) {
       // Müdür ve şef: yalnızca Başlat / Bitir, harita ve bugünkü kendi devriyeleri
       const kendi = v.turlar.filter((t) => t.benim && !(izSuruyor() && t.id === iz.tur));
@@ -1548,7 +1570,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <span>${v.gun === v.bugun ? "Bugün" : gunYazisi(v.gun)}${izKisi ? ` · ${kac(izKisi)}` : ""}</span>
       </div>
       <div class="devriye-harita" id="devriye-harita" aria-label="Devriye haritası"></div>
-      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık. Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
+      <p class="ipucu harita-not">Mavi çizgi: gezilen yol · Yeşil: başlangıç · Kırmızı: bitiş · Boşluk: kaydın durduğu aralık · Turuncu kesik çizgi: site sınırı (dışında konum kaydedilmez). Sağ üstten <b>Uydu</b> görünümünü seçebilirsiniz.</p>
       ${gorunen.map((t) => turSatiri(t, true)).join("") || `<p class="bos">Bu gün ${izKisi ? kac(izKisi) + " için " : ""}devriye kaydı yok.</p>`}
       ${v.mesaiAyarlar ? `
       <details class="nokta-yonet"><summary>⏰ Devriye mesai saatleri: ${kac(v.mesai.metin)}</summary>

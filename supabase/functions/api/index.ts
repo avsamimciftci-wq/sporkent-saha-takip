@@ -292,13 +292,34 @@ async function mesaiAraligi() {
   return { bas: a + b / 60, bit: c + d / 60, metin: `${iki(a)}:${iki(b)}–${iki(c)}:${iki(d)}`, ham: `${iki(a)}:${iki(b)}-${iki(c)}:${iki(d)}` };
 }
 const mesaiIcinde = (m: { bas: number; bit: number }) => { const h = trSaati(); return h >= m.bas && h < m.bit; };
-// Site sınırı (ayarlar: devriye_alan = "güneyLat,batıLng,kuzeyLat,doğuLng"); dışındaki konum kaydedilmez
-async function siteAlani() {
-  const { data } = await db.from("ayarlar").select("deger").eq("ad", "devriye_alan").maybeSingle();
-  const d = String(data?.deger ?? "").split(",").map(Number);
-  return d.length === 4 && d.every(Number.isFinite) ? d : null;
+// Site sınırı: yöneticinin çizdiği çokgen (ayarlar: devriye_sinir = [[enlem, boylam], ...]).
+// Konum sınırın içindeyse ya da kenara 30 m'den yakınsa kaydedilir (telefon konumu kenarda sapabilir).
+const SINIR_PAYI_M = 30;
+type Sinir = number[][];
+async function siteSiniri(): Promise<Sinir | null> {
+  const { data } = await db.from("ayarlar").select("deger").eq("ad", "devriye_sinir").maybeSingle();
+  try { const x = JSON.parse(String(data?.deger ?? "")); return Array.isArray(x) && x.length >= 3 ? x : null; } catch { return null; }
 }
-const alanda = (a: number[] | null, lat: number, lng: number) => !a || (lat >= a[0] && lat <= a[2] && lng >= a[1] && lng <= a[3]);
+function sinirIcinde(sn: Sinir, lat: number, lng: number) {
+  let ic = false;
+  for (let i = 0, j = sn.length - 1; i < sn.length; j = i++) {
+    const [yi, xi] = sn[i], [yj, xj] = sn[j];
+    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) ic = !ic;
+  }
+  return ic;
+}
+function sinirKenari(sn: Sinir, lat: number, lng: number) {
+  const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
+  let en = Infinity;
+  for (let i = 0; i < sn.length; i++) {
+    const a = sn[i], b = sn[(i + 1) % sn.length];
+    const ax = (a[1] - lng) * kx, ay = (a[0] - lat) * ky, dx = (b[1] - a[1]) * kx, dy = (b[0] - a[0]) * ky, L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+    en = Math.min(en, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return en;
+}
+const alanda = (sn: Sinir | null, lat: number, lng: number) => !sn || sinirIcinde(sn, lat, lng) || sinirKenari(sn, lat, lng) <= SINIR_PAYI_M;
 async function turIzleri(ids: number[]) {
   const tum: any[] = [];
   for (let i = 0; ; i += 1000) {
@@ -366,7 +387,7 @@ async function devriyeVerisi(istenen: string, u: { cihaz: string; rol: Rol }) {
   const m = await mesaiAraligi();
   const { data: kisiler } = izleyen ? await db.from("uyeler").select("ad, rol").in("rol", DEVRIYE_ISARETLEYEN).eq("durum", "onayli").order("rol").order("ad") : { data: [] };
   return {
-    gun, bugun, alan: await siteAlani(),
+    gun, bugun, sinir: await siteSiniri(),
     turlar: (turlar ?? []).map(({ cihaz: c, ...t }: any) => ({
       ...t, benim: c === u.cihaz,
       iz: izler.filter((x: any) => x.tur_id === t.id).map((x: any) => [Date.parse(x.zaman), x.lat, x.lng, x.kopuk ? 1 : 0]),
@@ -879,7 +900,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: tur } = await db.from("devriye_turlari").select("*").eq("id", Number(g.tur_id)).eq("cihaz", u.cihaz).maybeSingle();
       if (!tur) throw new Hata("Devriye bulunamadı.", 404);
       const alt = Date.parse(tur.basla) - 60000, ust = (tur.bitis ? Date.parse(tur.bitis) : Date.now()) + 60000;
-      const alan = await siteAlani();
+      const alan = await siteSiniri();
       const satirlar = (Array.isArray(g.noktalar) ? g.noktalar : []).slice(0, 1000).map((n: any) => ({
         tur_id: tur.id, zaman: Number(n?.z), lat: Number(n?.lat), lng: Number(n?.lng), dogruluk: Math.round(Number(n?.d) || 0), kopuk: !!n?.k,
       })).filter((n: any) => Number.isFinite(n.zaman) && n.zaman >= alt && n.zaman <= ust && Number.isFinite(n.lat) && Number.isFinite(n.lng)
