@@ -331,10 +331,7 @@
       : "Bildirilen sorunları ve yapılan işleri gruptaki herkes görür.";
     // Müdür ve şef sorun bildirmez, yalnızca "Yapıldı" girer
     $("#yeni-ac").style.display = yeniGirebilir() ? "" : "none";
-    const yd = $("#yonetim-ac");
-    yd.hidden = !yonetici();
-    yd.textContent = bekleyenSayisi ? `👥 Üyeler ve ayarlar · ${bekleyenSayisi} onay bekliyor` : "👥 Üyeler ve ayarlar";
-    yd.classList.toggle("uyari", bekleyenSayisi > 0);
+    if (!$("#ekran-ana").hidden) anaAc(); // ana sayfadaki "onay bekliyor" sayısı güncellensin
 
     const gorunen = siraya(genel
       .filter((k) => (filtre === "onay" ? onayBekliyor(k) : filtre === "tamam" ? k.durum === "tamam" : k.durum !== "tamam" && listede(k))), filtre);
@@ -973,7 +970,7 @@
     }
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     $("#yonetim").innerHTML = `
-      <div class="detay-ust"><button class="geri" data-geri>← İş Listesini Gör</button></div>
+      <div class="detay-ust"><button class="geri" type="button" data-ana>← Ana Sayfa</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
       <section class="davet-bolum">
@@ -1194,7 +1191,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     } catch (err) { mesaj(err.message); b.disabled = false; }
   });
 
-  $("#yonetim-ac").addEventListener("click", yonetimAc);
+
 
   // ---------- Günlük / haftalık görev programı ----------
   // Müdür ve şef bugünün ve bu haftanın kalemlerini işaretler; yönetici ve yönetim kurulu izler.
@@ -1932,7 +1929,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc };
+  const MODUL_AC = { saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -1945,6 +1942,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
+    $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
+    $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun
     const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
@@ -1954,7 +1954,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis" };
+  const MODUL_ADRES = { saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);

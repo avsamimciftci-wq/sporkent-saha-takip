@@ -837,3 +837,5 @@ body.gorucu-acik { overflow: hidden; }
 .cg-gordu { background: #c8e6c9; color: #1b5e20; }
 .cg-gormedi { background: #ffcdd2; color: #b71c1c; }
 .cevap-ozet { display: block; margin-top: 4px; font-size: 13px; color: #5d4037; font-weight: 700; }
+
+.ak-uyeler { background: linear-gradient(145deg, #546e7a, #263238); }
