@@ -65,7 +65,7 @@ async function temsilciyeBildir(t: any, baslik: string, govde: string, ek: { kay
   const { data } = await db.from("uyeler").select("cihaz").eq("ad", t.ad).eq("rol", "uye").is("ortak_no", null).eq("durum", "onayli");
   for (const x of data ?? []) await bildir({ cihaz: x.cihaz }, baslik, govde, ek);
 }
-const MAKS_UYE = 400; // başkan dahil onaylı üye sınırı
+const MAKS_UYE = 800; // başkan dahil onaylı üye sınırı (400 ortak, bir kısmı iki telefondan; TG, YK ve görevliler)
 // Bu dört görevin yazdığı kayıt doğrudan iş listesine düşer; diğerlerininki (TG üyesi, muhasebe)
 // önce yönetici / yönetim kurulu onayını bekler, onaylanınca herkes görür.
 // Kaydı onay beklemeden iş listesine düşenler. TG üyeleri (rolü "uye", unvanı TG…) de onaysız girer;
@@ -461,7 +461,8 @@ async function davetKoduDogrula(no: number, kod: string) {
   return d.id as number;
 }
 
-// Ortak kaydı: şifre yok; yöneticinin gönderdiği davet koduyla. Ad soyad, telefon ve ortaklık numarası; yönetici onaylayınca girer.
+// Ortak kaydı: şifre ve davet kodu yok. Ad soyad, ortaklık numarası ve cep telefonu; telefon kooperatif kayıtlarıyla
+// eşleşirse hemen girer, eşleşmezse yönetici onaylayınca girer. (Davet kodu yazılırsa yine geçerlidir.)
 async function ortakKayit(g: any) {
   const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
   const no = Number(temiz(g.ortak_no, 6));
@@ -493,26 +494,43 @@ async function ortakKayit(g: any) {
   // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
   // Aynı telefon aynı bilgilerle yeniden kayıt olursa durumu korunur; bilgi değişirse yeniden onay bekler
   const ayni = var_ && var_.durum !== "cikarildi" && var_.rol === "uye" && var_.ortak_no === no && var_.ad === ad && var_.telefon === telefon;
-  const davetId = ayni && var_.davetli_at ? null : await davetKoduDogrula(no, temiz(g.davet_kodu, 12).replace(/\D/g, ""));
-  const durum = ayni ? var_.durum : "bekliyor";
+  // Davet kodu artık zorunlu değil: yazıldıysa doğrulanır, yazılmadıysa telefon eşleşmesine bakılır
+  const kodYazdi = temiz(g.davet_kodu, 12).replace(/\D/g, "");
+  const davetId = ayni && var_.davetli_at ? null : kodYazdi ? await davetKoduDogrula(no, kodYazdi) : null;
+  // Yazdığı telefon, kooperatifin ortak listesinde bu numara için kayıtlı telefonlardan biriyse (ya da geçerli davet kodu
+  // yazdıysa) yönetici onayı beklemeden hemen girer. Tutmazsa yönetici onayına düşer.
+  // Yöneticinin daha önce çıkardığı ortak numarası ve dolu grup otomatik giremez.
+  const { uyuyor } = await listeyleKarsilastir(listede, ad, telefon);
+  let otomatik = uyuyor || !!davetId;
+  if (otomatik && var_?.durum === "cikarildi") otomatik = false;
+  if (otomatik) {
+    const { count: cikan } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("ortak_no", no).eq("durum", "cikarildi");
+    const { count: onayliSayi } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
+    if ((cikan ?? 0) > 0 || (onayliSayi ?? 0) >= MAKS_UYE) otomatik = false;
+  }
+  const durum = ayni && var_.durum === "onayli" ? "onayli" : otomatik ? "onayli" : ayni ? var_.durum : "bekliyor";
+  const yeniOnay = durum === "onayli" && var_?.durum !== "onayli";
   const anahtar = var_?.anahtar ?? anahtarUret();
   const unvan = `${no} No'lu Ortak`;
   const { error } = await db.from("uyeler").upsert({
     cihaz, anahtar, ad, rol: "uye", durum, unvan, ortak_no: no, telefon,
-    onay_at: durum === "onayli" ? var_.onay_at : null, son_gorulme: new Date().toISOString(),
+    onay_at: durum === "onayli" ? (yeniOnay ? new Date().toISOString() : var_.onay_at) : null, son_gorulme: new Date().toISOString(),
     davetli_at: davetId ? new Date().toISOString() : var_?.davetli_at ?? null,
   });
   if (error) throw error;
   if (davetId) await db.from("davet_kodlari").update({ kullanildi_at: new Date().toISOString(), kullanan_cihaz: cihaz }).eq("id", davetId);
   await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
-  if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
-    const { uyuyor } = await listeyleKarsilastir(listede, ad, telefon);
+  if ((durum === "bekliyor" || yeniOnay) && !cihaz.startsWith("test-")) {
+    // Bu ortak numarasıyla zaten girmiş telefonlar uyarılır (başkası onun yerine katılmasın)
     const { data: mevcutlar } = await db.from("uyeler").select("cihaz").eq("ortak_no", no).eq("durum", "onayli").neq("cihaz", cihaz);
     for (const m of mevcutlar ?? []) {
-      await bildir({ cihaz: m.cihaz }, "⚠ Numaranızla yeni başvuru",
-        `${no} numaralı ortaklığınız adına başka bir telefondan uygulamaya katılma başvurusu yapıldı. Siz yapmadıysanız hemen kooperatif yönetimine bildirin.`);
+      await bildir({ cihaz: m.cihaz }, "⚠ Numaranızla yeni katılım",
+        `${no} numaralı ortaklığınız adına başka bir telefondan uygulamaya katılındı. Siz yapmadıysanız hemen kooperatif yönetimine bildirin.`);
     }
-    await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Bilgileri örtüşmüyor!"}`, { sayfa: "uyeler" });
+    // Otomatik girenler için yöneticiye bildirim gitmez (400 bildirim olmasın); listede görünürler
+    if (durum === "bekliyor") {
+      await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Telefonu kooperatif kayıtlarıyla örtüşmüyor!"}`, { sayfa: "uyeler" });
+    }
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
 }

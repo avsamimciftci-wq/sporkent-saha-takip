@@ -803,7 +803,7 @@
   $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); girisEkrani(false); window.scrollTo(0, 0); });
   $("#sec-tg").addEventListener("click", () => { sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0); });
   // Davet kodu kutusuna harfli şahsi kod yazılırsa (TG / YK üyesi yanlış forma geldi): şahsi kodla girişe geç
-  $("#kayit-form [name=davet_kodu]").addEventListener("input", (e) => {
+  $("#kayit-form [name=davet_kodu]")?.addEventListener("input", (e) => {
     const v = e.target.value.trim();
     if (!/\p{L}/u.test(v)) return;
     const ad = $("#kayit-form [name=ad_soyad]").value.trim();
@@ -845,7 +845,7 @@
     const hata = $("#kayit-hata"); hata.hidden = true;
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
-      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")), davet_kodu: String(f.get("davet_kodu")) });
+      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")) });
       oturum = { ad: r.ad, rol: r.rol, unvan: r.unvan, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
       sakla.koy("sk_oturum", oturum);
       await basla();
@@ -1000,7 +1000,18 @@
       <h1>Üyeler ve ayarlar</h1>
 
       <section class="davet-bolum">
-        <h2>📨 Ortağa davet gönder</h2>
+        <h2>📨 Bütün ortakları davet edin</h2>
+        <div class="tg-link-kutu">
+          <b>🏠 Bütün ortaklar için tek davet mesajı</b>
+          <div class="tg-link">${kac(UYGULAMA_ADRESI.replace(/^https:\/\//, ""))}</div>
+          <small>Bu mesajı sitenin WhatsApp gruplarına bir kez gönderin. Kod yok: ortak adını, ortak numarasını ve cep telefonunu yazar. Telefonu kooperatif kayıtlarıyla eşleşen ortak <b>hemen girer</b>; eşleşmeyen aşağıdaki “Onay bekleyenler”e düşer.</small>
+          <details class="davet-onizle"><summary>Gidecek mesajı göster</summary><pre>${kac(genelDavetMetni)}</pre></details>
+          <div class="davet-tel">
+            <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(genelDavetMetni)}" target="_blank" rel="noopener">WhatsApp</a>
+            <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(genelDavetMetni)}">SMS</a>
+            <button type="button" class="davet-dugme kopya genel-davet-kopyala">📋 Kopyala</button></div>
+        </div>
+        <h2>Tek bir ortağa davet (isteğe bağlı)</h2>
         <div>
         <p>Ortaklık numarasını (örn. 12), telefon numarasını ya da ortağın adını / soyadını yazın. İsimde kelimenin tamamını yazın (örn. “Yılmaz”). Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
         <input id="davet-ara" class="davet-ara" type="search" placeholder="Ortak no, telefon ya da isim" autocomplete="off">
@@ -1077,6 +1088,25 @@
 
   // ---------- Ortağa davet (yönetici) ----------
   const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-ortak";
+  // Bütün ortaklara tek mesaj: kod yok, kooperatifte kayıtlı telefonla hemen girilir
+  const genelDavetMetni = `Sayın Ortağımız,
+
+Sporkent İşletme Kooperatifi SAHA TAKİP uygulaması kullanıma açıldı. Sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi ve parsel temsilcinizi görebilirsiniz.
+
+Katılmak için:
+1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
+2. Açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+3. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın ve "Ortağım"ı seçin.
+4. Adınızı soyadınızı, ortaklık numaranızı ve kooperatifte kayıtlı cep telefonunuzu yazıp "Kayıt ol"a basın.
+
+Telefonunuz kooperatifteki kaydınızla eşleşirse uygulama hemen açılır. Şifre ya da kod gerekmez.
+
+Sporkent İşletme Kooperatifi Yönetim Kurulu`;
+  document.addEventListener("click", async (e) => {
+    if (!e.target.closest(".genel-davet-kopyala")) return;
+    try { await navigator.clipboard.writeText(genelDavetMetni); mesaj("Genel davet mesajı kopyalandı."); }
+    catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
+  });
   const davetMetni = (r) => `Sayın Ortağımız,
 
 Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
