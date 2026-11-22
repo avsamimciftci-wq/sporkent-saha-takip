@@ -2436,7 +2436,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
-    $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi();
+    $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi() && oturum?.rol !== "baskan";
     // Restoran herkese açık (paylaşımları herkese bildirilir)
     $("#ana-kutular [data-ac=restoran]").hidden = false;
     // Parsel temsilcisine: ortak yakını onayları

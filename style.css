@@ -1011,6 +1011,11 @@ html.ana-acik body { padding-bottom: 0; }
 #ekran-ana .ak-parsel.yarim { flex-direction: column; gap: clamp(2px, .7dvh, 8px); padding: 4px 6px; }
 #ekran-ana .ak-parsel.yarim .parsel-foto { width: clamp(30px, 6dvh, 64px); height: clamp(30px, 6dvh, 64px); font-size: clamp(18px, 3.6dvh, 38px); }
 #ekran-ana .ak-parsel.yarim .parsel-yazi { align-items: center; text-align: center; font-size: inherit; }
+/* Kısa kutularda iki satırlık yazı ve rozet sığsın */
+#ekran-ana .ak-parsel.yarim .parsel-foto { width: clamp(26px, 5dvh, 64px); height: clamp(26px, 5dvh, 64px); }
+#ekran-ana .ak-parsel.yarim small { padding: 0 8px; line-height: 1.2; }
+#ekran-ana .ak-plaka { line-height: 1.05; gap: clamp(1px, .5dvh, 8px); }
+#ekran-ana .ak-plaka > span { font-size: clamp(18px, 3.8dvh, 46px) !important; }
 /* Telefon yan çevrilince: düğmeler dört sütun, satır sayısı azalır */
 @media (orientation: landscape) and (max-height: 520px) {
   #ekran-ana { max-width: none; }
