@@ -768,6 +768,10 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .secim-dugme small { font-size: 15px; opacity: .92; }
 .secim-ortak { background: linear-gradient(145deg, #2e7d6b, #1f4e45); }
 .secim-tg { background: linear-gradient(145deg, #6a1b9a, #3e0f63); }
+.secim-yakin { background: linear-gradient(145deg, #ef6c00, #b23c00); }
+/* Kayıt formunun üstünde: ortak ↔ ortağın yakını arasında geçiş */
+.mod-degistir { margin: 0 0 6px; padding: 10px 12px; text-align: center; font-size: 16px; background: #fff3e0; border: 2px solid #ef6c00; border-radius: 12px; color: #8a3a00; text-decoration: none; }
+#yakinlik-alan select { width: 100%; padding: 12px; font-size: 17px; border-radius: 10px; border: 1px solid var(--cizgi); background: var(--kart); color: var(--yazi); margin-top: 6px; }
 .secim-dugme:active { transform: scale(.98); }
 /* Ana sayfa kutuları hiçbir telefonda ekrandan taşmasın */
 .ana-kutular { grid-template-columns: repeat(2, minmax(0, 1fr)); }
