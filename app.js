@@ -1328,7 +1328,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
 
   // TG / YK üyesine davet: TG giriş linki + şahsi kod
-  const TG_ADRESI = "https://tinyurl.com/sporkent-tgyk";
+  const TG_ADRESI = "https://tinyurl.com/sporkent-asistan-tg";
   const tgLinkMetni = `Sayın TG / YK Üyemiz,
 
 SPORKENT ASİSTAN uygulamasına size özel giriş bağlantısı:
