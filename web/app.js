@@ -2281,8 +2281,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       try {
         const yol = tur === "metin" ? null : await paylasimDosyaYukle(b, dosya);
         d.textContent = "Gönderiliyor…";
-        await api(b + "_paylas", { tur, metin: f.metin.value, yol });
-        mesaj(b === "duyuru" ? "Duyuru yayımlandı. Herkese bildirim gönderildi." : "Paylaşıldı. Herkese bildirim gönderildi.");
+        const r = await api(b + "_paylas", { tur, metin: f.metin.value, yol });
+        mesaj(b === "duyuru"
+          ? (typeof r?.basarili === "number" ? `Duyuru yayımlandı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Duyuru yayımlandı. Herkese bildirim gönderildi.")
+          : "Paylaşıldı. Herkese bildirim gönderildi.");
         await paylasimAc(b);
       } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = eski; }
     });

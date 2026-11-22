@@ -1114,8 +1114,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
       const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)", video: " (video)" }[tur as "gorsel"];
-      await duyur("hepsi", `📢 Duyuru${ek}`, (metin || "Duyurular bölümünde yeni bir duyuru var.").slice(0, 180), { sayfa: "duyuru", resim, haric: u.cihaz });
-      return { id: p.id };
+      // Gönderen yönetici de alır: duyurunun gittiğini kendi telefonunda görür
+      const giden = await duyur("hepsi", `📢 Duyuru${ek}`, (metin || "Duyurular bölümünde yeni bir duyuru var.").slice(0, 180), { sayfa: "duyuru", resim });
+      return { id: p.id, ...giden };
     }
 
     case "duyuru_sil": {
