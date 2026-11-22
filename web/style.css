@@ -1026,4 +1026,4 @@ html.ana-acik body { padding-bottom: 0; }
   #ekran-ana .ana-kutu small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #ekran-ana .ana-karsilama { margin-bottom: 4px; }
 }
-.sec-tg { display: block; width: 100%; margin-top: 18px; padding: 12px 8px; font-size: 16px; line-height: 1.4; color: #37474f; text-align: center; border-top: 1px dashed #cfd8dc; }
+.sec-tg { font-family: inherit; display: block; width: 100%; margin-top: 18px; padding: 12px 8px; font-size: 16px; line-height: 1.4; color: #37474f; text-align: center; border-top: 1px dashed #cfd8dc; }
