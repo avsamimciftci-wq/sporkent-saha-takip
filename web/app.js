@@ -2458,8 +2458,22 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // (duyuruları o da görür)
     if (oturum?.rol === "restoran") for (const k of document.querySelectorAll("#ana-kutular .ana-kutu")) k.hidden = !["restoran", "duyuru"].includes(k.dataset.ac);
     duyuruRozeti();
-    // Görünen kutu sayısı tekse son kutu tam genişlik olsun (Parsel Temsilcisi hep tam genişlik)
-    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel):not(.ak-yakinlar)")].filter((k) => !k.hidden);
+    // Yönetim Kurulu'nu görenlerde o en üstte tam genişlik, Parsel Temsilcisi onun eski yerinde (Restoran'dan sonra) yarım kutu.
+    // Ortaklarda Parsel Temsilcisi en üstte tam genişlik kalır.
+    const kutular = $("#ana-kutular"), ykKutu = $("#ana-kutular [data-ac=yonetim]"), rsKutu = $("#ana-kutular [data-ac=restoran]");
+    const takas = !ykKutu.hidden && !pk.hidden;
+    if (takas) {
+      kutular.prepend(ykKutu);
+      rsKutu.after(pk);
+      if (!ortakMi() && parsel?.temsilciler?.length) pk.querySelector("small").textContent = `${parsel.temsilciler.length} temsilci`;
+    } else {
+      kutular.prepend(pk);
+      rsKutu.after(ykKutu);
+    }
+    ykKutu.classList.toggle("sabit-tam", takas); ykKutu.classList.toggle("tam", takas);
+    pk.classList.toggle("sabit-tam", !takas); pk.classList.toggle("tam", !takas); pk.classList.toggle("yarim", takas);
+    // Görünen kutu sayısı tekse son kutu tam genişlik olsun (en üstteki büyük kutu ve Ortak Yakını Onayları hep tam genişlik)
+    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.sabit-tam):not(.ak-yakinlar)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
     for (const [kutu, rozet] of [["saha", "#saha-rozet"], ["yonetim", "#yk-rozet"]]) {
       const r = $(rozet), k = $(`#ana-kutular [data-ac=${kutu}] small`);
