@@ -772,6 +772,15 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* Parsel temsilcisi: ortak yakını onayları */
 .ak-yakinlar { background: linear-gradient(145deg, #ef6c00, #b23c00); }
 .bant-yakin { background: #e65100; }
+/* Plaka girişi talebi */
+.ak-plaka { background: linear-gradient(145deg, #455a64, #1c313a); }
+.bant-plaka { background: #37474f; }
+.plaka-form .plaka-soru { display: block; font-size: 19px; margin: 6px 0 8px; color: var(--yesil); }
+.plaka-sec { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.plaka-sec input { position: absolute; opacity: 0; pointer-events: none; }
+.plaka-sec span { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 70px; padding: 8px; border-radius: 14px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); font-weight: 800; font-size: 17px; cursor: pointer; }
+.plaka-sec input:checked + span { background: #37474f; border-color: #37474f; color: #fff; }
+.plaka-kutu { font-size: 30px !important; font-weight: 800; letter-spacing: 3px; text-align: center; text-transform: uppercase; border: 3px solid #1b2421 !important; border-left: 22px solid #1e4fb5 !important; border-radius: 10px; background: #fff !important; color: #111 !important; padding: 10px !important; }
 .bekle-not { margin: 4px 0 14px; padding: 12px 14px; border-radius: 12px; background: #fff3e0; border: 2px solid #ef6c00; color: #5c2a04; font-size: 18px; line-height: 1.4; }
 .yakin-kart { display: flex; flex-direction: column; gap: 6px; background: var(--kart); border: 2px solid #ef6c00; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: var(--golge); }
 .yakin-kart b { font-size: 20px; }

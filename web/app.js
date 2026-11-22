@@ -960,6 +960,7 @@
     if (location.hash === "#servis") return servisAc();
     if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#yakinlar") return yakinlarAc();
+    if (location.hash === "#plaka") return plakaAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -2067,6 +2068,36 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
+  // ---------- Ortak: plaka girişi talebi ----------
+  function plakaAc() {
+    if (location.hash !== "#plaka") history.replaceState(null, "", "#plaka");
+    goster("plaka");
+  }
+  $("#plaka-form").addEventListener("change", (e) => {
+    if (e.target.name !== "arac") return;
+    const yakin = e.target.value === "yakin";
+    $("#plaka-sahibi").hidden = !yakin;
+    $("#plaka-form").arac_sahibi.required = yakin;
+  });
+  $("#plaka-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target, d = f.querySelector("button[type=submit]");
+    d.disabled = true; d.textContent = "Gönderiliyor…";
+    try {
+      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value });
+      if (r.eposta) {
+        mesaj("Talebiniz kooperatife e-postayla gönderildi.");
+      } else {
+        // Sunucuda e-posta hizmeti yoksa telefonun e-posta uygulaması hazır metinle açılır
+        mesaj("Talebiniz kaydedildi. Açılan e-postada “Gönder”e dokunun.");
+        location.href = `mailto:${r.kime}?subject=${encodeURIComponent(r.konu)}&body=${encodeURIComponent(r.metin)}`;
+      }
+      f.reset(); $("#plaka-sahibi").hidden = true;
+      setTimeout(anaAc, 1500);
+    } catch (err) { mesaj(err.message); }
+    finally { d.disabled = false; d.textContent = "📧 Kooperatife Gönder"; }
+  });
+
   // ---------- Parsel temsilcisi: ortak yakınlarının katılma başvuruları ----------
   function yakinlarAc() {
     if (location.hash !== "#yakinlar") history.replaceState(null, "", "#yakinlar");
@@ -2155,7 +2186,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2168,6 +2199,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
+    $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi();
     // Parsel temsilcisine: ortak yakını onayları
     const yk = $("#ana-kutular [data-ac=yakinlar]");
     yk.hidden = !parsel?.temsilcilik;
@@ -2194,7 +2227,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -2580,6 +2613,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash === "#ana") return anaAc();
     if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#yakinlar") return yakinlarAc();
+    if (location.hash === "#plaka") return plakaAc();
     if (location.hash === "#saha" || (location.hash === "" && $("#ekran-liste").hidden)) return sahaAc();
     if (location.hash === "#servis" && $("#ekran-servis").hidden) return servisAc();
     if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();

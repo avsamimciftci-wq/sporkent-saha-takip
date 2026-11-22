@@ -41,6 +41,24 @@ const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef
 const SURE_GORMEYEN: Rol[] = ["mudur", "sef", "muhasebe"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
 
+// ---------- E-posta ----------
+// Plaka girişi talepleri bu adrese gider.
+const PLAKA_EPOSTA = "kooperatif@sporkentsitesi.com";
+// Resend (resend.com) ile gönderim: sunucu sırlarında RESEND_API_KEY tanımlıysa e-posta sunucudan gider.
+// Tanımlı değilse false döner; uygulama o zaman telefonun e-posta uygulamasını hazır metinle açar.
+async function epostaGonder(kime: string, konu: string, metin: string): Promise<boolean> {
+  const anahtar = Deno.env.get("RESEND_API_KEY");
+  if (!anahtar) return false;
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${anahtar}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: Deno.env.get("EPOSTA_GONDEREN") ?? "Sporkent Saha Takip <onboarding@resend.dev>", to: [kime], subject: konu, text: metin }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
 // ---------- Parsel temsilcileri ----------
 // Ortak numarası aralığındaki temsilci: bu ortağın Saha Takip kaydı önce ona düşer
 async function temsilciBul(no: number | null | undefined) {
@@ -912,6 +930,37 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         await duyur({ cihaz: k.cihaz }, `Kaydınız onaylanmadı ${k.no}`, `${k.yer}: parsel temsilciniz ${u.ad} bu kaydı onaylamadı. Kendisiyle görüşebilirsiniz.`.slice(0, 200), { sayfa: "parsel" });
       }
       return { tamam: true };
+    }
+
+    case "plaka_talebi": {
+      // Ortak (ya da ortağın yakını) kendi aracının ya da yakınının aracının plakasını kooperatife bildirir
+      const uu = u as any;
+      if (rol !== "uye" || !uu.ortak_no) throw new Hata("Plaka girişi talebini ortaklar yapar.", 403);
+      const arac = g.arac === "yakin" ? "yakin" : g.arac === "kendi" ? "kendi" : "";
+      if (!arac) throw new Hata("Önce kendi aracınız mı, yakınınızın aracı mı olduğunu seçin.");
+      // "34abc123" → "34 ABC 123": rakam ve harf grupları arasına boşluk
+      const plaka = (temiz(g.plaka, 20).toLocaleUpperCase("tr").replace(/[^0-9A-ZÇĞİÖŞÜ]+/g, "").match(/\d+|[A-ZÇĞİÖŞÜ]+/g) ?? []).join(" ");
+      if (plaka.replace(/\s/g, "").length < 4 || !/\d/.test(plaka) || !/[A-ZÇĞİÖŞÜ]/.test(plaka)) throw new Hata("Plaka numarasını doğru yazın (örn. 34 ABC 123).");
+      const sahibi = arac === "yakin" ? temiz(g.arac_sahibi, 80) : "";
+      if (arac === "yakin" && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata("Aracın sahibi olan yakınınızın adını ve soyadını yazın.");
+      const { data: t, error } = await db.from("plaka_talepleri").insert({
+        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null,
+      }).select("id, created_at").single();
+      if (error) throw error;
+      const konu = `Plaka girişi talebi: ${plaka} (${uu.ortak_no} No'lu Ortak)`;
+      const metin = [
+        "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasından plaka girişi talebi:",
+        "",
+        `Plaka: ${plaka}`,
+        `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı (araç sahibi: ${sahibi})`}`,
+        `Talep eden: ${u.ad} (${uu.unvan ?? uu.ortak_no + " No'lu Ortak"})`,
+        `Telefon: ${uu.telefon ?? "-"}`,
+        `Talep no: ${t.id} · ${new Date(t.created_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
+      ].join("\n");
+      const gitti = await epostaGonder(PLAKA_EPOSTA, konu, metin);
+      if (gitti) await db.from("plaka_talepleri").update({ eposta_gitti: true }).eq("id", t.id);
+      await duyur(["baskan", "muhasebe"], "🚗 Plaka girişi talebi", `${plaka} · ${u.ad} (${uu.ortak_no} No'lu Ortak)${arac === "yakin" ? " · yakınının aracı" : ""}`);
+      return { tamam: true, eposta: gitti, kime: PLAKA_EPOSTA, konu, metin };
     }
 
     case "yakin_onayla":
