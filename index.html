@@ -64,27 +64,23 @@
     <!-- Önce kim olduğunu seçer: ortak (davet koduyla kayıt) ya da TG / YK / görevli (şahsi kodla giriş) -->
     <section id="giris-secim" class="kart giris-secim" hidden>
       <h1>Nasıl giriş yapacaksınız?</h1>
-      <button id="sec-ortak" class="secim-dugme secim-ortak" type="button"><span>🏠</span><b>Ortağım</b><small>Yönetimden gelen 6 rakamlı davet kodum var</small></button>
+      <button id="sec-ortak" class="secim-dugme secim-ortak" type="button"><span>🏠</span><b>Ortağım</b><small>Sporkent İşletme Kooperatifi ortağıyım</small></button>
       <button id="sec-tg" class="secim-dugme secim-tg" type="button"><span>🏅</span><b>TG / YK üyesiyim ya da görevliyim</b><small>Bana verilen şahsi kodum var (örn. TG1234)</small></button>
     </section>
 
     <form id="kayit-form" class="kart" hidden>
       <button id="kodla-gir-ust" class="tg-giris-dugme" type="button">👤 TG / YK üyesi ya da görevliyseniz<br><b>Şahsi kodunuzla buradan girin →</b></button>
       <h1>Ortak kaydı</h1>
-      <p class="ipucu kayit-ust">Bilgilerinizi yazın. Yönetici onayladığında uygulama açılır. Şifre gerekmez.</p>
+      <p class="ipucu kayit-ust">Bilgilerinizi yazın. Cep telefonunuz kooperatifte kayıtlı numaranızsa uygulama <b>hemen açılır</b>. Şifre ya da kod gerekmez.</p>
       <label>Adınız ve soyadınız
         <input name="ad_soyad" autocomplete="name" required maxlength="80" placeholder="Örn. Ayşe Yılmaz">
       </label>
       <label>Ortaklık numaranız
         <input name="ortak_no" required inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Örn. 12">
       </label>
-      <label>Davet kodu
-        <input name="davet_kodu" required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="6 haneli kod">
-        <small class="ipucu">Kooperatif yönetiminin size gönderdiği davet mesajındaki 6 haneli kod. Harfli bir şahsi kod (TG / YK) yazarsanız şahsi kodla girişe geçilir.</small>
-      </label>
       <label>Cep telefonunuz
         <input name="telefon" type="tel" autocomplete="tel" required maxlength="20" placeholder="0532 123 45 67">
-        <small class="ipucu">Yurt dışı numarası ise başına + koyun (örn. +49 …).</small>
+        <small class="ipucu">Kooperatifte kayıtlı cep telefonunuzu yazın. Başka bir numara yazarsanız kaydınız yönetimin onayına gider. Yurt dışı numarası ise başına + koyun (örn. +49 …).</small>
       </label>
       <p class="kvkk">🔒 Bilgileriniz yalnızca kooperatif içi iletişim için kullanılır. <a href="aydinlatma.html">Aydınlatma metni</a></p>
       <label class="okudum-kutu"><input type="checkbox" name="aydinlatma" required> <span><a href="aydinlatma.html">Aydınlatma metnini</a> okudum.</span></label>
