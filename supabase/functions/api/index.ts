@@ -600,7 +600,7 @@ async function kimlik(g: any) {
 async function tumFotograflariSil() {
   const { data: klasorler } = await db.storage.from(BUCKET).list("", { limit: 1000 });
   for (const k of klasorler ?? []) {
-    if (k.name === "aidat" || k.name === "devriye" || k.name === "temsilci") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
+    if (k.name === "aidat" || k.name === "devriye" || k.name === "temsilci" || k.name === "restoran") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
     for (;;) {
       const { data: dosyalar } = await db.storage.from(BUCKET).list(k.name, { limit: 1000 });
       if (!dosyalar?.length) break;
@@ -727,7 +727,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yukleme_adresi": {
-      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "restoran" ? "restoran" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -935,7 +935,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "plaka_talebi": {
       // Ortak (ya da ortağın yakını) kendi aracının ya da yakınının aracının plakasını kooperatife bildirir
       const uu = u as any;
-      if (rol !== "uye" || !uu.ortak_no) throw new Hata("Plaka girişi talebini ortaklar yapar.", 403);
+      if (rol !== "uye" || !uu.ortak_no) throw new Hata("Plaka-Kimlik Bildirimini ortaklar yapar.", 403);
       const arac = g.arac === "yakin" ? "yakin" : g.arac === "kendi" ? "kendi" : "";
       if (!arac) throw new Hata("Önce kendi aracınız mı, yakınınızın aracı mı olduğunu seçin.");
       // "34abc123" → "34 ABC 123": rakam ve harf grupları arasına boşluk
@@ -943,23 +943,34 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (plaka.replace(/\s/g, "").length < 4 || !/\d/.test(plaka) || !/[A-ZÇĞİÖŞÜ]/.test(plaka)) throw new Hata("Plaka numarasını doğru yazın (örn. 34 ABC 123).");
       const sahibi = arac === "yakin" ? temiz(g.arac_sahibi, 80) : "";
       if (arac === "yakin" && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata("Aracın sahibi olan yakınınızın adını ve soyadını yazın.");
+      // Yakının aracında yakının telefonu zorunlu
+      const sahibiTelHam = arac === "yakin" ? temiz(g.arac_sahibi_tel, 30) : "";
+      let sahibiTel = "";
+      if (arac === "yakin") {
+        let d = sahibiTelHam.replace(/\D/g, "");
+        if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
+        if (/^[2-5]\d{9}$/.test(d)) sahibiTel = `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+        else if (/^(\+|00)/.test(sahibiTelHam) && d.replace(/^00/, "").length >= 9 && d.length <= 15) sahibiTel = "+" + d.replace(/^00/, "");
+        else throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
+      }
       const { data: t, error } = await db.from("plaka_talepleri").insert({
-        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null,
+        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
       }).select("id, created_at").single();
       if (error) throw error;
-      const konu = `Plaka girişi talebi: ${plaka} (${uu.ortak_no} No'lu Ortak)`;
+      const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${uu.ortak_no} No'lu Ortak)`;
       const metin = [
-        "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasından plaka girişi talebi:",
+        "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasından Plaka-Kimlik Bildirimi:",
         "",
         `Plaka: ${plaka}`,
-        `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı (araç sahibi: ${sahibi})`}`,
+        `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı`}`,
+        ...(arac === "yakin" ? [`Araç sahibi: ${sahibi}`, `Araç sahibinin telefonu: ${sahibiTel}`] : []),
         `Talep eden: ${u.ad} (${uu.unvan ?? uu.ortak_no + " No'lu Ortak"})`,
         `Telefon: ${uu.telefon ?? "-"}`,
         `Talep no: ${t.id} · ${new Date(t.created_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
       ].join("\n");
       const gitti = await epostaGonder(PLAKA_EPOSTA, konu, metin);
       if (gitti) await db.from("plaka_talepleri").update({ eposta_gitti: true }).eq("id", t.id);
-      await duyur(["baskan", "muhasebe"], "🚗 Plaka girişi talebi", `${plaka} · ${u.ad} (${uu.ortak_no} No'lu Ortak)${arac === "yakin" ? " · yakınının aracı" : ""}`);
+      await duyur(["baskan", "muhasebe"], "🚗 Plaka-Kimlik Bildirimi", `${plaka} · ${u.ad} (${uu.ortak_no} No'lu Ortak)${arac === "yakin" ? " · yakınının aracı" : ""}`);
       return { tamam: true, eposta: gitti, kime: PLAKA_EPOSTA, konu, metin };
     }
 
@@ -1028,6 +1039,50 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       await db.storage.from(BUCKET).remove([x.yol]);
       await db.from("aidat_resimleri").delete().eq("id", x.id);
       return { tamam: true };
+    }
+
+    // ---------- Restoran: menü resimleri ve sipariş telefonu ----------
+    case "restoran_liste": {
+      const { data, error } = await db.from("restoran_menu").select("*").order("created_at");
+      if (error) throw error;
+      const yollar = (data ?? []).map((x: any) => x.yol);
+      const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+      const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
+      const { data: ayar } = await db.from("ayarlar").select("deger").eq("ad", "restoran_tel").maybeSingle();
+      return {
+        resimler: (data ?? []).map((x: any) => ({ id: x.id, baslik: x.baslik, url: harita.get(x.yol) ?? null })),
+        tel: ayar?.deger ?? "",
+        ekleyebilir: rol === "baskan",
+      };
+    }
+
+    case "restoran_ekle": {
+      yonetici();
+      const yol = temiz(g.yol, 200);
+      if (!yol.startsWith("restoran/")) throw new Hata("Resim yüklenemedi, tekrar deneyin.");
+      const { error } = await db.from("restoran_menu").insert({ yol, baslik: temiz(g.baslik, 120) || null, ekleyen: u.ad });
+      if (error) throw error;
+      return { tamam: true };
+    }
+
+    case "restoran_sil": {
+      yonetici();
+      const { data: x } = await db.from("restoran_menu").select("id, yol").eq("id", g.id).maybeSingle();
+      if (!x) throw new Hata("Resim bulunamadı.");
+      await db.storage.from(BUCKET).remove([x.yol]);
+      await db.from("restoran_menu").delete().eq("id", x.id);
+      return { tamam: true };
+    }
+
+    case "restoran_tel": {
+      yonetici();
+      const ham = temiz(g.tel, 30);
+      let d = ham.replace(/\D/g, "");
+      if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
+      if (!/^[2-5]\d{9}$/.test(d)) throw new Hata("Telefon numarasını doğru yazın (örn. 0532 123 45 67).");
+      const tel = `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+      await db.from("ayarlar").upsert({ ad: "restoran_tel", deger: tel });
+      return { tel };
     }
 
     // ---------- Yönetim iş programı (takvim) ----------

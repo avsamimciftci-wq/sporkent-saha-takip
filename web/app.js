@@ -961,6 +961,7 @@
     if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#plaka") return plakaAc();
+    if (location.hash === "#restoran") return restoranAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -2068,6 +2069,72 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
+  // ---------- Restoran: menü resimleri ve sipariş telefonu ----------
+  async function restoranAc() {
+    if (location.hash !== "#restoran") history.replaceState(null, "", "#restoran");
+    goster("restoran");
+    const kutu = $("#restoran");
+    if (!kutu.innerHTML) kutu.innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { restoranCiz(await api("restoran_liste")); }
+    catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  function restoranCiz(v) {
+    const uluslar = v.tel ? telefonUluslararasi(v.tel) : "";
+    const wpMetin = encodeURIComponent(`Merhaba, Sporkent sitesinden sipariş vermek istiyorum.\n${oturum?.unvan ? oturum.unvan + " · " : ""}${oturum?.ad || ""}\n\nSiparişim:\n`);
+    $("#restoran").innerHTML = `
+      ${v.tel ? `<div class="restoran-siparis">
+        <small>Sipariş için</small>
+        <span class="tel">📞 ${kac(v.tel)}</span>
+        <div class="restoran-dugmeler">
+          <a class="ara" href="tel:+${kac(uluslar)}">📞 Ara</a>
+          <a class="wp" href="https://wa.me/${kac(uluslar)}?text=${wpMetin}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        </div>
+      </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`}
+      ${v.resimler.length ? v.resimler.map((x) => `
+      <figure class="aidat-resim">
+        ${x.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(x.url)}" aria-label="Tam ekran aç"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Menü")}"></button>` : `<div class="foto-bos">Resim açılamadı</div>`}
+        <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b>` : ""}</span>
+          ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-restoran-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
+      </figure>`).join("") : `<p class="bos">Menü henüz eklenmedi.</p>`}
+      <p class="ipucu">Menüye dokunursanız tam ekran açılır, iki parmakla büyütebilirsiniz.</p>
+      ${v.ekleyebilir ? `
+      <form class="kart restoran-yonet" id="restoran-form">
+        <b>Yönetici: menü ve sipariş telefonu</b>
+        <label>Menü resmi başlığı (isteğe bağlı)
+          <input name="baslik" maxlength="120" placeholder="Örn. Ana yemekler">
+        </label>
+        <label class="foto-dugme"><input id="restoran-dosya" type="file" accept="image/*" hidden><span>➕ Menü resmi ekle</span></label>
+        <label>Sipariş telefonu
+          <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
+        </label>
+        <button type="button" class="ikincil" id="restoran-tel-kaydet" style="width:100%">📞 Telefonu kaydet</button>
+      </form>` : ""}`;
+  }
+  $("#restoran").addEventListener("click", async (e) => {
+    const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
+    if (e.target.closest("#restoran-tel-kaydet")) {
+      try { const x = await api("restoran_tel", { tel: $("#restoran-form").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await restoranAc(); }
+      catch (err) { mesaj(err.message); }
+      return;
+    }
+    const b = e.target.closest("[data-restoran-sil]"); if (!b) return;
+    if (!confirm("Bu menü resmi silinsin mi?")) return;
+    b.disabled = true;
+    try { await api("restoran_sil", { id: Number(b.dataset.restoranSil) }); mesaj("Resim silindi."); await restoranAc(); }
+    catch (err) { mesaj(err.message); b.disabled = false; }
+  });
+  $("#restoran").addEventListener("change", async (e) => {
+    if (e.target.id !== "restoran-dosya") return;
+    const f = e.target.files?.[0]; if (!f) return;
+    const etiket = e.target.nextElementSibling; etiket.textContent = "Yükleniyor…";
+    try {
+      const blob = await kucult(f, 2400);
+      const yol = await fotoYukle(blob, "restoran");
+      await api("restoran_ekle", { yol, baslik: $("#restoran-form").baslik.value });
+      mesaj("Menü resmi eklendi."); await restoranAc();
+    } catch (err) { mesaj(err.message); etiket.textContent = "➕ Menü resmi ekle"; e.target.value = ""; }
+  });
+
   // ---------- Ortak: plaka girişi talebi ----------
   function plakaAc() {
     if (location.hash !== "#plaka") history.replaceState(null, "", "#plaka");
@@ -2078,18 +2145,19 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const yakin = e.target.value === "yakin";
     $("#plaka-sahibi").hidden = !yakin;
     $("#plaka-form").arac_sahibi.required = yakin;
+    $("#plaka-form").arac_sahibi_tel.required = yakin; // yakının aracında yakının telefonu zorunlu
   });
   $("#plaka-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target, d = f.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Gönderiliyor…";
     try {
-      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value });
+      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value });
       if (r.eposta) {
-        mesaj("Talebiniz kooperatife e-postayla gönderildi.");
+        mesaj("Bildiriminiz kooperatife e-postayla gönderildi.");
       } else {
         // Sunucuda e-posta hizmeti yoksa telefonun e-posta uygulaması hazır metinle açılır
-        mesaj("Talebiniz kaydedildi. Açılan e-postada “Gönder”e dokunun.");
+        mesaj("Bildiriminiz kaydedildi. Açılan e-postada “Gönder”e dokunun.");
         location.href = `mailto:${r.kime}?subject=${encodeURIComponent(r.konu)}&body=${encodeURIComponent(r.metin)}`;
       }
       f.reset(); $("#plaka-sahibi").hidden = true;
@@ -2186,7 +2254,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2201,6 +2269,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
     $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi();
+    // Restoran: ortaklarda; yönetici de görür (menüyü ve sipariş telefonunu o girer)
+    $("#ana-kutular [data-ac=restoran]").hidden = !(ortakMi() || yonetici());
     // Parsel temsilcisine: ortak yakını onayları
     const yk = $("#ana-kutular [data-ac=yakinlar]");
     yk.hidden = !parsel?.temsilcilik;
@@ -2227,7 +2297,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -2614,6 +2684,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash === "#parsel") return parselAc();
     if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#plaka") return plakaAc();
+    if (location.hash === "#restoran") return restoranAc();
     if (location.hash === "#saha" || (location.hash === "" && $("#ekran-liste").hidden)) return sahaAc();
     if (location.hash === "#servis" && $("#ekran-servis").hidden) return servisAc();
     if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();
