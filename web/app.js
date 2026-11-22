@@ -737,6 +737,7 @@
       ? "Parsel temsilciniz onay verdikten sonra uygulama bu telefonda kendiliğinden açılır."
       : "Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.";
     if (!yakin) $("#bekle-temsilci").innerHTML = "";
+    $("#bekle-metin").hidden = false;
     bildirimKutusu();
     clearInterval(bekleZamani);
     bekleZamani = setInterval(durumKontrol, 10000);
@@ -744,11 +745,14 @@
   }
   // Onay bekleyen yakına parsel temsilcisinin kartı (resim, ad, telefon, Ara / WhatsApp / Mesaj)
   function bekleTemsilciCiz(t) {
-    $("#bekle-not").innerHTML = `⚠️ Girilen bilgiler kooperatifteki bilgilerle eşleşmiyor.<br><b>Lütfen ${t ? "parsel temsilciniz" : "kooperatif yönetimi"} ile görüşün.</b>`;
-    $("#bekle-metin").textContent = `${t ? "Parsel temsilciniz" : "Kooperatif yönetimi"} onay verdikten sonra uygulama bu telefonda kendiliğinden açılır.`;
+    // Temsilci yoksa tek parça not; altında yalnızca müdür ve muhasebenin telefonları
+    $("#bekle-not").innerHTML = t
+      ? `⚠️ Girilen bilgiler kooperatifteki bilgilerle eşleşmiyor.<br><b>Lütfen parsel temsilciniz ile görüşün.</b>`
+      : `⚠️ Girilen bilgiler kooperatifteki bilgilerle eşleşmiyor. Bu ortağın bulunduğu parselde <b>PARSEL TEMSİLCİSİ</b> belirlenmemiş. Bu nedenle <b>Kooperatif yönetimiyle görüşün.</b>`;
+    $("#bekle-metin").textContent = "Parsel temsilciniz onay verdikten sonra uygulama bu telefonda kendiliğinden açılır.";
+    $("#bekle-metin").hidden = !t;
     $("#bekle-temsilci").innerHTML = t ? temsilciKart(t)
-      : `<p class="parsel-not">Bu ortak numarası için parsel temsilcisi belirlenmemiş. Aşağıdaki numaralardan kooperatif yönetimiyle görüşün:</p>
-        <a class="iletisim-satir" href="tel:+905413253019"><span class="iletisim-ikon ara">📞</span><span><small>Müdür</small><b>0541 325 30 19</b><em>Aramak için dokunun</em></span></a>
+      : `<a class="iletisim-satir" href="tel:+905413253019"><span class="iletisim-ikon ara">📞</span><span><small>Müdür</small><b>0541 325 30 19</b><em>Aramak için dokunun</em></span></a>
         <a class="iletisim-satir" href="tel:+905413253021"><span class="iletisim-ikon ara">📞</span><span><small>Muhasebe</small><b>0541 325 30 21</b><em>Aramak için dokunun</em></span></a>`;
   }
 
