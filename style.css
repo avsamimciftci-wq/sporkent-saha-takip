@@ -85,7 +85,8 @@ img { -webkit-user-drag: none; }
 .perde { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
 .soru { width: 100%; max-width: 420px; }
 .ust-kurum { font-size: 17.25px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
-.ust-baslik { font-size: 34.6px; font-weight: 700; line-height: 1.15; }
+/* Başlık, logo ile "Ana Sayfaya Dön" arasında kalan yere göre küçülür (100vw - 320px = kenarlar + logo + düğme) */
+.ust-baslik { font-size: min(34.6px, calc((100vw - 320px) / 5.3)); font-weight: 700; line-height: 1.15; }
 .ust-dugme {
   background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5);
   border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px;
@@ -741,14 +742,19 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
   .ust-sol { gap: 9px; }
   /* Logo, sağdaki "Ana Sayfaya Dön" düğmesiyle aynı yükseklikte (92 px) kare */
   .ust-logo { width: 92px; height: 92px; }
-  /* Sığmadığı telefonda SAHA / TAKİP iki satıra bölünür, düğmenin altına girmez */
-  .ust-baslik { font-size: 28.6px; line-height: 1.05; white-space: normal; }
+  /* SPORKENT / ASİSTAN iki satıra bölünür; yazı boyu logo ile düğme arasında kalan yere göre küçülür,
+     düğmenin altına girmez (100vw - 263px = kenar boşlukları + logo + düğme) */
+  .ust-baslik { font-size: min(28.6px, calc((100vw - 263px) / 5.3)); line-height: 1.05; white-space: normal; }
   .ust-ana { padding: 6px 8px; width: 130px; height: 92px; min-height: 0; font-size: 15px; border-radius: 14px; }
   .ust-ana span { font-size: 28px; }
 }
-/* En dar telefonlar (iPhone SE 1. nesil, 320 px): TAKİP düğmenin altına girmesin */
+/* En dar telefonlar (iPhone SE 1. nesil, 320 px): logo ve düğme biraz küçülür (yine aynı yükseklikte),
+   başlık okunur boyda kalır */
 @media (max-width: 340px) {
-  .ust-baslik { font-size: 22px; }
+  .ust-logo { width: 72px; height: 72px; }
+  .ust-ana { width: 110px; height: 72px; font-size: 13px; }
+  .ust-ana span { font-size: 22px; }
+  .ust-baslik { font-size: calc((100vw - 223px) / 5.3); }
 }
 @media (max-width: 360px) {
   .alt-menu .ad-uzun { display: none; }
@@ -782,7 +788,20 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .restoran-dugmeler a { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 60px; border-radius: 14px; color: #fff; font-weight: 800; font-size: 19px; text-decoration: none; }
 .restoran-dugmeler .ara { background: #1565c0; }
 .restoran-dugmeler .wp { background: #1b8a4a; }
-.restoran-yonet { margin-top: 12px; }
+.restoran-yonet { margin: 0 0 16px; border: 2px solid #c62828; }
+.restoran-form-baslik { display: block; font-size: 20px; color: #b71c1c; margin-bottom: 10px; }
+.restoran-tur { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.restoran-tur button { font: inherit; font-weight: 800; font-size: 15px; line-height: 1.3; padding: 10px 4px; border-radius: 12px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); cursor: pointer; }
+.restoran-tur button.secili { background: #c62828; border-color: #c62828; color: #fff; }
+.restoran-tel-ayar { margin-top: 12px; font-size: 15px; }
+.restoran-tel-ayar summary { cursor: pointer; color: var(--soluk); font-weight: 700; }
+.restoran-tel-ayar input { width: 100%; margin-top: 8px; }
+.paylasim { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 16px; padding: 12px; margin-bottom: 14px; box-shadow: var(--golge); }
+.paylasim-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; color: var(--soluk); margin-bottom: 8px; }
+.paylasim img { display: block; width: 100%; border-radius: 10px; }
+.paylasim-video { display: block; width: 100%; border-radius: 10px; background: #000; max-height: 70vh; }
+.paylasim-pdf { display: flex; align-items: center; justify-content: center; min-height: 64px; border-radius: 12px; background: #fff3e0; border: 2px solid #ef6c00; color: #8a3a00; font-weight: 800; font-size: 19px; text-decoration: none; }
+.paylasim-metin { margin: 10px 2px 2px; font-size: 18px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
 /* Plaka girişi talebi */
 .ak-plaka { background: linear-gradient(145deg, #455a64, #1c313a); }
 .bant-plaka { background: #37474f; }
