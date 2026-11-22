@@ -1182,7 +1182,7 @@
   // Bütün ortaklara tek mesaj: kod yok, kooperatifte kayıtlı telefonla hemen girilir
   const genelDavetMetni = `Sayın Ortağımız,
 
-SPORKENT ASİSTAN uygulaması kullanıma açıldı. Sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi ve parsel temsilcinizi görebilirsiniz.
+SPORKENT ASİSTAN uygulaması kullanıma açıldı. Kooperatifin duyurularını anında alabilir, sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi, parsel temsilcinizi ve restoran menüsünü görebilir, araç plakanızı bildirebilirsiniz.
 
 Katılmak için:
 1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
