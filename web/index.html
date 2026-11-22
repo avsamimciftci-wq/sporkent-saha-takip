@@ -6,6 +6,8 @@
   <title>SPORKENT ASİSTAN</title>
   <meta name="theme-color" content="#1f4e45">
   <link rel="manifest" href="manifest.json">
+  <!-- TG / YK linkiyle gelen telefon ana ekrana eklerse uygulama hep "şahsi kodla giriş" ile açılsın (iPhone ana ekran uygulaması Safari'nin hafızasını görmez) -->
+  <script>if (/[?&](tg|giris=tg)/.test(location.search)) document.querySelector('link[rel=manifest]').href = "manifest-tg.json";</script>
   <link rel="icon" href="icons/logo-192.png">
   <link rel="apple-touch-icon" href="icons/logo-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -70,7 +72,9 @@
     <section id="giris-secim" class="kart giris-secim" hidden>
       <h1>Nasıl giriş yapacaksınız?</h1>
       <button id="sec-ortak" class="secim-dugme secim-ortak" type="button"><span>🏠</span><b>Kooperatif Ortağıyım</b><small>Kendi ortaklık numaramla kayıt oluyorum</small></button>
-      <button id="sec-yakin" class="secim-dugme secim-yakin" type="button"><span>👨‍👩‍👧</span><b>Ortağın Yakınıyım</b><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></button>    </section>
+      <button id="sec-yakin" class="secim-dugme secim-yakin" type="button"><span>👨‍👩‍👧</span><b>Ortağın Yakınıyım</b><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></button>
+      <button id="sec-tg" class="metin-dugme sec-tg" type="button">🔑 Temsilciler Grubu (TG) ya da Yönetim Kurulu üyesiyseniz <b>buraya dokunun</b></button>
+    </section>
 
     <form id="kayit-form" class="kart" hidden>
       <button id="mod-degistir" class="metin-dugme mod-degistir" type="button"></button>

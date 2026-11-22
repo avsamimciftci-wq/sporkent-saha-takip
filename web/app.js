@@ -950,6 +950,7 @@
   });
   $("#kayda-don").addEventListener("click", () => { sakla.sil("sk_tg"); girisEkrani(null); window.scrollTo(0, 0); });
   $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 0); girisEkrani(false); window.scrollTo(0, 0); });
+  $("#sec-tg").addEventListener("click", () => { sakla.koy("sk_tg", 1); sakla.koy("sk_yakin", 0); girisEkrani(true); window.scrollTo(0, 0); });
   $("#sec-yakin").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 1); girisEkrani(false); window.scrollTo(0, 0); });
   // Davet kodu kutusuna harfli şahsi kod yazılırsa (TG / YK üyesi yanlış forma geldi): şahsi kodla girişe geç
   $("#kayit-form [name=davet_kodu]")?.addEventListener("input", (e) => {
