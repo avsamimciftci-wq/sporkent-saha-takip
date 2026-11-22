@@ -39,6 +39,7 @@
     <p class="ana-karsilama"><span id="ana-hitap"></span> <b id="ana-ad"></b></p>
     <div id="ana-kutular" class="ana-kutular">
       <button type="button" data-ac="parsel" class="ana-kutu ak-parsel tam" hidden><span class="parsel-foto" id="ana-parsel-foto">👤</span><span class="parsel-yazi"><b>Parsel Temsilcisi</b><small></small></span></button>
+      <button type="button" data-ac="yakinlar" class="ana-kutu ak-yakinlar tam" hidden><span>👨‍👩‍👧</span>Ortak Yakını Onayları<small></small></button>
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
       <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
@@ -65,29 +66,19 @@
     <section id="giris-secim" class="kart giris-secim" hidden>
       <h1>Nasıl giriş yapacaksınız?</h1>
       <button id="sec-ortak" class="secim-dugme secim-ortak" type="button"><span>🏠</span><b>Kooperatif Ortağıyım</b><small>Kendi ortaklık numaramla kayıt oluyorum</small></button>
-      <button id="sec-yakin" class="secim-dugme secim-yakin" type="button"><span>👨‍👩‍👧</span><b>Ortağın Yakınıyım</b><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></button>
-      <button id="sec-tg" class="secim-dugme secim-tg" type="button"><span>🏅</span><b>TG / YK üyesiyim ya da görevliyim</b><small>Bana verilen şahsi kodum var (örn. TG1234)</small></button>
-    </section>
+      <button id="sec-yakin" class="secim-dugme secim-yakin" type="button"><span>👨‍👩‍👧</span><b>Ortağın Yakınıyım</b><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></button>    </section>
 
     <form id="kayit-form" class="kart" hidden>
-      <button id="kodla-gir-ust" class="tg-giris-dugme" type="button">👤 TG / YK üyesi ya da görevliyseniz<br><b>Şahsi kodunuzla buradan girin →</b></button>
       <button id="mod-degistir" class="metin-dugme mod-degistir" type="button"></button>
       <h1 id="kayit-baslik">Ortak kaydı</h1>
       <p id="kayit-aciklama" class="ipucu kayit-ust"></p>
-      <label id="yakinlik-alan" hidden>Ortakla yakınlığınız
-        <select name="yakinlik">
-          <option value="">Seçin…</option>
-          <option>Eşi</option><option>Kızı</option><option>Oğlu</option><option>Damadı</option><option>Gelini</option>
-          <option>Torunu</option><option>Annesi / Babası</option><option>Kardeşi</option><option>Misafiri</option><option>Kiracısı</option><option>Diğer</option>
-        </select>
-      </label>
-      <label>Adınız ve soyadınız
+      <label><span id="ad-etiket">Adınız ve soyadınız</span>
         <input name="ad_soyad" autocomplete="name" required maxlength="80" placeholder="Örn. Ayşe Yılmaz">
       </label>
       <label><span id="no-etiket">Ortaklık numaranız</span>
         <input name="ortak_no" required inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Örn. 12">
       </label>
-      <label>Cep telefonunuz
+      <label><span id="tel-etiket">Cep telefonunuz</span>
         <input name="telefon" type="tel" autocomplete="tel" required maxlength="20" placeholder="0532 123 45 67">
         <small id="tel-ipucu" class="ipucu"></small>
       </label>
@@ -95,7 +86,6 @@
       <label class="okudum-kutu"><input type="checkbox" name="aydinlatma" required> <span><a href="aydinlatma.html">Aydınlatma metnini</a> okudum.</span></label>
       <button class="ana-dugme" type="submit">Kayıt ol</button>
       <p id="kayit-hata" class="hata" hidden></p>
-      <button id="kodla-gir" class="metin-dugme" type="button">Görevli misiniz? Kişisel kodla giriş →</button>
     </form>
 
     <form id="giris-form" class="kart" hidden>
@@ -121,7 +111,7 @@
       <div style="font-size:44px">⏳</div>
       <h1>Onay bekleniyor</h1>
       <p><b id="bekle-ad"></b> · <span id="bekle-rol"></span></p>
-      <p class="ipucu" style="font-size:15px">Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.</p>
+      <p id="bekle-metin" class="ipucu" style="font-size:15px">Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.</p>
       <button id="bekle-bildirim" class="ikincil" style="width:100%">🔔 Onaylanınca bildirim gelsin</button>
     </div>
   </main>
@@ -203,6 +193,13 @@
   <main id="ekran-parsel" class="ekran" hidden>
     <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
     <div id="parsel-icerik"></div>
+  </main>
+
+  <!-- Parsel temsilcisi: kendi parselindeki ortakların yakınlarının katılma başvuruları -->
+  <main id="ekran-yakinlar" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-yakin">👨‍👩‍👧 Ortak Yakını Onayları</h1></div>
+    <p class="modul-alt">Parselinizdeki ortakların yakınları (eşi, çocuğu, damadı, misafiri…) uygulamaya katılmak istiyor. Telefonu ortağın kooperatif kaydında olmayanlar sizin onayınızı bekler.</p>
+    <div id="yakin-liste"></div>
   </main>
 
   <!-- Saha Takip (ana ekran) -->

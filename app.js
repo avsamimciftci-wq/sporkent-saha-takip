@@ -21,6 +21,7 @@
   let filtre = "acik";
   // Parsel temsilcisi bilgisi: { ortak, temsilci } ortağa; { temsilciler, resimEkler } yöneticiye; { temsilcilik } temsilciye
   let parsel = sakla.al("sk_parsel");
+  let bekleyenYakinlar = []; // parsel temsilcisine: onayını bekleyen ortak yakınları
 
   // ---------- Sunucu ----------
   class SunucuHatasi extends Error {
@@ -64,7 +65,7 @@
     if (o?.rol === "baskan") return "Yönetim Kurulu Başkanı Sayın";
     if (o?.rol === "yonetim") return "Yönetim Kurulu Üyesi Sayın";
     if (o?.rol === "uye" && /^TG/i.test(un)) return /başkan/i.test(un) ? "Temsilciler Grubu Başkanı Sayın" : "Temsilciler Grubu Üyesi Sayın";
-    if (o?.rol === "uye" && /Yakını/.test(un)) return "Sayın";
+    if (o?.rol === "uye" && /Yakını/.test(un)) return "Hoş geldiniz,";
     if (o?.rol === "uye") return "Ortağımız Sayın";
     return "Sayın";
   }
@@ -172,6 +173,10 @@
       cevapKisiler = r.cevapKisiler || [];
       parsel = r.parsel || null; sakla.koy("sk_parsel", parsel);
       if (!$("#ekran-parsel").hidden) parselCiz();
+      const oncekiYakin = bekleyenYakinlar.length;
+      bekleyenYakinlar = r.bekleyenYakinlar || [];
+      if (bekleyenYakinlar.length > oncekiYakin && oncekiYakin >= 0 && r.bekleyenYakinlar) mesaj(`Onayınızı bekleyen ${bekleyenYakinlar.length} ortak yakını var.`);
+      if (!$("#ekran-yakinlar").hidden) yakinCiz();
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
       if ((r.unvan || null) !== (oturum.unvan || null)) { oturum.unvan = r.unvan || null; sakla.koy("sk_oturum", oturum); }
@@ -725,6 +730,10 @@
     goster("bekle");
     $("#bekle-ad").textContent = oturum.ad;
     $("#bekle-rol").textContent = oturum.unvan || ROL_ADI[oturum.rol] || "";
+    // Ortak yakınının başvurusu parsel temsilcisine, diğerleri yöneticiye gider
+    $("#bekle-metin").textContent = /Yakını/.test(oturum.unvan || "")
+      ? "Telefonunuz ortağın kooperatifteki kayıtlarında olmadığı için kaydınız parsel temsilcisine iletildi. Onaylandığında bu ekran kendiliğinden açılır."
+      : "Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.";
     bildirimKutusu();
     clearInterval(bekleZamani);
     bekleZamani = setInterval(durumKontrol, 10000);
@@ -784,14 +793,14 @@
 
   // Kayıt formu iki biçimde: kooperatif ortağı ya da ortağın yakını (eşi, çocuğu, damadı, misafiri…)
   function kayitModu(yakin) {
-    const f = $("#kayit-form");
-    $("#yakinlik-alan").hidden = !yakin;
-    f.yakinlik.required = yakin;
     $("#kayit-baslik").textContent = yakin ? "Ortak yakını kaydı" : "Ortak kaydı";
     $("#kayit-aciklama").innerHTML = yakin
-      ? "Hangi ortağın yakını olduğunuzu ve kendi bilgilerinizi yazın. Telefonunuz ortağın kooperatifteki kaydında varsa uygulama <b>hemen açılır</b>; yoksa yönetim onaylayınca açılır."
+      ? "Yakını olduğunuz ortağın adını ve ortaklık numarasını, sonra kendi cep telefonunuzu yazın. Telefonunuz ortağın kooperatifteki kaydında varsa uygulama <b>hemen açılır</b>; yoksa parsel temsilcisi onaylayınca açılır."
       : "Bilgilerinizi yazın. Cep telefonunuz kooperatifte kayıtlı numaranızsa uygulama <b>hemen açılır</b>. Şifre ya da kod gerekmez.";
-    $("#no-etiket").textContent = yakin ? "Yakını olduğunuz ortağın ortaklık numarası" : "Ortaklık numaranız";
+    $("#ad-etiket").textContent = yakin ? "Ortağın adı ve soyadı" : "Adınız ve soyadınız";
+    $("#no-etiket").textContent = yakin ? "Ortağın ortaklık numarası" : "Ortaklık numaranız";
+    $("#tel-etiket").textContent = yakin ? "Kendi cep telefonunuz" : "Cep telefonunuz";
+    $("#kayit-form").ad_soyad.placeholder = yakin ? "Örn. Ahmet Yılmaz (ortağın adı)" : "Örn. Ayşe Yılmaz";
     $("#tel-ipucu").textContent = yakin
       ? "Kendi cep telefonunuzu yazın. Yurt dışı numarası ise başına + koyun (örn. +49 …)."
       : "Kooperatifte kayıtlı cep telefonunuzu yazın. Başka bir numara yazarsanız kaydınız yönetimin onayına gider. Yurt dışı numarası ise başına + koyun (örn. +49 …).";
@@ -816,12 +825,17 @@
       </ol>
       <div class="ios-ok">↘</div>`;
   }
-  $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
-  $("#kodla-gir-ust").addEventListener("click", () => { girisEkrani(true); window.scrollTo(0, 0); });
+  // Şahsi kodla giriş düğmesi ortaklara gösterilmez: TG / YK üyeleri kendi linkiyle gelir.
+  // Link bilgisi kaybolursa (iPhone ana ekran uygulaması), giriş ekranlarında üst banttaki logoya art arda 5 kez dokunulunca açılır.
+  let gizliDokunus = 0, gizliZaman = null;
+  $(".ust").addEventListener("click", () => {
+    if (onayli() || !$("#ekran-giris") || $("#ekran-giris").hidden) return;
+    gizliDokunus++; clearTimeout(gizliZaman); gizliZaman = setTimeout(() => (gizliDokunus = 0), 2500);
+    if (gizliDokunus >= 5) { gizliDokunus = 0; sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0); }
+  });
   $("#kayda-don").addEventListener("click", () => { sakla.sil("sk_tg"); girisEkrani(null); window.scrollTo(0, 0); });
   $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 0); girisEkrani(false); window.scrollTo(0, 0); });
   $("#sec-yakin").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 1); girisEkrani(false); window.scrollTo(0, 0); });
-  $("#sec-tg").addEventListener("click", () => { sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0); });
   // Davet kodu kutusuna harfli şahsi kod yazılırsa (TG / YK üyesi yanlış forma geldi): şahsi kodla girişe geç
   $("#kayit-form [name=davet_kodu]")?.addEventListener("input", (e) => {
     const v = e.target.value.trim();
@@ -866,7 +880,7 @@
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
       const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")),
-        yakinlik: sakla.al("sk_yakin") ? String(f.get("yakinlik") || "") : "" });
+        yakin: !!sakla.al("sk_yakin") });
       oturum = { ad: r.ad, rol: r.rol, unvan: r.unvan, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
       sakla.koy("sk_oturum", oturum);
       await basla();
@@ -927,6 +941,7 @@
     if (!location.hash || location.hash === "#ana") return anaAc();
     if (location.hash === "#servis") return servisAc();
     if (location.hash === "#parsel") return parselAc();
+    if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -1006,8 +1021,9 @@
         const ortak = ayniNoluar.filter((x) => !yakinMi(x));
         ek = ortak.length ? `<br><small class="ayni-no">ℹ️ Ortağın kendisi grupta: <b>${ortak.map((x) => kac(x.ad)).join(", ")}</b></small>` : `<br><small class="ayni-no">ℹ️ Bu ortağın kendisi henüz uygulamada değil.</small>`;
       } else {
-        const k = ayniNoluar.find((x) => !yakinMi(x));
-        ek = k ? `<br><small class="ayni-no">⚠ Bu numarada ortak kaydı zaten var: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski ortak kaydı silinir (yakınlara dokunulmaz).</small>` : "";
+        // Bir ortak birden fazla telefondan girebilir: onaylamak eski kayıtları silmez
+        const k = ayniNoluar.filter((x) => !yakinMi(x));
+        ek = k.length ? `<br><small class="ayni-no">ℹ️ Bu ortak başka telefonla da kayıtlı: ${k.map((x) => `<b>${kac(x.ad)}</b>${x.telefon ? " · " + kac(x.telefon) : ""}`).join(", ")}. Onaylamak onu silmez.</small>` : "";
       }
       return eslesmeKutusu(u) + ek;
     };
@@ -1199,7 +1215,9 @@ ${TG_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. "TG / YK üyesiyim ya da görevliyim" seçeneğine dokunun. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
+3. "Şahsi kodla giriş" ekranı açılır. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
+
+(iPhone'da uygulama açılınca bu ekran yerine "Nasıl giriş yapacaksınız?" ekranı gelirse, en üstteki Sporkent logosuna art arda 5 kez dokunun; şahsi kodla giriş ekranı açılır.)
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
@@ -2031,6 +2049,38 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
+  // ---------- Parsel temsilcisi: ortak yakınlarının katılma başvuruları ----------
+  function yakinlarAc() {
+    if (location.hash !== "#yakinlar") history.replaceState(null, "", "#yakinlar");
+    goster("yakinlar"); yakinCiz();
+  }
+  function yakinCiz() {
+    const liste = bekleyenYakinlar;
+    $("#yakin-liste").innerHTML = liste.length ? liste.map((y) => `
+      <div class="yakin-kart">
+        <b>${kac(y.ad)}</b>
+        <span>${kac(y.ortak_no)} No'lu ortağın yakını · ${tarihSaat(y.created_at)}</span>
+        <span class="${y.ad_uyuyor ? "eslesme-uyuyor" : "eslesme-uymuyor"} yakin-eslesme">${y.ad_uyuyor ? "✔ Yazdığı ortak adı kooperatif kaydıyla aynı" : "✖ Yazdığı ortak adı kooperatif kaydından farklı"}</span>
+        <span class="eslesme-uymuyor yakin-eslesme">✖ Telefonu ortağın kooperatif kaydında yok</span>
+        <a class="yakin-tel" href="tel:${kac(String(y.telefon).replace(/\s/g, ""))}">📞 ${kac(y.telefon)} · Ara</a>
+        <div class="dugmeler">
+          <button type="button" class="ikincil tehlike" data-yakin-reddet="${kac(y.cihaz)}">✖ Reddet</button>
+          <button type="button" class="ana-dugme" data-yakin-onayla="${kac(y.cihaz)}">✔ Onayla</button>
+        </div>
+      </div>`).join("") : `<p class="bos">Onay bekleyen yakın yok. 👍</p>`;
+  }
+  $("#yakin-liste").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-yakin-onayla],[data-yakin-reddet]"); if (!b) return;
+    const onay = !!b.dataset.yakinOnayla, hedef = b.dataset.yakinOnayla || b.dataset.yakinReddet;
+    if (!onay && !confirm("Bu başvuru reddedilsin mi? Kişi uygulamaya giremez.")) return;
+    b.disabled = true;
+    try {
+      await api(onay ? "yakin_onayla" : "yakin_reddet", { hedef });
+      await yenile(); yakinCiz();
+      mesaj(onay ? "Onaylandı. Uygulama kişinin telefonunda açıldı." : "Başvuru reddedildi.");
+    } catch (err) { mesaj(err.message); b.disabled = false; }
+  });
+
   // Parsel Temsilcisi ekranı: ortağa kendi temsilcisi, yöneticiye bütün temsilciler (resim ekleyerek)
   function parselCiz() {
     let html;
@@ -2087,7 +2137,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2100,6 +2150,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    // Parsel temsilcisine: ortak yakını onayları
+    const yk = $("#ana-kutular [data-ac=yakinlar]");
+    yk.hidden = !parsel?.temsilcilik;
+    yk.querySelector("small").textContent = bekleyenYakinlar.length ? `⏳ ${bekleyenYakinlar.length} onay bekliyor` : "Bekleyen yok";
     // Parsel Temsilcisi düğmesi ortaklarda ve yöneticide (resmi o ekler); Saha Takip herkeste ayrı düğme
     const pk = $("#ana-kutular [data-ac=parsel]");
     pk.hidden = !(ortakMi() || yonetici());
@@ -2111,7 +2165,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (Parsel Temsilcisi hep tam genişlik)
-    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel)")].filter((k) => !k.hidden);
+    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel):not(.ak-yakinlar)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
     for (const [kutu, rozet] of [["saha", "#saha-rozet"], ["yonetim", "#yk-rozet"]]) {
       const r = $(rozet), k = $(`#ana-kutular [data-ac=${kutu}] small`);
@@ -2122,7 +2176,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -2507,6 +2561,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (!onayli()) return;
     if (location.hash === "#ana") return anaAc();
     if (location.hash === "#parsel") return parselAc();
+    if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#saha" || (location.hash === "" && $("#ekran-liste").hidden)) return sahaAc();
     if (location.hash === "#servis" && $("#ekran-servis").hidden) return servisAc();
     if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();
