@@ -43,6 +43,7 @@
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
       <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
+      <button type="button" data-ac="plaka" class="ana-kutu ak-plaka" hidden><span>🚗</span>Plaka Girişi Talebi</button>
       <button type="button" data-ac="iletisim" class="ana-kutu ak-iletisim"><span>☎️</span>İletişim</button>
       <button type="button" data-ac="sokaklar" class="ana-kutu ak-sokak"><span>🗺️</span>Sokak Numaraları</button>
       <button type="button" data-ac="servis" class="ana-kutu ak-servis"><span>🚐</span>Servis</button>
@@ -195,6 +196,27 @@
   <main id="ekran-parsel" class="ekran" hidden>
     <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
     <div id="parsel-icerik"></div>
+  </main>
+
+  <!-- Ortak: araç plakası giriş talebi (kooperatif e-posta adresine gider) -->
+  <main id="ekran-plaka" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-plaka">🚗 Plaka Girişi Talebi</h1></div>
+    <form id="plaka-form" class="kart plaka-form">
+      <p class="modul-alt" style="margin-top:0">Site girişinde tanınması için aracın plakasını kooperatife bildirin.</p>
+      <b class="plaka-soru">1. Araç kimin?</b>
+      <div class="plaka-sec">
+        <label><input type="radio" name="arac" value="kendi" required><span>🙋 Kendi aracım</span></label>
+        <label><input type="radio" name="arac" value="yakin"><span>👨‍👩‍👧 Yakınımın aracı</span></label>
+      </div>
+      <label id="plaka-sahibi" hidden>Aracın sahibi olan yakınınızın adı ve soyadı
+        <input name="arac_sahibi" maxlength="80" autocomplete="off" placeholder="Örn. Zeynep Yılmaz">
+      </label>
+      <label><b class="plaka-soru">2. Plaka numarası</b>
+        <input name="plaka" class="plaka-kutu" required maxlength="14" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="34 ABC 123">
+      </label>
+      <button class="ana-dugme" type="submit">📧 Kooperatife Gönder</button>
+      <p class="ipucu">Talebiniz <b>kooperatif@sporkentsitesi.com</b> adresine gider.</p>
+    </form>
   </main>
 
   <!-- Parsel temsilcisi: kendi parselindeki ortakların yakınlarının katılma başvuruları -->
