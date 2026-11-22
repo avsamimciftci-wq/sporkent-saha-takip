@@ -116,7 +116,10 @@ const ROL_ADI: Record<Rol, string> = {
   baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi", restoran: "Restoran Yetkilisi",
 };
 // Restoran yetkilisinin yapabileceği işlemler (başka hiçbir bölüme erişemez)
-const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel"];
+const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel", "duyuru_liste", "kullanim"];
+// Kullanım raporunda sayılan bölümler (uygulamadaki ekran adları)
+const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restoran", "yonetim", "aidat", "plaka", "iletisim", "sokaklar", "servis",
+  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -655,6 +658,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         const t = await temsilciBul((u as any).ortak_no);
         if (t) temsilci = (await temsilciGorunumu([t]))[0];
       }
+      // Kullanım raporu: uygulamayı ana ekrana ekleyen ve her açılış (durum açılışta bir kez sorulur)
+      if (g.kurulu === true && !(u as any).kurulu) await db.from("uyeler").update({ kurulu: true, kurulu_at: new Date().toISOString() }).eq("cihaz", u.cihaz);
+      if (g.acilis === true) await db.rpc("kullanim_say", { p_cihaz: u.cihaz, p_bolum: "acilis" });
       return { rol, durum: u.durum, ad: u.ad, unvan: (u as any).unvan ?? null, temsilci };
     }
 
@@ -736,8 +742,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "yukleme_adresi": {
       // Restoran paylaşımında PDF ve video da yüklenir; diğer her şey JPEG fotoğraf
-      const uzanti = g.tur === "restoran" && ["jpg", "pdf", "mp4", "mov", "webm"].includes(g.uzanti) ? g.uzanti : "jpg";
-      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "restoran" ? "restoran" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
+      // Duyuru dosyasını yalnızca yönetici yükler
+      if (g.tur === "duyuru") yonetici();
+      const coklu = g.tur === "restoran" || g.tur === "duyuru";
+      const uzanti = coklu && ["jpg", "pdf", "mp4", "mov", "webm"].includes(g.uzanti) ? g.uzanti : "jpg";
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -1052,8 +1061,112 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     // ---------- Restoran: paylaşımlar (görsel, metin, PDF, video) ve sipariş telefonu ----------
+    // ---------- Duyurular: yalnızca yönetici paylaşır, herkes görür, her paylaşım herkese bildirilir ----------
+    case "duyuru_liste": {
+      const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "duyuru").order("created_at", { ascending: false }).limit(100);
+      if (error) throw error;
+      const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
+      const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+      const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
+      return {
+        paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at,
+          ekleyen: "Kooperatif Yönetimi", url: x.yol ? harita.get(x.yol) ?? null : null })),
+        yonetir: rol === "baskan",
+      };
+    }
+
+    case "duyuru_paylas": {
+      yonetici();
+      const tur = ["gorsel", "metin", "pdf", "video"].includes(g.tur) ? g.tur : "";
+      if (!tur) throw new Hata("Duyuru türünü seçin.");
+      const metin = temiz(g.metin, 3000);
+      const yol = tur === "metin" ? null : temiz(g.yol, 200);
+      if (tur === "metin" && !metin) throw new Hata("Duyuru metnini yazın.");
+      if (tur !== "metin" && !yol?.startsWith("duyuru/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
+      const { data: p, error } = await db.from("restoran_paylasim").insert({ bolum: "duyuru", tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
+      if (error) throw error;
+      let resim: string | null = null;
+      if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
+      const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)", video: " (video)" }[tur as "gorsel"];
+      await duyur("hepsi", `📢 Duyuru${ek}`, (metin || "Duyurular bölümünde yeni bir duyuru var.").slice(0, 180), { sayfa: "duyuru", resim, haric: u.cihaz });
+      return { id: p.id };
+    }
+
+    case "duyuru_sil": {
+      yonetici();
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).eq("bolum", "duyuru").maybeSingle();
+      if (!x) throw new Hata("Duyuru bulunamadı.");
+      if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
+      await db.from("restoran_paylasim").delete().eq("id", x.id);
+      return { tamam: true };
+    }
+
+    // ---------- Kullanım: bölüm açılışlarını sayar; rapor yalnızca yöneticide ----------
+    case "kullanim": {
+      const bolum = temiz(g.bolum, 30);
+      if (KULLANIM_BOLUMLERI.includes(bolum) && bolum !== "acilis") await db.rpc("kullanim_say", { p_cihaz: u.cihaz, p_bolum: bolum });
+      return { tamam: true };
+    }
+
+    case "kullanim_raporu": {
+      yonetici();
+      const gun = [1, 7, 30, 90, 365].includes(Number(g.gun)) ? Number(g.gun) : 30;
+      const simdi = Date.now();
+      const bas = new Date(simdi + 3 * 3600e3 - (gun - 1) * 86400e3).toISOString().slice(0, 10); // Türkiye günü
+      const { data: uy, error } = await db.from("uyeler").select("cihaz, ad, rol, unvan, durum, created_at, son_gorulme, kurulu").neq("durum", "cikarildi");
+      if (error) throw error;
+      const kisiler = (uy ?? []).filter((x: any) => !x.cihaz.startsWith("test-"));
+      const { data: ab } = await db.from("abonelikler").select("cihaz");
+      const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
+      // Kullanım satırları sayfa sayfa okunur
+      let ku: any[] = [];
+      for (let i = 0; ; i += 1000) {
+        const { data: p, error: e2 } = await db.from("kullanim").select("cihaz, bolum, sayi").gte("gun", bas).range(i, i + 999);
+        if (e2) throw e2;
+        ku = ku.concat(p ?? []);
+        if ((p ?? []).length < 1000) break;
+      }
+      ku = ku.filter((x) => !x.cihaz.startsWith("test-"));
+      const bolumler: Record<string, { acilis: number; kisi: Set<string> }> = {};
+      const kisiAcilis = new Map<string, number>(), kisiBolum = new Map<string, Record<string, number>>();
+      for (const x of ku) {
+        if (x.bolum === "acilis") { kisiAcilis.set(x.cihaz, (kisiAcilis.get(x.cihaz) ?? 0) + x.sayi); continue; }
+        if (x.bolum === "ana") continue;
+        (bolumler[x.bolum] ??= { acilis: 0, kisi: new Set() }).acilis += x.sayi;
+        bolumler[x.bolum].kisi.add(x.cihaz);
+        const kb = kisiBolum.get(x.cihaz) ?? {}; kb[x.bolum] = (kb[x.bolum] ?? 0) + x.sayi; kisiBolum.set(x.cihaz, kb);
+      }
+      const once = (s: number) => kisiler.filter((x: any) => x.durum === "onayli" && x.son_gorulme && simdi - Date.parse(x.son_gorulme) < s * 3600e3).length;
+      return {
+        gun,
+        ozet: {
+          kayitli: kisiler.filter((x: any) => x.durum === "onayli").length,
+          bekleyen: kisiler.filter((x: any) => x.durum === "bekliyor").length,
+          kurulu: kisiler.filter((x: any) => x.durum === "onayli" && x.kurulu).length,
+          bildirim: kisiler.filter((x: any) => x.durum === "onayli" && aboneler.has(x.cihaz)).length,
+          aktif_24s: once(24), aktif_7g: once(24 * 7), aktif_30g: once(24 * 30),
+          donemde_acan: kisiAcilis.size,
+          acilis: [...kisiAcilis.values()].reduce((a, b) => a + b, 0),
+        },
+        roller: Object.entries(kisiler.filter((x: any) => x.durum === "onayli").reduce((m: Record<string, number>, x: any) => {
+          const un = x.unvan ?? "";
+          const k = /Yakını/.test(un) ? "Ortak yakını" : /No'lu Ortak$/.test(un) ? "Ortak" : un || (ROL_ADI[x.rol as Rol] ?? x.rol);
+          m[k] = (m[k] ?? 0) + 1; return m;
+        }, {})).sort((a, b) => b[1] - a[1]),
+        bolumler: Object.entries(bolumler).map(([b, v]) => ({ bolum: b, acilis: v.acilis, kisi: v.kisi.size })).sort((a, b) => b.acilis - a.acilis),
+        kisiler: kisiler.filter((x: any) => x.durum === "onayli")
+          .map((x: any) => {
+            const kb = kisiBolum.get(x.cihaz) ?? {};
+            const enCok = Object.entries(kb).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+            return { ad: x.ad, unvan: x.unvan ?? ROL_ADI[x.rol as Rol] ?? x.rol, son_gorulme: x.son_gorulme, kayit: x.created_at,
+              kurulu: !!x.kurulu, bildirim: aboneler.has(x.cihaz), acilis: kisiAcilis.get(x.cihaz) ?? 0, en_cok: enCok };
+          })
+          .sort((a: any, b: any) => (Date.parse(b.son_gorulme ?? 0) || 0) - (Date.parse(a.son_gorulme ?? 0) || 0)),
+      };
+    }
+
     case "restoran_liste": {
-      const { data, error } = await db.from("restoran_paylasim").select("*").order("created_at", { ascending: false }).limit(100);
+      const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "restoran").order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
       const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
       const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
@@ -1088,7 +1201,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "restoran_sil": {
       // Restoran yetkilisi ve yönetici her paylaşımı silebilir
       restoranYonetir();
-      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).maybeSingle();
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).eq("bolum", "restoran").maybeSingle();
       if (!x) throw new Hata("Paylaşım bulunamadı.");
       if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
       await db.from("restoran_paylasim").delete().eq("id", x.id);

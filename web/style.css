@@ -802,6 +802,53 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .paylasim-video { display: block; width: 100%; border-radius: 10px; background: #000; max-height: 70vh; }
 .paylasim-pdf { display: flex; align-items: center; justify-content: center; min-height: 64px; border-radius: 12px; background: #fff3e0; border: 2px solid #ef6c00; color: #8a3a00; font-weight: 800; font-size: 19px; text-decoration: none; }
 .paylasim-metin { margin: 10px 2px 2px; font-size: 18px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+/* Duyurular: restoran paylaşımıyla aynı yapı, lacivert renkte */
+.ak-duyuru { background: linear-gradient(145deg, #283593, #121858); }
+.bant-duyuru { background: #283593; }
+#duyuru .restoran-yonet { border-color: #283593; }
+#duyuru .restoran-form-baslik { color: #283593; }
+#duyuru .restoran-tur button.secili { background: #283593; border-color: #283593; }
+.paylasim.duyuru { border-left: 6px solid #283593; }
+.paylasim.duyuru .paylasim-metin { font-size: 19px; }
+/* Kullanım raporu */
+.ak-rapor { background: linear-gradient(145deg, #00838f, #004d55); }
+.bant-rapor { background: #00838f; }
+.rapor-donem { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.rapor-donem button { flex: 1 1 auto; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 8px; border-radius: 20px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); cursor: pointer; }
+.rapor-donem button.secili { background: #00838f; border-color: #00838f; color: #fff; }
+.rapor-tarih { margin: 0 0 6px; }
+.rapor-baslik { font-size: 19px; margin: 18px 0 8px; color: #00695c; }
+.rapor-baslik small { font-size: 14px; color: var(--soluk); font-weight: 600; }
+.rapor-kutular { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rapor-kutular.iki { grid-template-columns: 1fr 1fr; margin-top: 8px; }
+.rapor-kutu { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 14px; padding: 10px 6px; text-align: center; box-shadow: var(--golge); }
+.rapor-kutu b { display: block; font-size: 30px; line-height: 1.1; color: #00838f; }
+.rapor-kutu span { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.rapor-kutu small { display: block; font-size: 12px; color: var(--soluk); margin-top: 2px; }
+.rapor-roller > div { display: flex; justify-content: space-between; padding: 7px 2px; border-bottom: 1px solid var(--cizgi); font-size: 17px; }
+.rapor-roller > div:last-child { border-bottom: 0; }
+.rapor-bolum { padding: 7px 0; }
+.rapor-bolum-ust { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; }
+.rapor-bolum-ust b { font-size: 14px; color: var(--soluk); white-space: nowrap; }
+.rapor-cubuk { height: 12px; background: var(--cizgi); border-radius: 6px; margin-top: 5px; overflow: hidden; }
+.rapor-cubuk i { display: block; height: 100%; background: linear-gradient(90deg, #26a69a, #00838f); border-radius: 6px; }
+.rapor-ara { width: 100%; margin-bottom: 8px; }
+.rapor-kisiler { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 14px; box-shadow: var(--golge); }
+.rapor-kisi { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--cizgi); }
+.rapor-kisi:last-child { border-bottom: 0; }
+.rapor-kisi b { display: block; font-size: 16px; }
+.rapor-kisi small { display: block; font-size: 13px; color: var(--soluk); }
+.rapor-kisi-sag { text-align: right; flex: none; max-width: 55%; }
+.rapor-kisi-sag span { font-weight: 800; font-size: 14px; }
+.rapor-kisi-sag .aktif { color: #1b8a4a; }
+.rapor-kisi-sag .pasif { color: #b71c1c; }
+.rapor-yazdir { width: 100%; margin: 12px 0 20px; }
+@media (max-width: 360px) { .rapor-kutular { grid-template-columns: 1fr 1fr; } }
+@media print {
+  .ust, .baslik-cift .geri, .rapor-donem, .rapor-ara, .rapor-yazdir, .alt-menu { display: none !important; }
+  .rapor-kutu, .rapor-kisiler, .kart { box-shadow: none; }
+  .rapor-kisi { break-inside: avoid; }
+}
 /* Plaka girişi talebi */
 .ak-plaka { background: linear-gradient(145deg, #455a64, #1c313a); }
 .bant-plaka { background: #37474f; }

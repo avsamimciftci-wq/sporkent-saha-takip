@@ -40,6 +40,7 @@
     <div id="ana-kutular" class="ana-kutular">
       <button type="button" data-ac="parsel" class="ana-kutu ak-parsel tam" hidden><span class="parsel-foto" id="ana-parsel-foto">👤</span><span class="parsel-yazi"><b>Parsel Temsilcisi</b><small></small></span></button>
       <button type="button" data-ac="yakinlar" class="ana-kutu ak-yakinlar tam" hidden><span>👨‍👩‍👧</span>Ortak Yakını Onayları<small></small></button>
+      <button type="button" data-ac="duyuru" class="ana-kutu ak-duyuru"><span>📢</span>Duyurular<small></small></button>
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
       <button type="button" data-ac="restoran" class="ana-kutu ak-restoran" hidden><span>🍽️</span>Restoran</button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
@@ -49,6 +50,7 @@
       <button type="button" data-ac="sokaklar" class="ana-kutu ak-sokak"><span>🗺️</span>Sokak Numaraları</button>
       <button type="button" data-ac="servis" class="ana-kutu ak-servis"><span>🚐</span>Servis</button>
       <button type="button" data-ac="uyeler" class="ana-kutu ak-uyeler" hidden><span>👥</span>Üyeler ve Ayarlar<small></small></button>
+      <button type="button" data-ac="rapor" class="ana-kutu ak-rapor" hidden><span>📊</span>Kullanım Raporu</button>
     </div>
   </main>
 
@@ -197,6 +199,18 @@
   <main id="ekran-parsel" class="ekran" hidden>
     <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
     <div id="parsel-icerik"></div>
+  </main>
+
+  <!-- Duyurular: yönetici metin, görsel, PDF ya da video paylaşır; herkes görür -->
+  <main id="ekran-duyuru" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-duyuru">📢 Duyurular</h1></div>
+    <div id="duyuru"></div>
+  </main>
+
+  <!-- Kullanım raporu (yalnızca yönetici) -->
+  <main id="ekran-rapor" class="ekran" hidden>
+    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-rapor">📊 Kullanım Raporu</h1></div>
+    <div id="rapor"></div>
   </main>
 
   <!-- Restoran: menü resimleri ve sipariş telefonu (ara / WhatsApp) -->
