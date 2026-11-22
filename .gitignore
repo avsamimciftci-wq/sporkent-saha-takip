@@ -8,3 +8,9 @@ TG_Kodlari*.csv
 YK_Kodlari*.csv
 Sporkent_Yedek_*.7z
 yedekleme/*.bundle
+Sporkent_Asistan_Yedek_*
+
+# Ekran görüntüleri, kılavuz ve video: kişi adı ve telefon içerir, açık depoya girmez
+TG_gorunum/
+ekran_goruntuleri/
+kilavuz/

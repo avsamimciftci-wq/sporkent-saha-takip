@@ -1,4 +1,4 @@
-// Sporkent Saha Takip: tek sayfa uygulama.
+// SPORKENT ASİSTAN: tek sayfa uygulama.
 (() => {
   "use strict";
 
@@ -69,7 +69,7 @@
     if (o?.rol === "uye") return "Ortağımız Sayın";
     return "Sayın";
   }
-  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Ortak" };
+  const ROL_ADI = { baskan: "YK Başkanı (Yönetici)", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "Ortak", restoran: "Restoran Yetkilisi" };
   // Yönetici ve yönetim kurulu, TG üyesi / muhasebe kayıtlarını onaylar; bu dört görevin kaydı onaysız düşer
   const kayitOnaylar = () => ["baskan", "yonetim"].includes(oturum?.rol);
   const onayBekliyor = (k) => k.onay_durumu === "bekliyor";
@@ -333,7 +333,7 @@
   function listeCiz() {
     const saat = new Date().getHours();
     const selam = saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
-    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(hitap())} ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Saha Takip</small></span>`;
+    $("#karsilama").innerHTML = `<span class="k-ikon">👋</span><span><b>${selam}, ${kac(hitap())} ${kac(oturum.ad)}</b><small>${kac(oturum.unvan || ROL_ADI[oturum.rol] || "")} · Sporkent Asistan</small></span>`;
     parselUstCiz();
     const bekleyenKayit = kayitlar.filter(benOnaylarim);
     const ou = $("#onay-uyari");
@@ -1161,7 +1161,7 @@
   // Bütün ortaklara tek mesaj: kod yok, kooperatifte kayıtlı telefonla hemen girilir
   const genelDavetMetni = `Sayın Ortağımız,
 
-Sporkent İşletme Kooperatifi SAHA TAKİP uygulaması kullanıma açıldı. Sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi ve parsel temsilcinizi görebilirsiniz.
+SPORKENT ASİSTAN uygulaması kullanıma açıldı. Sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi ve parsel temsilcinizi görebilirsiniz.
 
 Katılmak için:
 1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
@@ -1181,7 +1181,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
   const davetMetni = (r) => `Sayın Ortağımız,
 
-Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
+SPORKENT ASİSTAN uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
 
 ${UYGULAMA_ADRESI}
 
@@ -1229,7 +1229,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const TG_ADRESI = "https://tinyurl.com/sporkent-tgyk";
   const tgLinkMetni = `Sayın TG / YK Üyemiz,
 
-Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasına size özel giriş bağlantısı:
+SPORKENT ASİSTAN uygulamasına size özel giriş bağlantısı:
 
 ${TG_ADRESI}
 
@@ -2069,7 +2069,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
-  // ---------- Restoran: menü resimleri ve sipariş telefonu ----------
+  // ---------- Restoran: paylaşımlar (görsel, metin, PDF, video) ve sipariş telefonu ----------
+  // Restoran yetkilisi ve yönetici paylaşım yapar ve siler; herkes görür, her paylaşım herkese bildirilir.
+  let restoranTur = "gorsel";
+  const RESTORAN_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], video: ["🎬", "Video", "video/*"] };
   async function restoranAc() {
     if (location.hash !== "#restoran") history.replaceState(null, "", "#restoran");
     goster("restoran");
@@ -2078,10 +2081,38 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     try { restoranCiz(await api("restoran_liste")); }
     catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
+  function paylasimHtml(p, yonetir) {
+    let ic = "";
+    if (p.tur === "gorsel") ic = p.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(p.url)}" aria-label="Tam ekran aç"><img src="${kac(p.url)}" alt=""></button>` : `<div class="foto-bos">Görsel açılamadı</div>`;
+    else if (p.tur === "video") ic = p.url ? `<video class="paylasim-video" src="${kac(p.url)}" controls playsinline preload="metadata"></video>` : "";
+    else if (p.tur === "pdf") ic = p.url ? `<a class="paylasim-pdf" href="${kac(p.url)}" target="_blank" rel="noopener">📄 PDF'yi aç</a>` : "";
+    return `<article class="paylasim">
+      <div class="paylasim-ust"><span>${RESTORAN_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
+        ${yonetir ? `<button type="button" class="kucuk-dugme tehlike" data-restoran-sil="${p.id}">🗑 Sil</button>` : ""}</div>
+      ${ic}
+      ${p.metin ? `<p class="paylasim-metin">${kac(p.metin)}</p>` : ""}
+    </article>`;
+  }
   function restoranCiz(v) {
     const uluslar = v.tel ? telefonUluslararasi(v.tel) : "";
     const wpMetin = encodeURIComponent(`Merhaba, Sporkent sitesinden sipariş vermek istiyorum.\n${oturum?.unvan ? oturum.unvan + " · " : ""}${oturum?.ad || ""}\n\nSiparişim:\n`);
+    const t = RESTORAN_TURLERI[restoranTur];
     $("#restoran").innerHTML = `
+      ${v.yonetir ? `
+      <form class="kart restoran-yonet" id="restoran-form">
+        <b class="restoran-form-baslik">➕ Yeni paylaşım</b>
+        <div class="restoran-tur">${Object.entries(RESTORAN_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-restoran-tur="${k}" class="${k === restoranTur ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}</div>
+        ${restoranTur !== "metin" ? `<label class="foto-dugme"><input id="restoran-dosya" type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
+          <p id="restoran-secilen" class="ipucu" hidden></p>` : ""}
+        <label>${restoranTur === "metin" ? "Paylaşılacak metin" : "Açıklama (isteğe bağlı)"}
+          <textarea name="metin" rows="${restoranTur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${restoranTur === "metin" ? "Örn. Bu akşam balık günü!" : "Örn. Haftanın menüsü"}"></textarea>
+        </label>
+        <button class="ana-dugme" type="submit">📣 Paylaş ve herkese bildir</button>
+        <details class="restoran-tel-ayar"><summary>📞 Sipariş telefonunu değiştir</summary>
+          <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
+          <button type="button" class="ikincil" id="restoran-tel-kaydet" style="width:100%;margin-top:8px">Telefonu kaydet</button>
+        </details>
+      </form>` : ""}
       ${v.tel ? `<div class="restoran-siparis">
         <small>Sipariş için</small>
         <span class="tel">📞 ${kac(v.tel)}</span>
@@ -2090,49 +2121,55 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <a class="wp" href="https://wa.me/${kac(uluslar)}?text=${wpMetin}" target="_blank" rel="noopener">💬 WhatsApp</a>
         </div>
       </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`}
-      ${v.resimler.length ? v.resimler.map((x) => `
-      <figure class="aidat-resim">
-        ${x.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(x.url)}" aria-label="Tam ekran aç"><img src="${kac(x.url)}" alt="${kac(x.baslik || "Menü")}"></button>` : `<div class="foto-bos">Resim açılamadı</div>`}
-        <figcaption><span>${x.baslik ? `<b>${kac(x.baslik)}</b>` : ""}</span>
-          ${v.ekleyebilir ? `<button type="button" class="kucuk-dugme tehlike" data-restoran-sil="${x.id}">🗑 Sil</button>` : ""}</figcaption>
-      </figure>`).join("") : `<p class="bos">Menü henüz eklenmedi.</p>`}
-      <p class="ipucu">Menüye dokunursanız tam ekran açılır, iki parmakla büyütebilirsiniz.</p>
-      ${v.ekleyebilir ? `
-      <form class="kart restoran-yonet" id="restoran-form">
-        <b>Yönetici: menü ve sipariş telefonu</b>
-        <label>Menü resmi başlığı (isteğe bağlı)
-          <input name="baslik" maxlength="120" placeholder="Örn. Ana yemekler">
-        </label>
-        <label class="foto-dugme"><input id="restoran-dosya" type="file" accept="image/*" hidden><span>➕ Menü resmi ekle</span></label>
-        <label>Sipariş telefonu
-          <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
-        </label>
-        <button type="button" class="ikincil" id="restoran-tel-kaydet" style="width:100%">📞 Telefonu kaydet</button>
-      </form>` : ""}`;
+      ${v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(p, v.yonetir)).join("") : `<p class="bos">Henüz paylaşım yok.</p>`}`;
   }
   $("#restoran").addEventListener("click", async (e) => {
     const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
+    const tb = e.target.closest("[data-restoran-tur]");
+    if (tb) { restoranTur = tb.dataset.restoranTur; return restoranAc(); }
     if (e.target.closest("#restoran-tel-kaydet")) {
       try { const x = await api("restoran_tel", { tel: $("#restoran-form").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await restoranAc(); }
       catch (err) { mesaj(err.message); }
       return;
     }
     const b = e.target.closest("[data-restoran-sil]"); if (!b) return;
-    if (!confirm("Bu menü resmi silinsin mi?")) return;
+    if (!confirm("Bu paylaşım herkesten silinsin mi?")) return;
     b.disabled = true;
-    try { await api("restoran_sil", { id: Number(b.dataset.restoranSil) }); mesaj("Resim silindi."); await restoranAc(); }
+    try { await api("restoran_sil", { id: Number(b.dataset.restoranSil) }); mesaj("Paylaşım silindi."); await restoranAc(); }
     catch (err) { mesaj(err.message); b.disabled = false; }
   });
-  $("#restoran").addEventListener("change", async (e) => {
+  $("#restoran").addEventListener("change", (e) => {
     if (e.target.id !== "restoran-dosya") return;
-    const f = e.target.files?.[0]; if (!f) return;
-    const etiket = e.target.nextElementSibling; etiket.textContent = "Yükleniyor…";
+    const f = e.target.files?.[0], y = $("#restoran-secilen");
+    if (!f) { y.hidden = true; return; }
+    y.textContent = `Seçilen: ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`; y.hidden = false;
+  });
+  // Görsel küçültülüp JPEG olarak, PDF ve video olduğu gibi yüklenir (en fazla 50 MB)
+  async function restoranDosyaYukle(f) {
+    let blob = f, uzanti, tip;
+    if (restoranTur === "gorsel") { blob = await kucult(f, 2400); uzanti = "jpg"; tip = "image/jpeg"; }
+    else if (restoranTur === "pdf") { uzanti = "pdf"; tip = "application/pdf"; }
+    else { uzanti = /quicktime|\.mov$/i.test(f.type + f.name) ? "mov" : /webm/i.test(f.type) ? "webm" : "mp4"; tip = f.type || "video/mp4"; }
+    if (blob.size > 50 * 1048576) throw new Error("Dosya çok büyük (en fazla 50 MB). Daha kısa bir video seçin.");
+    const { yol, adres } = await api("yukleme_adresi", { tur: "restoran", uzanti });
+    const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": tip, "x-upsert": "false" }, body: blob });
+    if (!r.ok) throw new Error("Dosya yüklenemedi, tekrar deneyin.");
+    return yol;
+  }
+  $("#restoran").addEventListener("submit", async (e) => {
+    if (e.target.id !== "restoran-form") return;
+    e.preventDefault();
+    const f = e.target, d = f.querySelector("button[type=submit]");
+    const dosya = $("#restoran-dosya")?.files?.[0];
+    if (restoranTur !== "metin" && !dosya) return mesaj(`Önce ${RESTORAN_TURLERI[restoranTur][1].toLocaleLowerCase("tr")} seçin.`);
+    d.disabled = true; d.textContent = "Yükleniyor…";
     try {
-      const blob = await kucult(f, 2400);
-      const yol = await fotoYukle(blob, "restoran");
-      await api("restoran_ekle", { yol, baslik: $("#restoran-form").baslik.value });
-      mesaj("Menü resmi eklendi."); await restoranAc();
-    } catch (err) { mesaj(err.message); etiket.textContent = "➕ Menü resmi ekle"; e.target.value = ""; }
+      const yol = restoranTur === "metin" ? null : await restoranDosyaYukle(dosya);
+      d.textContent = "Paylaşılıyor…";
+      await api("restoran_paylas", { tur: restoranTur, metin: f.metin.value, yol });
+      mesaj("Paylaşıldı. Herkese bildirim gönderildi.");
+      await restoranAc();
+    } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "📣 Paylaş ve herkese bildir"; }
   });
 
   // ---------- Ortak: plaka girişi talebi ----------
@@ -2269,8 +2306,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
     $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi();
-    // Restoran: ortaklarda; yönetici de görür (menüyü ve sipariş telefonunu o girer)
-    $("#ana-kutular [data-ac=restoran]").hidden = !(ortakMi() || yonetici());
+    // Restoran herkese açık (paylaşımları herkese bildirilir)
+    $("#ana-kutular [data-ac=restoran]").hidden = false;
     // Parsel temsilcisine: ortak yakını onayları
     const yk = $("#ana-kutular [data-ac=yakinlar]");
     yk.hidden = !parsel?.temsilcilik;
@@ -2285,6 +2322,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
+    // Restoran yetkilisi yalnızca Restoran bölümünü görür
+    if (oturum?.rol === "restoran") for (const k of document.querySelectorAll("#ana-kutular .ana-kutu")) k.hidden = k.dataset.ac !== "restoran";
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (Parsel Temsilcisi hep tam genişlik)
     const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel):not(.ak-yakinlar)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));

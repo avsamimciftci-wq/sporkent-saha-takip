@@ -1,6 +1,6 @@
-// Sporkent SAHA TAKİP: haftalık yedek.
+// SPORKENT ASİSTAN: haftalık yedek.
 // Kodları, veritabanının bütün tablolarını, fotoğrafları ve gizli dosyaları
-// OneDrive › SPORKENT İŞLETME KOOPERATİFİ › SAHA TAKİP PROGRAMI YEDEĞİ › <tarih> klasörüne kopyalar.
+// OneDrive › SPORKENT İŞLETME KOOPERATİFİ › SPORKENT ASİSTAN PROGRAMI YEDEĞİ › <tarih> klasörüne kopyalar.
 // Windows Görev Zamanlayıcı her hafta çalıştırır; elle de çalıştırılabilir:  node yedekle.mjs
 import { execSync } from "child_process";
 import fs from "fs";
@@ -10,10 +10,10 @@ import { fileURLToPath } from "url";
 const PROJE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REF = "inhqkwuvlxhabkiulyrd";
 const URL = `https://${REF}.supabase.co`;
-const KOK = path.join(process.env.USERPROFILE || "C:/Users/HP", "OneDrive", "SPORKENT İŞLETME KOOPERATİFİ", "SAHA TAKİP PROGRAMI YEDEĞİ");
+const KOK = path.join(process.env.USERPROFILE || "C:/Users/HP", "OneDrive", "SPORKENT İŞLETME KOOPERATİFİ", "SPORKENT ASİSTAN PROGRAMI YEDEĞİ");
 const TABLOLAR = ["ayarlar", "uyeler", "abonelikler", "kayitlar", "goruntulemeler", "gorev_isaretleri",
-  "ortaklar", "tg_uyeleri", "aidat_resimleri", "is_programi", "bildirim_gunlugu", "ortak_rehberi", "davet_kodlari", "servis_guzergah", "devriye_turlari", "devriye_izleri", "cevap_gorulme", "parsel_temsilcileri", "plaka_talepleri", "restoran_menu"];
-const SAYACLI = ["kayitlar", "aidat_resimleri", "is_programi", "tg_uyeleri", "bildirim_gunlugu", "davet_kodlari", "servis_guzergah", "devriye_turlari", "devriye_izleri", "parsel_temsilcileri", "plaka_talepleri", "restoran_menu"];
+  "ortaklar", "tg_uyeleri", "aidat_resimleri", "is_programi", "bildirim_gunlugu", "ortak_rehberi", "davet_kodlari", "servis_guzergah", "devriye_turlari", "devriye_izleri", "cevap_gorulme", "parsel_temsilcileri", "plaka_talepleri", "restoran_menu", "restoran_paylasim"];
+const SAYACLI = ["kayitlar", "aidat_resimleri", "is_programi", "tg_uyeleri", "bildirim_gunlugu", "davet_kodlari", "servis_guzergah", "devriye_turlari", "devriye_izleri", "parsel_temsilcileri", "plaka_talepleri", "restoran_menu", "restoran_paylasim"];
 
 const tarih = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye günü
 const HEDEF = path.join(KOK, tarih);
@@ -42,7 +42,7 @@ async function main() {
   const servis = JSON.parse(ham.slice(ham.indexOf("["))).find((k) => k.name === "service_role")?.api_key;
   if (!servis) throw new Error("Supabase servis anahtarı alınamadı (supabase login gerekli olabilir).");
   const h = { apikey: servis, Authorization: `Bearer ${servis}` };
-  const geri = ["-- Sporkent SAHA TAKİP: verileri yeni veritabanına geri yükleme", "-- Önce tablolar kurulmuş olmalı (supabase db push).", "begin;"];
+  const geri = ["-- SPORKENT ASİSTAN: verileri yeni veritabanına geri yükleme", "-- Önce tablolar kurulmuş olmalı (supabase db push).", "begin;"];
   const ozet = {};
   for (const t of TABLOLAR) {
     let veri = [];

@@ -1,4 +1,4 @@
-// Sporkent İşletme Kooperatifi SAHA TAKİP: tek API ucu.
+// SPORKENT ASİSTAN: tek API ucu.
 // Giriş kodu yalnızca gruba katılırken kullanılır; yönetici (YK başkanı) onaylayınca telefon
 // kendi gizli anahtarıyla çalışır. Tarayıcıya hiçbir tablo açık değildir.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -30,7 +30,8 @@ class Hata extends Error {
 
 // baskan: YK başkanı ve yönetici (onay, üye çıkarma, kodlar, tümden silme)
 // baskan, mudur ve sef işi "yapıldı" olarak kapatır; onaylı her üye bütün kayıtları görür.
-type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye";
+// restoran: restoran yetkilisi; şahsi kodla girer, yalnızca Restoran bölümünü görür ve yönetir
+type Rol = "baskan" | "mudur" | "sef" | "yonetim" | "muhasebe" | "uye" | "restoran";
 const ROLLER: Rol[] = ["baskan", "mudur", "sef", "yonetim", "muhasebe", "uye"];
 const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 // Yönetim işleri: yönetici ve yönetim kurulu girer; yalnızca bu dört görev görür, bildirim de yalnızca onlara gider
@@ -53,7 +54,7 @@ async function epostaGonder(kime: string, konu: string, metin: string): Promise<
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${anahtar}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: Deno.env.get("EPOSTA_GONDEREN") ?? "Sporkent Saha Takip <onboarding@resend.dev>", to: [kime], subject: konu, text: metin }),
+      body: JSON.stringify({ from: Deno.env.get("EPOSTA_GONDEREN") ?? "SPORKENT ASİSTAN <onboarding@resend.dev>", to: [kime], subject: konu, text: metin }),
     });
     return r.ok;
   } catch { return false; }
@@ -112,8 +113,10 @@ const KAYIT_ONAYLAYAN: Rol[] = ["baskan", "yonetim"];
 const AIDAT_EKLEYEN: Rol[] = ["baskan"];
 const PROGRAM_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef"];
 const ROL_ADI: Record<Rol, string> = {
-  baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi",
+  baskan: "YK Başkanı", mudur: "Müdür", sef: "Şef", yonetim: "Yönetim Kurulu", muhasebe: "Muhasebe", uye: "TG Üyesi", restoran: "Restoran Yetkilisi",
 };
+// Restoran yetkilisinin yapabileceği işlemler (başka hiçbir bölüme erişemez)
+const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -640,6 +643,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   if (u.durum !== "onayli" && !["durum", "abone_ol", "izin_bildir"].includes(eylem)) {
     throw new Hata("Kaydınız yönetici onayını bekliyor.", 403, { bekliyor: true });
   }
+  if (rol === "restoran" && !RESTORAN_ISLEMLERI.includes(eylem)) throw new Hata("Restoran yetkilisi yalnızca Restoran bölümünü kullanabilir.", 403);
+  // Restoranı yöneten: restoran yetkilisi ve yönetici
+  const restoranYonetir = () => { if (rol !== "restoran" && rol !== "baskan") throw new Hata("Bu işlemi yalnızca restoran yetkilisi ve yönetici yapabilir.", 403); };
 
   switch (eylem) {
     case "durum": {
@@ -653,6 +659,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "liste": {
+      // Restoran yetkilisi saha kayıtlarını görmez
+      if (rol === "restoran") return { kayitlar: [], rol, unvan: (u as any).unvan ?? null };
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
       // Onay bekleyen kaydı yazan kişi ve onaylayacak olan görür: ortağın kaydını parsel temsilcisi,
@@ -727,7 +735,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yukleme_adresi": {
-      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "restoran" ? "restoran" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
+      // Restoran paylaşımında PDF ve video da yüklenir; diğer her şey JPEG fotoğraf
+      const uzanti = g.tur === "restoran" && ["jpg", "pdf", "mp4", "mov", "webm"].includes(g.uzanti) ? g.uzanti : "jpg";
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : g.tur === "restoran" ? "restoran" : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -959,7 +969,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (error) throw error;
       const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${uu.ortak_no} No'lu Ortak)`;
       const metin = [
-        "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasından Plaka-Kimlik Bildirimi:",
+        "SPORKENT ASİSTAN uygulamasından Plaka-Kimlik Bildirimi:",
         "",
         `Plaka: ${plaka}`,
         `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı`}`,
@@ -988,7 +998,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi).`);
         await db.from("uyeler").update({ durum: "onayli", onay_at: new Date().toISOString() }).eq("cihaz", hedef);
-        await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasını kullanmaya başlayabilirsiniz.");
+        await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "SPORKENT ASİSTAN uygulamasını kullanmaya başlayabilirsiniz.");
       } else {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
         await db.from("uyeler").delete().eq("cihaz", hedef);
@@ -1041,41 +1051,52 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
-    // ---------- Restoran: menü resimleri ve sipariş telefonu ----------
+    // ---------- Restoran: paylaşımlar (görsel, metin, PDF, video) ve sipariş telefonu ----------
     case "restoran_liste": {
-      const { data, error } = await db.from("restoran_menu").select("*").order("created_at");
+      const { data, error } = await db.from("restoran_paylasim").select("*").order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
-      const yollar = (data ?? []).map((x: any) => x.yol);
+      const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
       const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
       const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
       const { data: ayar } = await db.from("ayarlar").select("deger").eq("ad", "restoran_tel").maybeSingle();
       return {
-        resimler: (data ?? []).map((x: any) => ({ id: x.id, baslik: x.baslik, url: harita.get(x.yol) ?? null })),
+        paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at,
+          ekleyen: x.rol === "baskan" ? "Kooperatif Yönetimi" : "Restoran", url: x.yol ? harita.get(x.yol) ?? null : null })),
         tel: ayar?.deger ?? "",
-        ekleyebilir: rol === "baskan",
+        yonetir: rol === "baskan" || rol === "restoran",
       };
     }
 
-    case "restoran_ekle": {
-      yonetici();
-      const yol = temiz(g.yol, 200);
-      if (!yol.startsWith("restoran/")) throw new Hata("Resim yüklenemedi, tekrar deneyin.");
-      const { error } = await db.from("restoran_menu").insert({ yol, baslik: temiz(g.baslik, 120) || null, ekleyen: u.ad });
+    case "restoran_paylas": {
+      restoranYonetir();
+      const tur = ["gorsel", "metin", "pdf", "video"].includes(g.tur) ? g.tur : "";
+      if (!tur) throw new Hata("Paylaşım türünü seçin.");
+      const metin = temiz(g.metin, 3000);
+      const yol = tur === "metin" ? null : temiz(g.yol, 200);
+      if (tur === "metin" && !metin) throw new Hata("Paylaşılacak metni yazın.");
+      if (tur !== "metin" && !yol?.startsWith("restoran/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
+      const { data: p, error } = await db.from("restoran_paylasim").insert({ tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
       if (error) throw error;
-      return { tamam: true };
+      // Uygulamayı kullanan herkese (ortak yakınları dahil) sesli bildirim; görselde resim de görünür
+      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF", video: "🎬 Yeni video" }[tur as "gorsel"];
+      let resim: string | null = null;
+      if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
+      await duyur("hepsi", `🍽️ Restoran: ${ad}`, (metin || "Restoran bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "restoran", resim, haric: u.cihaz });
+      return { id: p.id };
     }
 
     case "restoran_sil": {
-      yonetici();
-      const { data: x } = await db.from("restoran_menu").select("id, yol").eq("id", g.id).maybeSingle();
-      if (!x) throw new Hata("Resim bulunamadı.");
-      await db.storage.from(BUCKET).remove([x.yol]);
-      await db.from("restoran_menu").delete().eq("id", x.id);
+      // Restoran yetkilisi ve yönetici her paylaşımı silebilir
+      restoranYonetir();
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).maybeSingle();
+      if (!x) throw new Hata("Paylaşım bulunamadı.");
+      if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
+      await db.from("restoran_paylasim").delete().eq("id", x.id);
       return { tamam: true };
     }
 
     case "restoran_tel": {
-      yonetici();
+      restoranYonetir();
       const ham = temiz(g.tel, 30);
       let d = ham.replace(/\D/g, "");
       if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
@@ -1298,7 +1319,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (durum === "cikarildi") {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
       } else {
-        await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasını kullanmaya başlayabilirsiniz.");
+        await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "SPORKENT ASİSTAN uygulamasını kullanmaya başlayabilirsiniz.");
       }
       return { tamam: true };
     }
