@@ -142,6 +142,32 @@
   window.addEventListener("resize", ustYukseklik);
   ustYukseklik();
 
+  // Ana sayfa düğmeleri: simge, yazı ve rozet düğmenin çerçevesine sığana kadar küçülür.
+  // Telefonların yazı tipi ve emoji boyları farklı olduğundan gerçek ölçüme göre ayarlanır.
+  function kutulariSigdir() {
+    const ana = $("#ekran-ana");
+    if (!ana || ana.hidden) return;
+    for (const k of document.querySelectorAll("#ana-kutular .ana-kutu")) {
+      if (k.hidden) continue;
+      k.style.removeProperty("--olcek");
+      const kr = k.getBoundingClientRect();
+      if (!kr.height) continue;
+      const rg = document.createRange();
+      const tasiyor = () => {
+        rg.selectNodeContents(k);
+        const r = rg.getBoundingClientRect();
+        return r.top < kr.top + 3 || r.bottom > kr.bottom - 3 || r.left < kr.left + 2 || r.right > kr.right - 2;
+      };
+      for (let s = 0.95; s >= 0.3 && tasiyor(); s -= 0.05) k.style.setProperty("--olcek", s.toFixed(2));
+    }
+  }
+  let sigdirSirada = false;
+  const sigdirIste = () => { if (sigdirSirada) return; sigdirSirada = true; requestAnimationFrame(() => { sigdirSirada = false; kutulariSigdir(); }); };
+  if ("ResizeObserver" in window) new ResizeObserver(sigdirIste).observe($("#ana-kutular"));
+  // Rozet yazısı, görünen düğmeler ya da düğme düzeni değişince yeniden ölç (style değişikliği izlenmez: döngü olmaz)
+  new MutationObserver(sigdirIste).observe($("#ana-kutular"), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  document.fonts?.ready.then(() => kutulariSigdir());
+
   // Kullanım raporu: hangi bölüm kaç kez açıldı. Ekranda 1,5 sn kalan bölüm sayılır; aynı bölüm içinde
   // gezinmek (liste → kayıt → liste) tek açılış sayılır, ana sayfaya dönünce sıfırlanır.
   const EKRAN_BOLUM = { liste: "saha", detay: "saha", yeni: "saha", yonetim: "uyeler", yonetimisleri: "yonetim", yksaha: "yksaha", program: "program",
@@ -2539,6 +2565,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // Onayımı bekleyen kayıt (parsel temsilcisi / yönetim) varsa Saha Takip düğmesinde yazsın
     const onayimda = kayitlar.filter(benOnaylarim).length;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
+    kutulariSigdir();
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
   const MODUL_ADRES = { duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
