@@ -2462,13 +2462,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // Ortaklarda Parsel Temsilcisi en üstte tam genişlik kalır.
     const kutular = $("#ana-kutular"), ykKutu = $("#ana-kutular [data-ac=yonetim]"), rsKutu = $("#ana-kutular [data-ac=restoran]");
     const takas = !ykKutu.hidden && !pk.hidden;
+    // Servis hep Restoran'ın hemen yanında
+    const svKutu = $("#ana-kutular [data-ac=servis]");
+    rsKutu.after(svKutu);
     if (takas) {
       kutular.prepend(ykKutu);
-      rsKutu.after(pk);
+      svKutu.after(pk);
       if (!ortakMi() && parsel?.temsilciler?.length) pk.querySelector("small").textContent = `${parsel.temsilciler.length} temsilci`;
     } else {
       kutular.prepend(pk);
-      rsKutu.after(ykKutu);
+      svKutu.after(ykKutu);
     }
     ykKutu.classList.toggle("sabit-tam", takas); ykKutu.classList.toggle("tam", takas);
     pk.classList.toggle("sabit-tam", !takas); pk.classList.toggle("tam", !takas); pk.classList.toggle("yarim", takas);
