@@ -64,6 +64,7 @@
     if (o?.rol === "baskan") return "Yönetim Kurulu Başkanı Sayın";
     if (o?.rol === "yonetim") return "Yönetim Kurulu Üyesi Sayın";
     if (o?.rol === "uye" && /^TG/i.test(un)) return /başkan/i.test(un) ? "Temsilciler Grubu Başkanı Sayın" : "Temsilciler Grubu Üyesi Sayın";
+    if (o?.rol === "uye" && /Yakını/.test(un)) return "Sayın";
     if (o?.rol === "uye") return "Ortağımız Sayın";
     return "Sayın";
   }
@@ -770,6 +771,7 @@
     $("#giris-secim").hidden = kurulmali || kodla !== null;
     $("#kayit-form").hidden = kurulmali || kodla !== false;
     $("#giris-form").hidden = kurulmali || kodla !== true;
+    kayitModu(!!sakla.al("sk_yakin"));
     // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
     if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
     if (kurulmali && masaustu) {
@@ -779,6 +781,23 @@
         <p class="kur-adim">Aşağıdaki bağlantıyı telefonunuzda açın, sonra ana ekranınıza ekleyin:<br><b class="masaustu-link">tinyurl.com/sporkent-takip</b></p>`;
     }
   }
+
+  // Kayıt formu iki biçimde: kooperatif ortağı ya da ortağın yakını (eşi, çocuğu, damadı, misafiri…)
+  function kayitModu(yakin) {
+    const f = $("#kayit-form");
+    $("#yakinlik-alan").hidden = !yakin;
+    f.yakinlik.required = yakin;
+    $("#kayit-baslik").textContent = yakin ? "Ortak yakını kaydı" : "Ortak kaydı";
+    $("#kayit-aciklama").innerHTML = yakin
+      ? "Hangi ortağın yakını olduğunuzu ve kendi bilgilerinizi yazın. Telefonunuz ortağın kooperatifteki kaydında varsa uygulama <b>hemen açılır</b>; yoksa yönetim onaylayınca açılır."
+      : "Bilgilerinizi yazın. Cep telefonunuz kooperatifte kayıtlı numaranızsa uygulama <b>hemen açılır</b>. Şifre ya da kod gerekmez.";
+    $("#no-etiket").textContent = yakin ? "Yakını olduğunuz ortağın ortaklık numarası" : "Ortaklık numaranız";
+    $("#tel-ipucu").textContent = yakin
+      ? "Kendi cep telefonunuzu yazın. Yurt dışı numarası ise başına + koyun (örn. +49 …)."
+      : "Kooperatifte kayıtlı cep telefonunuzu yazın. Başka bir numara yazarsanız kaydınız yönetimin onayına gider. Yurt dışı numarası ise başına + koyun (örn. +49 …).";
+    $("#mod-degistir").innerHTML = yakin ? "🏠 Kooperatif ortağıysanız <b>buraya dokunun</b>" : "👨‍👩‍👧 Ortağın yakınıysanız (eşi, çocuğu, misafiri…) <b>buraya dokunun</b>";
+  }
+  $("#mod-degistir").addEventListener("click", () => { const y = !sakla.al("sk_yakin"); sakla.koy("sk_yakin", y ? 1 : 0); kayitModu(y); window.scrollTo(0, 0); });
 
   function iosAdimlari() {
     if (uygulamaIci) return `<ol class="ios-adim">
@@ -800,7 +819,8 @@
   $("#kodla-gir").addEventListener("click", () => girisEkrani(true));
   $("#kodla-gir-ust").addEventListener("click", () => { girisEkrani(true); window.scrollTo(0, 0); });
   $("#kayda-don").addEventListener("click", () => { sakla.sil("sk_tg"); girisEkrani(null); window.scrollTo(0, 0); });
-  $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); girisEkrani(false); window.scrollTo(0, 0); });
+  $("#sec-ortak").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 0); girisEkrani(false); window.scrollTo(0, 0); });
+  $("#sec-yakin").addEventListener("click", () => { sakla.koy("sk_tg", 0); sakla.koy("sk_yakin", 1); girisEkrani(false); window.scrollTo(0, 0); });
   $("#sec-tg").addEventListener("click", () => { sakla.koy("sk_tg", 1); girisEkrani(true); window.scrollTo(0, 0); });
   // Davet kodu kutusuna harfli şahsi kod yazılırsa (TG / YK üyesi yanlış forma geldi): şahsi kodla girişe geç
   $("#kayit-form [name=davet_kodu]")?.addEventListener("input", (e) => {
@@ -845,7 +865,8 @@
     const hata = $("#kayit-hata"); hata.hidden = true;
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
-      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")) });
+      const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")),
+        yakinlik: sakla.al("sk_yakin") ? String(f.get("yakinlik") || "") : "" });
       oturum = { ad: r.ad, rol: r.rol, unvan: r.unvan, durum: r.durum, anahtar: r.anahtar, vapid: r.vapid };
       sakla.koy("sk_oturum", oturum);
       await basla();
@@ -976,20 +997,33 @@
     const cikan = uyeler.filter((u) => u.durum === "cikarildi");
     bekleyenSayisi = bekleyen.length;
     // Aynı ortaklık numarasıyla gruptaki biri varsa onaylamadan önce uyar
+    const yakinMi = (x) => /Yakını/.test(x.unvan || "");
     const ayniNo = (u) => {
-      const k = u.ortak_no && uyeler.find((x) => x.cihaz !== u.cihaz && x.ortak_no === u.ortak_no && x.durum !== "cikarildi");
-      const ayni = k ? `<br><small class="ayni-no">⚠ Bu numara zaten kayıtlı: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski kayıt silinir.</small>` : "";
-      return eslesmeKutusu(u) + ayni;
+      const ayniNoluar = u.ortak_no ? uyeler.filter((x) => x.cihaz !== u.cihaz && x.ortak_no === u.ortak_no && x.durum !== "cikarildi") : [];
+      let ek = "";
+      if (yakinMi(u)) {
+        // Yakın onaylanınca kimse silinmez; ortağın gruptaki kayıtları bilgi olarak gösterilir
+        const ortak = ayniNoluar.filter((x) => !yakinMi(x));
+        ek = ortak.length ? `<br><small class="ayni-no">ℹ️ Ortağın kendisi grupta: <b>${ortak.map((x) => kac(x.ad)).join(", ")}</b></small>` : `<br><small class="ayni-no">ℹ️ Bu ortağın kendisi henüz uygulamada değil.</small>`;
+      } else {
+        const k = ayniNoluar.find((x) => !yakinMi(x));
+        ek = k ? `<br><small class="ayni-no">⚠ Bu numarada ortak kaydı zaten var: <b>${kac(k.ad)}</b>${k.telefon ? " · " + kac(k.telefon) : ""}. Onaylarsanız eski ortak kaydı silinir (yakınlara dokunulmaz).</small>` : "";
+      }
+      return eslesmeKutusu(u) + ek;
     };
     // Resmi ortak listesiyle karşılaştırma: mavi örtüşüyor, kırmızı örtüşmüyor
     function eslesmeKutusu(u) {
       const e = u.eslesme;
       if (!e) return "";
       return listeKutusu(u, e) + (u.davetli_at
-        ? `<div class="eslesme eslesme-uyuyor">✔ Davet kodu doğru<small>Size gönderdiğiniz kodla kayıt oldu</small></div>`
-        : `<div class="eslesme eslesme-uymuyor">✖ Davet koduyla kayıt olmadı<small>Davet kodu sisteminden önceki başvuru</small></div>`);
+        ? `<div class="eslesme eslesme-uyuyor">✔ Davet kodu doğru<small>Size gönderdiğiniz kodla kayıt oldu</small></div>` : "");
     }
     function listeKutusu(u, e) {
+      if (yakinMi(u)) {
+        return e.uyuyor
+          ? `<div class="eslesme eslesme-uyuyor">✔ Telefonu ortağın kayıtlarında var<small>${kac(u.ortak_no)} numaralı ortağın listedeki telefonlarından biri</small></div>`
+          : `<div class="eslesme eslesme-uymuyor">✖ Telefonu ortağın kayıtlarında yok<small>${e.listede ? "Ortağa sorarak onaylayabilirsiniz" : `${kac(u.ortak_no)} numaralı ortak listede yok`}</small></div>`;
+      }
       if (e.uyuyor) return `<div class="eslesme eslesme-uyuyor">✔ Ortağın bilgileri örtüşüyor<small>${kac(u.ortak_no)} numaralı ortağın listedeki telefonu${e.ad_uyuyor ? " ve adı" : ""} ile aynı${e.ad_uyuyor ? "" : " (ad listedekinden farklı yazılmış)"}</small></div>`;
       const neden = e.listede ? `Telefon listedekiyle aynı değil${e.ad_uyuyor ? " (ad tutuyor)" : ", ad da tutmuyor"}` : `${kac(u.ortak_no)} numaralı ortak listede yok`;
       return `<div class="eslesme eslesme-uymuyor">✖ Ortağın bilgileri örtüşmüyor<small>${neden}</small></div>`;
@@ -1096,10 +1130,12 @@ Sporkent İşletme Kooperatifi SAHA TAKİP uygulaması kullanıma açıldı. Sit
 Katılmak için:
 1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
 2. Açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
-3. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın ve "Ortağım"ı seçin.
+3. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın ve "Kooperatif Ortağıyım"ı seçin.
 4. Adınızı soyadınızı, ortaklık numaranızı ve kooperatifte kayıtlı cep telefonunuzu yazıp "Kayıt ol"a basın.
 
 Telefonunuz kooperatifteki kaydınızla eşleşirse uygulama hemen açılır. Şifre ya da kod gerekmez.
+
+Ortağımızın eşi, çocukları, damadı, gelini ve misafirleri de "Ortağın Yakınıyım"ı seçip ortağın numarasıyla katılabilir.
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   document.addEventListener("click", async (e) => {
@@ -1115,7 +1151,7 @@ ${UYGULAMA_ADRESI}
 
 1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. "Ortağım" seçeneğine dokunun. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
+3. "Kooperatif Ortağıyım" seçeneğine dokunun. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
 
 Davet kodunuz: ${r.kod.slice(0, 3)} ${r.kod.slice(3)}
 (Bu kod yalnızca size özeldir, ${r.gun} gün geçerlidir. Kimseyle paylaşmayın.)
