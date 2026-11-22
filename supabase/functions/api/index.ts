@@ -624,8 +624,15 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
   }
 
   switch (eylem) {
-    case "durum":
-      return { rol, durum: u.durum, ad: u.ad, unvan: (u as any).unvan ?? null };
+    case "durum": {
+      // Onay bekleyen ortak yakınına: görüşmesi gereken parsel temsilcisinin adı, telefonu ve resmi
+      let temsilci: any = null;
+      if (u.durum === "bekliyor" && /Yakını/.test((u as any).unvan ?? "")) {
+        const t = await temsilciBul((u as any).ortak_no);
+        if (t) temsilci = (await temsilciGorunumu([t]))[0];
+      }
+      return { rol, durum: u.durum, ad: u.ad, unvan: (u as any).unvan ?? null, temsilci };
+    }
 
     case "liste": {
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);

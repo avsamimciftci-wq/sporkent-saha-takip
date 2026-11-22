@@ -731,18 +731,28 @@
     $("#bekle-ad").textContent = oturum.ad;
     $("#bekle-rol").textContent = oturum.unvan || ROL_ADI[oturum.rol] || "";
     // Ortak yakınının başvurusu parsel temsilcisine, diğerleri yöneticiye gider
-    $("#bekle-metin").textContent = /Yakını/.test(oturum.unvan || "")
-      ? "Telefonunuz ortağın kooperatifteki kayıtlarında olmadığı için kaydınız parsel temsilcisine iletildi. Onaylandığında bu ekran kendiliğinden açılır."
+    const yakin = /Yakını/.test(oturum.unvan || "");
+    $("#bekle-not").hidden = !yakin;
+    $("#bekle-metin").textContent = yakin
+      ? "Parsel temsilciniz onay verdikten sonra uygulama bu telefonda kendiliğinden açılır."
       : "Kaydınız yöneticiye (Yönetim Kurulu Başkanı) iletildi. Onaylandığında bu ekran kendiliğinden açılır.";
+    if (!yakin) $("#bekle-temsilci").innerHTML = "";
     bildirimKutusu();
     clearInterval(bekleZamani);
     bekleZamani = setInterval(durumKontrol, 10000);
+    if (yakin) durumKontrol(); // temsilci bilgisi hemen gelsin
+  }
+  // Onay bekleyen yakına parsel temsilcisinin kartı (resim, ad, telefon, Ara / WhatsApp / Mesaj)
+  function bekleTemsilciCiz(t) {
+    $("#bekle-temsilci").innerHTML = t ? temsilciKart(t)
+      : `<p class="parsel-not">Bu ortak numarası için parsel temsilcisi belirlenmemiş. Kooperatif yönetimiyle görüşün: Ana sayfadaki İletişim bilgileri ya da Müdür 0541 325 30 19.</p>`;
   }
 
   async function durumKontrol() {
     if (!oturum?.anahtar) return clearInterval(bekleZamani);
     try {
       const r = await api("durum");
+      if (r.durum === "bekliyor" && /Yakını/.test(r.unvan || "")) bekleTemsilciCiz(r.temsilci);
       if (r.durum === "onayli") {
         clearInterval(bekleZamani);
         Object.assign(oturum, { durum: "onayli", rol: r.rol });

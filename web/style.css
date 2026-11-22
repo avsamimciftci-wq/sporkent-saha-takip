@@ -772,6 +772,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 /* Parsel temsilcisi: ortak yakını onayları */
 .ak-yakinlar { background: linear-gradient(145deg, #ef6c00, #b23c00); }
 .bant-yakin { background: #e65100; }
+.bekle-not { margin: 4px 0 14px; padding: 12px 14px; border-radius: 12px; background: #fff3e0; border: 2px solid #ef6c00; color: #5c2a04; font-size: 18px; line-height: 1.4; }
 .yakin-kart { display: flex; flex-direction: column; gap: 6px; background: var(--kart); border: 2px solid #ef6c00; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: var(--golge); }
 .yakin-kart b { font-size: 20px; }
 .yakin-kart > span { font-size: 15px; color: var(--soluk); }
