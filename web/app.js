@@ -472,6 +472,17 @@
           <button type="button" class="ikincil tehlike" id="kayit-reddet">${k.temsilci_id ? "✖ Onaylamıyorum" : "✖ Reddet"}</button>
           <button type="button" class="ana-dugme" id="kayit-onayla">✔ Onayla</button>
         </div>
+        ${k.temsilci_id ? `
+        <form id="ret-form" hidden>
+          <label>Ortağa cevabınız (isteğe bağlı)
+            <textarea name="metin" rows="3" maxlength="1000" placeholder="Neden reddettiğinizi yazabilirsiniz"></textarea>
+          </label>
+          <div class="dugmeler">
+            <button type="button" class="ikincil" id="ret-vazgec">Vazgeç</button>
+            <button type="submit" class="ana-dugme tehlike-dolu">✖ Reddet ve Ortağa Bildir</button>
+          </div>
+          <small class="ipucu">Kayıt silinir; ortağa ret bildirimi gider. Cevap yazdıysanız bildirimde görünür.</small>
+        </form>` : ""}
       </div>` : bekliyor && k.temsilci_id ? `<p class="onay-kutu">⏳ Kaydınız parsel temsilcinizin${parsel?.temsilci ? ` (<b>${kac(parsel.temsilci.ad)}</b>)` : ""} onayını bekliyor. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
         : bekliyor ? `<p class="onay-kutu">⏳ Kaydınız yönetimin onayını bekliyor. Onaylanınca iş listesine düşer ve herkes görür.</p>` : ""}
       ${k.gizli ? `<p class="gizli-not">🔒 YK iş emri: yalnızca yönetici, yönetim kurulu, muhasebe, müdür ve şef görür.</p>` : ""}
@@ -649,16 +660,30 @@
         mesaj("Onaylandı. İş listesine düştü, herkese bildirildi.");
       } catch (err) { mesaj(err.message); e.target.disabled = false; e.target.textContent = "✔ Onayla"; }
     });
-    $("#kayit-reddet")?.addEventListener("click", async (e) => {
-      if (!confirm(`"${k.yer}" kaydı reddedilip silinsin mi?`)) return;
-      e.target.disabled = true;
+    const reddet = async (d, metin) => {
+      d.disabled = true;
       try {
-        await api("kayit_reddet", { id: k.id });
+        await api("kayit_reddet", { id: k.id, metin });
         kayitlar = kayitlar.filter((x) => x.id !== k.id);
         history.replaceState(null, "", location.pathname);
         goster("liste"); listeCiz();
-        mesaj("Kayıt reddedildi ve silindi.");
-      } catch (err) { mesaj(err.message); e.target.disabled = false; }
+        mesaj(k.temsilci_id ? "Kayıt reddedildi. Ortağa bildirim gönderildi." : "Kayıt reddedildi ve silindi.");
+      } catch (err) { mesaj(err.message); d.disabled = false; }
+    };
+    $("#kayit-reddet")?.addEventListener("click", (e) => {
+      // Parsel temsilcisi: reddederken ortağa isteğe bağlı cevap yazar
+      if ($("#ret-form")) {
+        $("#ret-form").hidden = false; e.target.closest(".dugmeler").hidden = true;
+        return $("#ret-form textarea").focus();
+      }
+      if (confirm(`"${k.yer}" kaydı reddedilip silinsin mi?`)) reddet(e.target);
+    });
+    $("#ret-vazgec")?.addEventListener("click", () => {
+      $("#ret-form").hidden = true; $("#kayit-reddet").closest(".dugmeler").hidden = false;
+    });
+    $("#ret-form")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      reddet(e.target.querySelector("button[type=submit]"), e.target.metin.value.trim());
     });
     $("#kayit-sil")?.addEventListener("click", async (e) => {
       if (!confirm(`${k.no} numaralı "${k.yer}" kaydı herkesten silinsin mi? Geri alınamaz.`)) return;

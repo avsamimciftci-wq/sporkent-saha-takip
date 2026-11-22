@@ -961,13 +961,17 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "kayit_reddet": {
       // Onay bekleyen kaydı yönetici ya da yönetim kurulu reddeder: fotoğrafıyla silinir
       await onayYetkisi(g.id);
-      const { data: k } = await db.from("kayitlar").select("id, no, yer, cihaz, foto_once, onay_durumu, temsilci_id").eq("id", g.id).maybeSingle();
+      const { data: k } = await db.from("kayitlar").select("id, no, yer, cihaz, foto_once, onay_durumu, temsilci_id, temsilci_cevaplari").eq("id", g.id).maybeSingle();
       if (!k || k.onay_durumu !== "bekliyor") throw new Hata("Kayıt bulunamadı ya da zaten onaylanmış.");
       if (k.foto_once) await db.storage.from(BUCKET).remove([k.foto_once]);
       await db.from("kayitlar").delete().eq("id", k.id);
-      // Temsilci onaylamadıysa kaydı yazan ortağa haber verilir
-      if (k.temsilci_id && k.cihaz) {
-        await duyur({ cihaz: k.cihaz }, `Kaydınız onaylanmadı ${k.no}`, `${k.yer}: parsel temsilciniz ${u.ad} bu kaydı onaylamadı. Kendisiyle görüşebilirsiniz.`.slice(0, 200), { sayfa: "parsel" });
+      // Temsilci reddettiyse kaydı yazan ortağa haber verilir; reddederken yazdığı cevap (yoksa son cevabı) da gider
+      if (k.temsilci_id && k.cihaz && k.cihaz !== u.cihaz) {
+        const onceki = Array.isArray(k.temsilci_cevaplari) ? k.temsilci_cevaplari.at(-1)?.metin : "";
+        const cevap = temiz(g.metin, 1000) || onceki || "";
+        await duyur({ cihaz: k.cihaz }, `❌ Kaydınız reddedildi ${k.no}`.slice(0, 80),
+          (cevap ? `${k.yer}: Parsel temsilciniz ${u.ad} kaydınızı reddetti. Cevabı: ${cevap}`
+            : `${k.yer}: Parsel temsilciniz ${u.ad} kaydınızı reddetti. Kendisiyle görüşebilirsiniz.`).slice(0, 240), { sayfa: "parsel" });
       }
       return { tamam: true };
     }

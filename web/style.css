@@ -393,6 +393,9 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .onay-kutu { margin: 10px 0; padding: 14px; border-radius: 14px; border: 3px solid #b54708; background: #fef0db; color: #5c2a04; }
 .onay-kutu h2 { margin: 0 0 6px; }
 .onay-kutu .dugmeler { grid-template-columns: 1fr 1.6fr; }
+.onay-kutu .dugmeler[hidden], #ret-form[hidden] { display: none; }
+#ret-form textarea { width: 100%; margin-top: 4px; }
+.ana-dugme.tehlike-dolu { background: #c62828; color: #fff; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .onay-uyari, :root:not([data-theme="light"]) .rozet.bekliyor, :root:not([data-theme="light"]) .onay-kutu { background: #3a2610; color: #ffcf99; }
 }
