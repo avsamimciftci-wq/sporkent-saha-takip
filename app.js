@@ -411,6 +411,7 @@
           <span class="satir-yer" style="display:block">${kac(k.yer)}</span>
           <span class="satir-sorun">${kac(k.sorun)}</span>
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
+          ${k.temsilci_cevaplari?.length && (k.benim || k.temsilcisiyim) ? `<span class="satir-cevap">💬 Temsilci ${kac(k.temsilci_cevaplari.at(-1).ad)}: ${kac(k.temsilci_cevaplari.at(-1).metin)}</span>` : ""}
           ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi"><span class="cevap-verildi">✅ CEVAP VERİLDİ${k.cevaplar.length > 1 ? ` (${k.cevaplar.length})` : ""}${cevapOkunmadi(k) ? " · YENİ" : ""}</span>💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}${cevapGorulmeOzet(k)}</span>` : ""}
           ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
@@ -506,6 +507,20 @@
           <small class="ipucu">Yönetim Kurulu bölümündeki herkes (yönetici, yönetim kurulu, muhasebe, müdür, şef) görür ve bildirim alır.</small>
         </form>` : ""}
       </div>` : ""}
+      ${k.temsilci_id && (k.temsilcisiyim || (k.temsilci_cevaplari?.length && (k.benim || yonetici()))) ? `
+      <div class="islem yk-cevaplar">
+        <h2>💬 Parsel temsilcisinin cevabı</h2>
+        ${(k.temsilci_cevaplari || []).length ? k.temsilci_cevaplari.map((c) => `
+        <div class="yk-cevap"><p>${kac(c.metin)}</p><small>${kac(c.ad)} · ${tarihSaat(c.at)}</small></div>`).join("")
+          : `<p class="ipucu" style="margin:0">Henüz cevap yazılmadı.</p>`}
+        ${k.temsilcisiyim ? `
+        <button type="button" class="ana-dugme" id="tm-cevap-ac">💬 Cevap Ver</button>
+        <form id="tm-cevap-form" hidden>
+          <textarea name="metin" rows="3" maxlength="1000" required placeholder="Ortağa cevabınızı yazın"></textarea>
+          <button type="submit" class="ana-dugme">Gönder</button>
+          <small class="ipucu">Cevabınız kaydı yazan ortağa bildirim olarak gider.</small>
+        </form>` : ""}
+      </div>` : ""}
       ${kapat ? `
       <form class="islem" id="kapat-form">
         <h2>Sorunu giderdiniz mi?</h2>
@@ -570,6 +585,20 @@
         cevapOkundu(k);
         listeCiz(); detayGoster(k.id);
         mesaj("Cevap gönderildi. Yönetim Kurulu bölümündekilere bildirildi.");
+      } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Gönder"; }
+    });
+    $("#tm-cevap-ac")?.addEventListener("click", (e) => {
+      e.target.hidden = true; $("#tm-cevap-form").hidden = false; $("#tm-cevap-form textarea").focus();
+    });
+    $("#tm-cevap-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const d = e.target.querySelector("button[type=submit]"), metin = e.target.metin.value.trim();
+      if (!metin) return;
+      d.disabled = true; d.textContent = "Gönderiliyor…";
+      try {
+        Object.assign(k, await api("temsilci_cevap", { id: k.id, metin }));
+        detayGoster(k.id);
+        mesaj("Cevabınız ortağa gönderildi.");
       } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Gönder"; }
     });
     let cevapGun = null;
