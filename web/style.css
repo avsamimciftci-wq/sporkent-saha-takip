@@ -1000,25 +1000,23 @@ html.ana-acik body { padding-bottom: 0; }
 }
 #ekran-ana .ana-karsilama { flex: none; margin: 0 0 8px; font-size: clamp(14px, 2.3dvh, 18px); line-height: 1.3; }
 #ekran-ana .ana-kutular { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); gap: clamp(6px, 1.3dvh, 12px); }
-#ekran-ana .ana-kutu { min-height: 0; overflow: hidden; padding: 4px 6px; gap: clamp(2px, .7dvh, 8px);
-  font-size: clamp(13px, 2.3dvh, 20px); border-radius: clamp(12px, 2dvh, 18px); }
-#ekran-ana .ana-kutu > span:not(.parsel-yazi) { font-size: clamp(20px, 4.6dvh, 46px); }
-#ekran-ana .ana-kutu small { font-size: clamp(11px, 1.7dvh, 14px); padding: 1px 8px; }
+/* --olcek: içerik sığmazsa uygulama düğme düğme küçültür (1 = normal). Simge çok, yazı az küçülür (--yolcek). */
+#ekran-ana .ana-kutu { --yolcek: calc(.55 + .45 * var(--olcek, 1)); min-height: 0; overflow: hidden; padding: 4px 6px; gap: calc(clamp(2px, .7dvh, 8px) * var(--olcek, 1));
+  font-size: calc(clamp(13px, 2.3dvh, 20px) * var(--yolcek)); line-height: 1.15; border-radius: clamp(12px, 2dvh, 18px); }
+#ekran-ana .ana-kutu > span:not(.parsel-yazi) { font-size: calc(clamp(20px, 4.6dvh, 46px) * var(--olcek, 1)); }
+#ekran-ana .ana-kutu small { font-size: calc(clamp(11px, 1.7dvh, 14px) * var(--yolcek)); padding: 1px 8px; line-height: 1.2; }
 #ekran-ana .ana-kutu.tam { min-height: 0; }
 /* Parsel Temsilciliği-Saha Takip: resim solda, yazı sağda (yükseklikten kazanır) */
 #ekran-ana .ak-parsel { flex-direction: row; gap: clamp(8px, 2dvh, 16px); padding: 6px 12px; min-height: 0; }
-#ekran-ana .ak-parsel .parsel-foto { flex: none; width: clamp(40px, 9dvh, 96px); height: clamp(40px, 9dvh, 96px); font-size: clamp(22px, 5dvh, 52px); border-width: 2px; }
-#ekran-ana .ak-parsel .parsel-yazi { align-items: flex-start; text-align: left; gap: clamp(2px, .6dvh, 6px); font-size: clamp(15px, 2.6dvh, 22px); }
+#ekran-ana .ak-parsel .parsel-foto { flex: none; width: calc(clamp(40px, 9dvh, 96px) * var(--olcek, 1)); height: calc(clamp(40px, 9dvh, 96px) * var(--olcek, 1)); font-size: calc(clamp(22px, 5dvh, 52px) * var(--olcek, 1)); border-width: 2px; }
+#ekran-ana .ak-parsel .parsel-yazi { align-items: flex-start; text-align: left; gap: calc(clamp(2px, .6dvh, 6px) * var(--olcek, 1)); font-size: calc(clamp(15px, 2.6dvh, 22px) * var(--yolcek)); }
 #ekran-ana .ak-parsel .parsel-yazi small { white-space: normal; }
 /* Yönetim Kurulu'nu görenlerde Parsel Temsilcisi yarım kutu: resim üstte, yazı altta */
 #ekran-ana .ak-parsel.yarim { flex-direction: column; gap: clamp(2px, .7dvh, 8px); padding: 4px 6px; }
-#ekran-ana .ak-parsel.yarim .parsel-foto { width: clamp(30px, 6dvh, 64px); height: clamp(30px, 6dvh, 64px); font-size: clamp(18px, 3.6dvh, 38px); }
+#ekran-ana .ak-parsel.yarim .parsel-foto { width: calc(clamp(26px, 5dvh, 64px) * var(--olcek, 1)); height: calc(clamp(26px, 5dvh, 64px) * var(--olcek, 1)); font-size: calc(clamp(18px, 3.6dvh, 38px) * var(--olcek, 1)); }
 #ekran-ana .ak-parsel.yarim .parsel-yazi { align-items: center; text-align: center; font-size: inherit; }
-/* Kısa kutularda iki satırlık yazı ve rozet sığsın */
-#ekran-ana .ak-parsel.yarim .parsel-foto { width: clamp(26px, 5dvh, 64px); height: clamp(26px, 5dvh, 64px); }
-#ekran-ana .ak-parsel.yarim small { padding: 0 8px; line-height: 1.2; }
-#ekran-ana .ak-plaka { line-height: 1.05; gap: clamp(1px, .5dvh, 8px); }
-#ekran-ana .ak-plaka > span { font-size: clamp(18px, 3.8dvh, 46px) !important; }
+#ekran-ana .ak-parsel.yarim small { padding: 0 8px; }
+#ekran-ana .ak-plaka { line-height: 1.05; }
 /* Telefon yan çevrilince: düğmeler dört sütun, satır sayısı azalır */
 @media (orientation: landscape) and (max-height: 520px) {
   #ekran-ana { max-width: none; }
