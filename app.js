@@ -142,11 +142,28 @@
   window.addEventListener("resize", ustYukseklik);
   ustYukseklik();
 
+  // Kullanım raporu: hangi bölüm kaç kez açıldı. Ekranda 1,5 sn kalan bölüm sayılır; aynı bölüm içinde
+  // gezinmek (liste → kayıt → liste) tek açılış sayılır, ana sayfaya dönünce sıfırlanır.
+  const EKRAN_BOLUM = { liste: "saha", detay: "saha", yeni: "saha", yonetim: "uyeler", yonetimisleri: "yonetim", yksaha: "yksaha", program: "program",
+    gorevler: "gorevler", aidat: "aidat", iletisim: "iletisim", parsel: "parsel", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar",
+    sokaklar: "sokaklar", servis: "servis", duyuru: "duyuru", rapor: "rapor" };
+  let sonSayilan = null;
+  function kullanimSay(ad) {
+    if (ad === "ana") { sonSayilan = null; return; }
+    const bolum = EKRAN_BOLUM[ad];
+    if (!bolum || !oturum?.anahtar || oturum.durum !== "onayli") return;
+    setTimeout(() => {
+      if (document.getElementById("ekran-" + ad)?.hidden !== false || sonSayilan === bolum) return;
+      sonSayilan = bolum;
+      api("kullanim", { bolum }).catch(() => {});
+    }, 1500);
+  }
   function goster(ad) {
     if (ad !== "gorevler" && typeof haritaKapat === "function") haritaKapat();
     if (ad !== "servis" && typeof servisHaritaKapat === "function") servisHaritaKapat();
     setTimeout(() => { if (typeof izCubuk === "function") izCubuk(); }, 0);
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
+    kullanimSay(ad);
     document.documentElement.classList.toggle("ana-acik", ad === "ana");
     if (ad === "ana") ustYukseklik();
     // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
@@ -932,6 +949,7 @@
         if (e.data.sayfa === "uyeler") yonetimAc();
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
+        else if (e.data.sayfa === "duyuru" || e.data.sayfa === "restoran") { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); }
         else yenile();
       });
     }
@@ -945,7 +963,8 @@
     clearInterval(bekleZamani);
     bildirimleriTemizle();
     try { devriyeDevam(); } catch {}
-    api("durum").then((r) => {
+    // Kullanım raporu için: açılış sayılır, ana ekrana eklenmişse bildirilir
+    api("durum", { acilis: true, kurulu: anaEkranda() }).then((r) => {
       if (!r || r.durum !== "onayli") return;
       const once = JSON.stringify([oturum.ad, oturum.rol, oturum.unvan]);
       Object.assign(oturum, { ad: r.ad || oturum.ad, rol: r.rol || oturum.rol, unvan: r.unvan ?? null });
@@ -962,6 +981,8 @@
     if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#plaka") return plakaAc();
     if (location.hash === "#restoran") return restoranAc();
+    if (location.hash === "#duyuru") return duyuruAc();
+    if (location.hash === "#rapor" && yonetici()) return raporAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#iletisim") return iletisimAc();
@@ -2069,107 +2090,217 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
-  // ---------- Restoran: paylaşımlar (görsel, metin, PDF, video) ve sipariş telefonu ----------
-  // Restoran yetkilisi ve yönetici paylaşım yapar ve siler; herkes görür, her paylaşım herkese bildirilir.
-  let restoranTur = "gorsel";
-  const RESTORAN_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], video: ["🎬", "Video", "video/*"] };
-  async function restoranAc() {
-    if (location.hash !== "#restoran") history.replaceState(null, "", "#restoran");
-    goster("restoran");
-    const kutu = $("#restoran");
+  // ---------- Paylaşım bölümleri: Duyurular ve Restoran (görsel, metin, PDF, video) ----------
+  // Duyuruyu yalnızca yönetici, restoran paylaşımını restoran yetkilisi ve yönetici yapar ve siler;
+  // herkes görür, her paylaşım uygulamayı kullanan herkese sesli bildirimle duyurulur.
+  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], video: ["🎬", "Video", "video/*"] };
+  const PAYLASIM_BOLUMU = {
+    restoran: { ornekMetin: "Örn. Bu akşam balık günü!", ornekAciklama: "Örn. Haftanın menüsü", bos: "Henüz paylaşım yok." },
+    duyuru: { ornekMetin: "Örn. Cumartesi günü saat 10.00'da sitede ilaçlama yapılacaktır.", ornekAciklama: "Örn. Genel Kurul daveti", bos: "Henüz duyuru yok." },
+  };
+  const paylasimTur = { restoran: "gorsel", duyuru: "metin" };
+  async function paylasimAc(b) {
+    if (location.hash !== "#" + b) history.replaceState(null, "", "#" + b);
+    goster(b);
+    const kutu = $("#" + b);
     if (!kutu.innerHTML) kutu.innerHTML = `<p class="bos">Yükleniyor…</p>`;
-    try { restoranCiz(await api("restoran_liste")); }
+    try { const v = await api(b + "_liste"); paylasimCiz(b, v); if (b === "duyuru") duyuruGorulduIsaretle(v); }
     catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
-  function paylasimHtml(p, yonetir) {
+  function restoranAc() { return paylasimAc("restoran"); }
+  function duyuruAc() { return paylasimAc("duyuru"); }
+  function paylasimHtml(b, p, yonetir) {
     let ic = "";
     if (p.tur === "gorsel") ic = p.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(p.url)}" aria-label="Tam ekran aç"><img src="${kac(p.url)}" alt=""></button>` : `<div class="foto-bos">Görsel açılamadı</div>`;
     else if (p.tur === "video") ic = p.url ? `<video class="paylasim-video" src="${kac(p.url)}" controls playsinline preload="metadata"></video>` : "";
     else if (p.tur === "pdf") ic = p.url ? `<a class="paylasim-pdf" href="${kac(p.url)}" target="_blank" rel="noopener">📄 PDF'yi aç</a>` : "";
-    return `<article class="paylasim">
-      <div class="paylasim-ust"><span>${RESTORAN_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
-        ${yonetir ? `<button type="button" class="kucuk-dugme tehlike" data-restoran-sil="${p.id}">🗑 Sil</button>` : ""}</div>
+    return `<article class="paylasim${b === "duyuru" ? " duyuru" : ""}">
+      <div class="paylasim-ust"><span>${PAYLASIM_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
+        ${yonetir ? `<button type="button" class="kucuk-dugme tehlike" data-paylasim-sil="${p.id}">🗑 Sil</button>` : ""}</div>
       ${ic}
       ${p.metin ? `<p class="paylasim-metin">${kac(p.metin)}</p>` : ""}
     </article>`;
   }
-  function restoranCiz(v) {
-    const uluslar = v.tel ? telefonUluslararasi(v.tel) : "";
-    const wpMetin = encodeURIComponent(`Merhaba, Sporkent sitesinden sipariş vermek istiyorum.\n${oturum?.unvan ? oturum.unvan + " · " : ""}${oturum?.ad || ""}\n\nSiparişim:\n`);
-    const t = RESTORAN_TURLERI[restoranTur];
-    $("#restoran").innerHTML = `
-      ${v.yonetir ? `
-      <form class="kart restoran-yonet" id="restoran-form">
-        <b class="restoran-form-baslik">➕ Yeni paylaşım</b>
-        <div class="restoran-tur">${Object.entries(RESTORAN_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-restoran-tur="${k}" class="${k === restoranTur ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}</div>
-        ${restoranTur !== "metin" ? `<label class="foto-dugme"><input id="restoran-dosya" type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
-          <p id="restoran-secilen" class="ipucu" hidden></p>` : ""}
-        <label>${restoranTur === "metin" ? "Paylaşılacak metin" : "Açıklama (isteğe bağlı)"}
-          <textarea name="metin" rows="${restoranTur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${restoranTur === "metin" ? "Örn. Bu akşam balık günü!" : "Örn. Haftanın menüsü"}"></textarea>
-        </label>
-        <button class="ana-dugme" type="submit">📣 Paylaş ve herkese bildir</button>
-        <details class="restoran-tel-ayar"><summary>📞 Sipariş telefonunu değiştir</summary>
-          <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
-          <button type="button" class="ikincil" id="restoran-tel-kaydet" style="width:100%;margin-top:8px">Telefonu kaydet</button>
-        </details>
-      </form>` : ""}
-      ${v.tel ? `<div class="restoran-siparis">
+  function paylasimCiz(b, v) {
+    const tur = paylasimTur[b], t = PAYLASIM_TURLERI[tur], ayar = PAYLASIM_BOLUMU[b];
+    let siparis = "";
+    if (b === "restoran") {
+      const uluslar = v.tel ? telefonUluslararasi(v.tel) : "";
+      const wpMetin = encodeURIComponent(`Merhaba, Sporkent sitesinden sipariş vermek istiyorum.\n${oturum?.unvan ? oturum.unvan + " · " : ""}${oturum?.ad || ""}\n\nSiparişim:\n`);
+      siparis = v.tel ? `<div class="restoran-siparis">
         <small>Sipariş için</small>
         <span class="tel">📞 ${kac(v.tel)}</span>
         <div class="restoran-dugmeler">
           <a class="ara" href="tel:+${kac(uluslar)}">📞 Ara</a>
           <a class="wp" href="https://wa.me/${kac(uluslar)}?text=${wpMetin}" target="_blank" rel="noopener">💬 WhatsApp</a>
         </div>
-      </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`}
-      ${v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(p, v.yonetir)).join("") : `<p class="bos">Henüz paylaşım yok.</p>`}`;
-  }
-  $("#restoran").addEventListener("click", async (e) => {
-    const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
-    const tb = e.target.closest("[data-restoran-tur]");
-    if (tb) { restoranTur = tb.dataset.restoranTur; return restoranAc(); }
-    if (e.target.closest("#restoran-tel-kaydet")) {
-      try { const x = await api("restoran_tel", { tel: $("#restoran-form").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await restoranAc(); }
-      catch (err) { mesaj(err.message); }
-      return;
+      </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`;
     }
-    const b = e.target.closest("[data-restoran-sil]"); if (!b) return;
-    if (!confirm("Bu paylaşım herkesten silinsin mi?")) return;
-    b.disabled = true;
-    try { await api("restoran_sil", { id: Number(b.dataset.restoranSil) }); mesaj("Paylaşım silindi."); await restoranAc(); }
-    catch (err) { mesaj(err.message); b.disabled = false; }
-  });
-  $("#restoran").addEventListener("change", (e) => {
-    if (e.target.id !== "restoran-dosya") return;
-    const f = e.target.files?.[0], y = $("#restoran-secilen");
-    if (!f) { y.hidden = true; return; }
-    y.textContent = `Seçilen: ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`; y.hidden = false;
-  });
+    $("#" + b).innerHTML = `
+      ${v.yonetir ? `
+      <form class="kart restoran-yonet" data-paylasim-form>
+        <b class="restoran-form-baslik">➕ ${b === "duyuru" ? "Yeni duyuru" : "Yeni paylaşım"}</b>
+        <div class="restoran-tur">${Object.entries(PAYLASIM_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}</div>
+        ${tur !== "metin" ? `<label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
+          <p data-paylasim-secilen class="ipucu" hidden></p>` : ""}
+        <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : "Açıklama (isteğe bağlı)"}
+          <textarea name="metin" rows="${tur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${tur === "metin" ? ayar.ornekMetin : ayar.ornekAciklama}"></textarea>
+        </label>
+        <button class="ana-dugme" type="submit">📣 ${b === "duyuru" ? "Duyur ve herkese bildir" : "Paylaş ve herkese bildir"}</button>
+        ${b === "restoran" ? `<details class="restoran-tel-ayar"><summary>📞 Sipariş telefonunu değiştir</summary>
+          <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
+          <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
+        </details>` : ""}
+      </form>` : ""}
+      ${siparis}
+      ${v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`}`;
+  }
   // Görsel küçültülüp JPEG olarak, PDF ve video olduğu gibi yüklenir (en fazla 50 MB)
-  async function restoranDosyaYukle(f) {
+  async function paylasimDosyaYukle(b, f) {
+    const tur = paylasimTur[b];
     let blob = f, uzanti, tip;
-    if (restoranTur === "gorsel") { blob = await kucult(f, 2400); uzanti = "jpg"; tip = "image/jpeg"; }
-    else if (restoranTur === "pdf") { uzanti = "pdf"; tip = "application/pdf"; }
+    if (tur === "gorsel") { blob = await kucult(f, 2400); uzanti = "jpg"; tip = "image/jpeg"; }
+    else if (tur === "pdf") { uzanti = "pdf"; tip = "application/pdf"; }
     else { uzanti = /quicktime|\.mov$/i.test(f.type + f.name) ? "mov" : /webm/i.test(f.type) ? "webm" : "mp4"; tip = f.type || "video/mp4"; }
     if (blob.size > 50 * 1048576) throw new Error("Dosya çok büyük (en fazla 50 MB). Daha kısa bir video seçin.");
-    const { yol, adres } = await api("yukleme_adresi", { tur: "restoran", uzanti });
+    const { yol, adres } = await api("yukleme_adresi", { tur: b, uzanti });
     const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": tip, "x-upsert": "false" }, body: blob });
     if (!r.ok) throw new Error("Dosya yüklenemedi, tekrar deneyin.");
     return yol;
   }
-  $("#restoran").addEventListener("submit", async (e) => {
-    if (e.target.id !== "restoran-form") return;
-    e.preventDefault();
-    const f = e.target, d = f.querySelector("button[type=submit]");
-    const dosya = $("#restoran-dosya")?.files?.[0];
-    if (restoranTur !== "metin" && !dosya) return mesaj(`Önce ${RESTORAN_TURLERI[restoranTur][1].toLocaleLowerCase("tr")} seçin.`);
-    d.disabled = true; d.textContent = "Yükleniyor…";
-    try {
-      const yol = restoranTur === "metin" ? null : await restoranDosyaYukle(dosya);
-      d.textContent = "Paylaşılıyor…";
-      await api("restoran_paylas", { tur: restoranTur, metin: f.metin.value, yol });
-      mesaj("Paylaşıldı. Herkese bildirim gönderildi.");
-      await restoranAc();
-    } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "📣 Paylaş ve herkese bildir"; }
+  for (const b of ["restoran", "duyuru"]) {
+    const kutu = $("#" + b);
+    kutu.addEventListener("click", async (e) => {
+      const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
+      const tb = e.target.closest("[data-paylasim-tur]");
+      if (tb) { paylasimTur[b] = tb.dataset.paylasimTur; return paylasimAc(b); }
+      if (e.target.closest("[data-restoran-tel-kaydet]")) {
+        try { const x = await api("restoran_tel", { tel: kutu.querySelector("[data-paylasim-form]").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await paylasimAc(b); }
+        catch (err) { mesaj(err.message); }
+        return;
+      }
+      const s = e.target.closest("[data-paylasim-sil]"); if (!s) return;
+      if (!confirm(b === "duyuru" ? "Bu duyuru herkesten silinsin mi?" : "Bu paylaşım herkesten silinsin mi?")) return;
+      s.disabled = true;
+      try { await api(b + "_sil", { id: Number(s.dataset.paylasimSil) }); mesaj(b === "duyuru" ? "Duyuru silindi." : "Paylaşım silindi."); await paylasimAc(b); }
+      catch (err) { mesaj(err.message); s.disabled = false; }
+    });
+    kutu.addEventListener("change", (e) => {
+      if (!e.target.matches("[data-paylasim-dosya]")) return;
+      const f = e.target.files?.[0], y = kutu.querySelector("[data-paylasim-secilen]");
+      if (!f) { y.hidden = true; return; }
+      y.textContent = `Seçilen: ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`; y.hidden = false;
+    });
+    kutu.addEventListener("submit", async (e) => {
+      if (!e.target.matches("[data-paylasim-form]")) return;
+      e.preventDefault();
+      const f = e.target, d = f.querySelector("button[type=submit]"), eski = d.textContent, tur = paylasimTur[b];
+      const dosya = f.querySelector("[data-paylasim-dosya]")?.files?.[0];
+      if (tur !== "metin" && !dosya) return mesaj(`Önce ${PAYLASIM_TURLERI[tur][1].toLocaleLowerCase("tr")} seçin.`);
+      d.disabled = true; d.textContent = "Yükleniyor…";
+      try {
+        const yol = tur === "metin" ? null : await paylasimDosyaYukle(b, dosya);
+        d.textContent = "Gönderiliyor…";
+        await api(b + "_paylas", { tur, metin: f.metin.value, yol });
+        mesaj(b === "duyuru" ? "Duyuru yayımlandı. Herkese bildirim gönderildi." : "Paylaşıldı. Herkese bildirim gönderildi.");
+        await paylasimAc(b);
+      } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = eski; }
+    });
+  }
+
+  // Ana sayfadaki Duyurular düğmesinde okunmamış duyuru sayısı (dakikada en çok bir kez sorulur)
+  let duyuruSon = { zaman: 0, tarihler: [] };
+  async function duyuruRozeti() {
+    const k = $("#ana-kutular [data-ac=duyuru] small"); if (!k) return;
+    const yaz = () => {
+      const gorulen = sakla.al("sk_duyuru_gorulen") || "";
+      const yeni = duyuruSon.tarihler.filter((t) => t > gorulen).length;
+      k.textContent = yeni ? `🔴 ${yeni} yeni duyuru` : "";
+    };
+    yaz();
+    if (Date.now() - duyuruSon.zaman < 60000) return;
+    duyuruSon.zaman = Date.now();
+    try { duyuruSon.tarihler = (await api("duyuru_liste")).paylasimlar.map((p) => p.created_at); yaz(); } catch {}
+  }
+  // Duyurular açılınca hepsi okunmuş sayılır
+  const duyuruGorulduIsaretle = (v) => { if (v.paylasimlar[0]) sakla.koy("sk_duyuru_gorulen", v.paylasimlar[0].created_at); duyuruSon.tarihler = v.paylasimlar.map((p) => p.created_at); };
+
+  // ---------- Kullanım raporu (yalnızca yönetici) ----------
+  const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
+    aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
+    yakinlar: "👨‍👩‍👧 Ortak Yakını Onayları", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
+    program: "📅 İş Programı", devriye: "🚶 Günlük Devriye", gorevler: "✅ Görevler" };
+  const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
+  let raporGun = 30, raporVeri = null, raporAra = "";
+  const sonGorulmeKisa = (t) => {
+    if (!t) return "Hiç";
+    const dk = Math.round((Date.now() - Date.parse(t)) / 60000);
+    if (dk < 5) return "Şu an";
+    if (dk < 60) return `${dk} dk önce`;
+    if (dk < 1440) return `${Math.round(dk / 60)} saat önce`;
+    if (dk < 2880) return "Dün";
+    return `${Math.round(dk / 1440)} gün önce`;
+  };
+  async function raporAc() {
+    if (!yonetici()) return;
+    if (location.hash !== "#rapor") history.replaceState(history.state, "", "#rapor");
+    goster("rapor");
+    $("#rapor").innerHTML = `<p class="bos">Rapor hazırlanıyor…</p>`;
+    try { raporVeri = await api("kullanim_raporu", { gun: raporGun }); raporCiz(); }
+    catch (e) { $("#rapor").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  function raporCiz() {
+    const v = raporVeri, o = v.ozet;
+    const enFazla = Math.max(1, ...v.bolumler.map((b) => b.acilis));
+    const ara = raporAra.toLocaleLowerCase("tr");
+    const kisiler = v.kisiler.filter((k) => !ara || `${k.ad} ${k.unvan}`.toLocaleLowerCase("tr").includes(ara));
+    const kutu = (sayi, ad, alt = "") => `<div class="rapor-kutu"><b>${sayi}</b><span>${ad}</span>${alt ? `<small>${alt}</small>` : ""}</div>`;
+    $("#rapor").innerHTML = `
+      <div class="rapor-donem">${Object.entries(RAPOR_DONEM).map(([g, ad]) => `<button type="button" data-rapor-gun="${g}" class="${Number(g) === v.gun ? "secili" : ""}">${ad}</button>`).join("")}</div>
+      <p class="ipucu rapor-tarih">Rapor tarihi: ${tarihSaat(new Date())} · Dönem: ${RAPOR_DONEM[v.gun]}</p>
+      <h3 class="rapor-baslik">Kaç kişi kullanıyor?</h3>
+      <div class="rapor-kutular">
+        ${kutu(o.kayitli, "Kayıtlı kişi", o.bekleyen ? `+ ${o.bekleyen} onay bekliyor` : "")}
+        ${kutu(o.kurulu, "Telefonuna yükleyen", "ana ekrana eklemiş")}
+        ${kutu(o.bildirim, "Bildirimi açık")}
+        ${kutu(o.aktif_24s, "Son 24 saatte giren")}
+        ${kutu(o.aktif_7g, "Son 7 günde giren")}
+        ${kutu(o.aktif_30g, "Son 30 günde giren")}
+      </div>
+      <div class="rapor-kutular iki">
+        ${kutu(o.donemde_acan, "Bu dönemde uygulamayı açan")}
+        ${kutu(o.acilis, "Bu dönemde toplam açılış")}
+      </div>
+      <h3 class="rapor-baslik">Kimler kayıtlı?</h3>
+      <div class="kart rapor-roller">${v.roller.map(([ad, n]) => `<div><span>${kac(ad)}</span><b>${n}</b></div>`).join("") || `<p class="bos">Kayıt yok.</p>`}</div>
+      <h3 class="rapor-baslik">En çok kullanılan bölümler <small>(${RAPOR_DONEM[v.gun].toLocaleLowerCase("tr")})</small></h3>
+      <div class="kart rapor-bolumler">${v.bolumler.length ? v.bolumler.map((b, i) => `
+        <div class="rapor-bolum">
+          <div class="rapor-bolum-ust"><span>${i + 1}. ${BOLUM_ADI[b.bolum] || kac(b.bolum)}</span><b>${b.acilis} açılış · ${b.kisi} kişi</b></div>
+          <div class="rapor-cubuk"><i style="width:${Math.max(3, Math.round(b.acilis / enFazla * 100))}%"></i></div>
+        </div>`).join("") : `<p class="bos">Bu dönemde henüz kayıtlı kullanım yok. Sayım bu güncellemeyle başladı; birkaç gün içinde dolacak.</p>`}</div>
+      <h3 class="rapor-baslik">Kim, ne zaman kullandı? <small>(${v.kisiler.length} kişi)</small></h3>
+      <input class="rapor-ara" type="search" placeholder="🔍 İsimle ara" value="${kac(raporAra)}">
+      <div class="rapor-kisiler">${kisiler.map((k) => `
+        <div class="rapor-kisi">
+          <div><b>${kac(k.ad)}</b><small>${kac(k.unvan)}</small></div>
+          <div class="rapor-kisi-sag"><span class="${k.son_gorulme && Date.now() - Date.parse(k.son_gorulme) < 7 * 86400e3 ? "aktif" : "pasif"}">${sonGorulmeKisa(k.son_gorulme)}</span>
+            <small>${k.kurulu ? "📲" : ""}${k.bildirim ? "🔔" : "🔕"} ${k.acilis ? `${k.acilis} açılış` : ""}${k.en_cok ? ` · ${BOLUM_ADI[k.en_cok] || k.en_cok}` : ""}</small></div>
+        </div>`).join("") || `<p class="bos">Bulunamadı.</p>`}</div>
+      <p class="ipucu">📲 telefonuna yüklemiş · 🔔 bildirimi açık · 🔕 bildirimi kapalı. "Açılış": seçilen dönemde uygulamayı kaç gün/kez açtığı.</p>
+      <button type="button" class="ikincil rapor-yazdir" data-rapor-yazdir>🖨️ Yazdır / PDF olarak kaydet</button>`;
+  }
+  $("#rapor").addEventListener("click", (e) => {
+    const g = e.target.closest("[data-rapor-gun]");
+    if (g) { raporGun = Number(g.dataset.raporGun); return raporAc(); }
+    if (e.target.closest("[data-rapor-yazdir]")) window.print();
+  });
+  $("#rapor").addEventListener("input", (e) => {
+    if (!e.target.matches(".rapor-ara")) return;
+    raporAra = e.target.value;
+    const yer = e.target.selectionStart;
+    raporCiz();
+    const a = $("#rapor .rapor-ara"); a.focus(); a.setSelectionRange(yer, yer);
   });
 
   // ---------- Ortak: plaka girişi talebi ----------
@@ -2291,7 +2422,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2321,9 +2452,12 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       : parsel?.temsilciler?.length ? parsel.temsilciler.map((t) => t.ad).join(", ") : "";
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
+    $("#ana-kutular [data-ac=rapor]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Restoran yetkilisi yalnızca Restoran bölümünü görür
-    if (oturum?.rol === "restoran") for (const k of document.querySelectorAll("#ana-kutular .ana-kutu")) k.hidden = k.dataset.ac !== "restoran";
+    // (duyuruları o da görür)
+    if (oturum?.rol === "restoran") for (const k of document.querySelectorAll("#ana-kutular .ana-kutu")) k.hidden = !["restoran", "duyuru"].includes(k.dataset.ac);
+    duyuruRozeti();
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (Parsel Temsilcisi hep tam genişlik)
     const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.ak-parsel):not(.ak-yakinlar)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
@@ -2336,7 +2470,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
