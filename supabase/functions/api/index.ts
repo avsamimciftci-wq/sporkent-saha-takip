@@ -954,7 +954,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "plaka_talebi": {
       // Ortak (ya da ortağın yakını) kendi aracının ya da yakınının aracının plakasını kooperatife bildirir
       const uu = u as any;
-      if (rol !== "uye" || !uu.ortak_no) throw new Hata("Plaka-Kimlik Bildirimini ortaklar yapar.", 403);
+      if (rol !== "baskan" && (rol !== "uye" || !uu.ortak_no)) throw new Hata("Plaka-Kimlik Bildirimini ortaklar yapar.", 403);
+      const kimlik = uu.ortak_no ? `${uu.ortak_no} No'lu Ortak` : (uu.unvan || "Yönetici");
       const arac = g.arac === "yakin" ? "yakin" : g.arac === "kendi" ? "kendi" : "";
       if (!arac) throw new Hata("Önce kendi aracınız mı, yakınınızın aracı mı olduğunu seçin.");
       // "34abc123" → "34 ABC 123": rakam ve harf grupları arasına boşluk
@@ -973,23 +974,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         else throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
       }
       const { data: t, error } = await db.from("plaka_talepleri").insert({
-        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
+        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no ?? null, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
       }).select("id, created_at").single();
       if (error) throw error;
-      const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${uu.ortak_no} No'lu Ortak)`;
+      const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${kimlik})`;
       const metin = [
         "SPORKENT ASİSTAN uygulamasından Plaka-Kimlik Bildirimi:",
         "",
         `Plaka: ${plaka}`,
         `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı`}`,
         ...(arac === "yakin" ? [`Araç sahibi: ${sahibi}`, `Araç sahibinin telefonu: ${sahibiTel}`] : []),
-        `Talep eden: ${u.ad} (${uu.unvan ?? uu.ortak_no + " No'lu Ortak"})`,
+        `Talep eden: ${u.ad} (${uu.unvan ?? kimlik})`,
         `Telefon: ${uu.telefon ?? "-"}`,
         `Talep no: ${t.id} · ${new Date(t.created_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
       ].join("\n");
       const gitti = await epostaGonder(PLAKA_EPOSTA, konu, metin);
       if (gitti) await db.from("plaka_talepleri").update({ eposta_gitti: true }).eq("id", t.id);
-      await duyur(["baskan", "muhasebe"], "🚗 Plaka-Kimlik Bildirimi", `${plaka} · ${u.ad} (${uu.ortak_no} No'lu Ortak)${arac === "yakin" ? " · yakınının aracı" : ""}`);
+      await duyur(["baskan", "muhasebe"], "🚗 Plaka-Kimlik Bildirimi", `${plaka} · ${u.ad} (${kimlik})${arac === "yakin" ? " · yakınının aracı" : ""}`);
       return { tamam: true, eposta: gitti, kime: PLAKA_EPOSTA, konu, metin };
     }
 

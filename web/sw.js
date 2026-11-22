@@ -1,10 +1,10 @@
-// Bildirimleri gösterir ve uygulama kabuğunu önbellekte tutar.
-const SURUM = "sk-v157";
-const DURUM = "sk-durum"; // sürümden bağımsız küçük kayıt: temizlenmemiş bildirim var mı
+﻿// Bildirimleri gÃ¶sterir ve uygulama kabuÄŸunu Ã¶nbellekte tutar.
+const SURUM = "sk-v158";
+const DURUM = "sk-durum"; // sÃ¼rÃ¼mden baÄŸÄ±msÄ±z kÃ¼Ã§Ã¼k kayÄ±t: temizlenmemiÅŸ bildirim var mÄ±
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "icons/logo-192.png"];
 
 self.addEventListener("install", (e) => {
-  // GitHub Pages dosyaları 10 dk tarayıcı önbelleğinde tutar; "reload" ile her zaman sunucudan alınır.
+  // GitHub Pages dosyalarÄ± 10 dk tarayÄ±cÄ± Ã¶nbelleÄŸinde tutar; "reload" ile her zaman sunucudan alÄ±nÄ±r.
   e.waitUntil(caches.open(SURUM)
     .then((c) => c.addAll(KABUK.map((u) => new Request(u, { cache: "reload" }))))
     .then(() => self.skipWaiting()));
@@ -18,7 +18,7 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-// Önce ağ, olmazsa önbellek: güncel sürüm her zaman öncelikli.
+// Ã–nce aÄŸ, olmazsa Ã¶nbellek: gÃ¼ncel sÃ¼rÃ¼m her zaman Ã¶ncelikli.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
@@ -37,7 +37,7 @@ self.addEventListener("push", (e) => {
   let v = {};
   try { v = e.data.json(); } catch { v = { baslik: "Sporkent", govde: e.data ? e.data.text() : "" }; }
   e.waitUntil((async () => {
-    // Sesli, titreşimli ve dokunulana kadar ekranda kalan bildirim
+    // Sesli, titreÅŸimli ve dokunulana kadar ekranda kalan bildirim
     await self.registration.showNotification(v.baslik || "Sporkent", {
       body: v.govde || "",
       icon: "icons/logo-192.png",
@@ -51,15 +51,15 @@ self.addEventListener("push", (e) => {
       data: { kayitId: v.kayitId, sayfa: v.sayfa },
     });
     await bekleyenVar(true);
-    // iPhone ve bilgisayar simgedeki sayıyı kendiliğinden koymaz; bekleyen bildirim kadar yaz
+    // iPhone ve bilgisayar simgedeki sayÄ±yÄ± kendiliÄŸinden koymaz; bekleyen bildirim kadar yaz
     await sayiyiYaz();
-    // Uygulama açıksa haber ver: iş penceresi kendiliğinden açılsın
+    // Uygulama aÃ§Ä±ksa haber ver: iÅŸ penceresi kendiliÄŸinden aÃ§Ä±lsÄ±n
     const pencereler = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const p of pencereler) p.postMessage({ tip: "bildirim", kayitId: v.kayitId, sayfa: v.sayfa });
   })());
 });
 
-// Simgedeki sayı = bildirim çubuğunda bekleyen Sporkent bildirimi (Android bunu kendisi sayar)
+// Simgedeki sayÄ± = bildirim Ã§ubuÄŸunda bekleyen Sporkent bildirimi (Android bunu kendisi sayar)
 async function sayiyiYaz() {
   try {
     const n = (await self.registration.getNotifications()).length;
@@ -67,7 +67,7 @@ async function sayiyiYaz() {
   } catch {}
 }
 
-// Bildirim geldi mi, uygulama açılıp temizlendi mi (kayıt yoksa "geldi" sayılır)
+// Bildirim geldi mi, uygulama aÃ§Ä±lÄ±p temizlendi mi (kayÄ±t yoksa "geldi" sayÄ±lÄ±r)
 async function bekleyenVar(deger) {
   const c = await caches.open(DURUM);
   if (deger !== undefined) return c.put("bekleyen", new Response(deger ? "1" : "0"));
@@ -75,12 +75,12 @@ async function bekleyenVar(deger) {
   return !r || (await r.text()) === "1";
 }
 
-// Uygulama açılınca çubuktaki bildirimleri kapat, simgedeki sayıyı sil
+// Uygulama aÃ§Ä±lÄ±nca Ã§ubuktaki bildirimleri kapat, simgedeki sayÄ±yÄ± sil
 async function temizle() {
   try { for (const b of await self.registration.getNotifications()) b.close(); } catch {}
   try { await self.navigator.clearAppBadge?.(); } catch {}
-  // Samsung simgedeki sayıyı bildirimler kapansa da bazen tutuyor; sessiz bir bildirim
-  // gösterip hemen kapatmak sayıyı yeniden hesaplatıp sıfırlıyor. Yalnızca bildirim geldiyse.
+  // Samsung simgedeki sayÄ±yÄ± bildirimler kapansa da bazen tutuyor; sessiz bir bildirim
+  // gÃ¶sterip hemen kapatmak sayÄ±yÄ± yeniden hesaplatÄ±p sÄ±fÄ±rlÄ±yor. YalnÄ±zca bildirim geldiyse.
   try {
     if (!(await bekleyenVar())) return false;
     await self.registration.showNotification("Sporkent", { tag: "sk-temizlik", silent: true, body: "" });
