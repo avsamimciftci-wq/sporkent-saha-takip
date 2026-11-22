@@ -698,6 +698,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const kayitlar = (data ?? []).map(({ cihaz: c, ...k }: any) => {
         const x: any = { ...k, benim: c === u.cihaz };
         if (k.onay_durumu === "bekliyor") x.onaylayabilir = k.temsilci_id ? tIds.includes(k.temsilci_id) : KAYIT_ONAYLAYAN.includes(rol);
+        // Bu ortağın parsel temsilcisi: kayda cevap yazabilir
+        if (k.temsilci_id && tIds.includes(k.temsilci_id)) x.temsilcisiyim = true;
+        // Temsilci-ortak yazışmasını yalnızca ikisi ve yönetici görür
+        if (!x.temsilcisiyim && !x.benim && rol !== "baskan") delete x.temsilci_cevaplari;
         if (k.gizli) x.veren_rol = verenRol.get(c) ?? null;
         if (k.gizli && SURE_GORMEYEN.includes(rol)) x.son_tarih = null;
         return x;
@@ -868,6 +872,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         await bildir(YONETIM_ISI_GOREN, `💬 YK cevabı • ${k.yer}`.slice(0, 80), `${u.ad}: ${metin}`.slice(0, 200), { kayitId: k.id, haric: u.cihaz });
       }
       return { cevaplar };
+    }
+
+    case "temsilci_cevap": {
+      // Parsel temsilcisi, parselindeki ortağın kaydına cevap yazar; ortağa bildirim gider
+      const metin = temiz(g.metin, 1000);
+      if (!metin) throw new Hata("Cevap boş olamaz.");
+      const { data: k } = await db.from("kayitlar").select("id, no, yer, cihaz, temsilci_id, temsilci_cevaplari").eq("id", g.id).maybeSingle();
+      if (!k || !k.temsilci_id) throw new Hata("Kayıt bulunamadı.");
+      const tIds = (await temsilcilikleri(u)).map((t) => t.id);
+      if (!tIds.includes(k.temsilci_id)) throw new Hata("Bu kayda yalnızca ortağın parsel temsilcisi cevap yazabilir.", 403);
+      const temsilci_cevaplari = [...(Array.isArray(k.temsilci_cevaplari) ? k.temsilci_cevaplari : []), { ad: u.ad, metin, at: new Date().toISOString() }];
+      const { error } = await db.from("kayitlar").update({ temsilci_cevaplari }).eq("id", k.id);
+      if (error) throw error;
+      if (k.cihaz && k.cihaz !== u.cihaz) {
+        await duyur({ cihaz: k.cihaz }, `💬 Parsel temsilcinizden cevap ${k.no}`.slice(0, 80), `${u.ad}: ${metin}`.slice(0, 200), { kayitId: k.id });
+      }
+      return { temsilci_cevaplari };
     }
 
     case "cevap_ver": {
