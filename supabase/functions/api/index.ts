@@ -308,7 +308,17 @@ async function giris(g: any) {
   if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
     await bildir(["baskan"], "Onay bekleyen üye", `${ad} (${ROL_ADI[rol]}) gruba katılmak istiyor.`, { sayfa: "uyeler" });
   }
+  // Şahsi koduyla ilk kez giren (TG / YK üyesi, restoran yetkilisi…) yöneticiye bildirilir; yeniden girişler ve yönetici hariç
+  if (durum === "onayli" && rol !== "baskan" && var_?.durum !== "onayli" && !eskiOnayli && !cihaz.startsWith("test-")) {
+    await katildiBildir(ad, tg?.unvan ?? ROL_ADI[rol]);
+  }
   return { rol, durum, anahtar, ad, unvan: tg?.unvan ?? null, vapid: VAPID_PUBLIC || null };
+}
+
+// Programa yeni katılan (onay beklemeden giren) yöneticiye bildirilir; toplam kişi sayısıyla
+async function katildiBildir(ad: string, kim: string) {
+  const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli").not("cihaz", "like", "test-%");
+  await bildir(["baskan"], "✅ Programa yeni katılım", `${ad} (${kim}) SPORKENT ASİSTAN'a katıldı. Toplam ${count ?? "?"} kişi.`, { sayfa: "uyeler" });
 }
 
 const adNorm = (s: string) => String(s ?? "").toLocaleUpperCase("tr").replace(/\s+/g, " ").trim();
@@ -574,7 +584,8 @@ async function ortakKayit(g: any) {
         ? `Ortaklığınızın bir yakını ${telefon} numaralı telefondan uygulamaya ${durum === "onayli" ? "katıldı" : "katılmak istiyor"}. Tanımıyorsanız hemen kooperatif yönetimine bildirin.`
         : `${no} numaralı ortaklığınız adına başka bir telefondan uygulamaya katılındı. Siz yapmadıysanız hemen kooperatif yönetimine bildirin.`);
     }
-    // Otomatik girenler için bildirim gitmez (400 bildirim olmasın); listede görünürler.
+    // Otomatik girenler yöneticiye "katıldı" diye bildirilir.
+    if (yeniOnay) await katildiBildir(ad, yakinlik ? `${no} No'lu ortağın yakını` : `${no} No'lu Ortak`);
     // Onay bekleyen yakın parsel temsilcisine (temsilci yoksa yöneticiye), onay bekleyen ortak yöneticiye bildirilir.
     if (durum === "bekliyor" && yakinlik) {
       const t = await temsilciBul(no);
@@ -1034,6 +1045,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi).`);
         await db.from("uyeler").update({ durum: "onayli", onay_at: new Date().toISOString() }).eq("cihaz", hedef);
         await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "SPORKENT ASİSTAN uygulamasını kullanmaya başlayabilirsiniz.");
+        // Temsilci onayladıysa yönetici de haberdar olur (yöneticinin kendi onayında gerek yok)
+        if (rol !== "baskan" && !u.cihaz.startsWith("test-")) await katildiBildir(y.ad, `${y.ortak_no} No'lu ortağın yakını, temsilci ${u.ad} onayladı`);
       } else {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
         await db.from("uyeler").delete().eq("cihaz", hedef);
