@@ -744,8 +744,12 @@
   }
   // Onay bekleyen yakına parsel temsilcisinin kartı (resim, ad, telefon, Ara / WhatsApp / Mesaj)
   function bekleTemsilciCiz(t) {
+    $("#bekle-not").innerHTML = `⚠️ Girilen bilgiler kooperatifteki bilgilerle eşleşmiyor.<br><b>Lütfen ${t ? "parsel temsilciniz" : "kooperatif yönetimi"} ile görüşün.</b>`;
+    $("#bekle-metin").textContent = `${t ? "Parsel temsilciniz" : "Kooperatif yönetimi"} onay verdikten sonra uygulama bu telefonda kendiliğinden açılır.`;
     $("#bekle-temsilci").innerHTML = t ? temsilciKart(t)
-      : `<p class="parsel-not">Bu ortak numarası için parsel temsilcisi belirlenmemiş. Kooperatif yönetimiyle görüşün: Ana sayfadaki İletişim bilgileri ya da Müdür 0541 325 30 19.</p>`;
+      : `<p class="parsel-not">Bu ortak numarası için parsel temsilcisi belirlenmemiş. Aşağıdaki numaralardan kooperatif yönetimiyle görüşün:</p>
+        <a class="iletisim-satir" href="tel:+905413253019"><span class="iletisim-ikon ara">📞</span><span><small>Müdür</small><b>0541 325 30 19</b><em>Aramak için dokunun</em></span></a>
+        <a class="iletisim-satir" href="tel:+905413253021"><span class="iletisim-ikon ara">📞</span><span><small>Muhasebe</small><b>0541 325 30 21</b><em>Aramak için dokunun</em></span></a>`;
   }
 
   async function durumKontrol() {
