@@ -60,8 +60,24 @@ async function temsilciGorunumu(liste: any[]) {
   const harita = new Map((data ?? []).map((d: any) => [d.path, d.signedUrl]));
   return liste.map((t) => ({ id: t.id, baslik: t.baslik, ad: t.ad, telefon: t.telefon, no_bas: t.no_bas, no_bit: t.no_bit, resim_url: t.resim ? harita.get(t.resim) ?? null : null }));
 }
+// Temsilcinin parsellerindeki ortakların onay bekleyen yakınları (yazdığı ortak adı kooperatif kaydıyla aynı mı)
+async function yakinBasvurulari(temsil: any[]) {
+  const { data } = await db.from("uyeler").select("cihaz, ad, ortak_no, telefon, created_at")
+    .eq("durum", "bekliyor").ilike("unvan", "%Yakını%").order("created_at");
+  const kapsar = (no: number) => temsil.some((t) => no >= t.no_bas && no <= t.no_bit);
+  const liste = (data ?? []).filter((x: any) => kapsar(x.ortak_no));
+  const nolar = [...new Set(liste.map((x: any) => x.ortak_no))];
+  const { data: rh } = nolar.length ? await db.from("ortak_rehberi").select("no, ad_ozet").in("no", nolar) : { data: [] };
+  const adOzet = new Map((rh ?? []).map((r: any) => [r.no, r.ad_ozet]));
+  const sonuc = [];
+  for (const x of liste) {
+    const ortakAdi = String(x.ad).replace(/\s*\(yakını\)$/i, "");
+    sonuc.push({ ...x, ad_uyuyor: adOzet.get(x.ortak_no) === await rehberOzeti(adNorm(ortakAdi)) });
+  }
+  return sonuc;
+}
 // Temsilcinin telefonlarına bildirim
-async function temsilciyeBildir(t: any, baslik: string, govde: string, ek: { kayitId?: number } = {}) {
+async function temsilciyeBildir(t: any, baslik: string, govde: string, ek: { kayitId?: number; sayfa?: string } = {}) {
   const { data } = await db.from("uyeler").select("cihaz").eq("ad", t.ad).eq("rol", "uye").is("ortak_no", null).eq("durum", "onayli");
   for (const x of data ?? []) await bildir({ cihaz: x.cihaz }, baslik, govde, ek);
 }
@@ -464,18 +480,18 @@ async function davetKoduDogrula(no: number, kod: string) {
 // Ortak kaydı: şifre ve davet kodu yok. Ad soyad, ortaklık numarası ve cep telefonu; telefon kooperatif kayıtlarıyla
 // eşleşirse hemen girer, eşleşmezse yönetici onaylayınca girer. (Davet kodu yazılırsa yine geçerlidir.)
 async function ortakKayit(g: any) {
-  const ad = temiz(g.ad_soyad, 80).replace(/\s+/g, " ");
+  // Ortağın yakını (eşi, çocuğu, damadı, misafiri…): ortağın adını ve numarasını, kendi telefonunu yazar.
+  // Uygulamada "Ahmet Yılmaz (yakını)" diye görünür.
+  const yakinlik = g.yakin === true || g.yakin === "true";
+  const yazilanAd = temiz(g.ad_soyad, 80).replace(/\s+/g, " ").replace(/\s*\(yakını\)$/i, "");
+  const ad = yakinlik ? `${yazilanAd} (yakını)` : yazilanAd;
   const no = Number(temiz(g.ortak_no, 6));
   const ham = temiz(g.telefon, 30);
   let tel = ham.replace(/\D/g, "");
   const cihaz = temiz(g.cihaz, 80);
-  if (ad.split(" ").length < 2) throw new Hata("Adınızı ve soyadınızı birlikte yazın.");
-  if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata("Ortaklık numaranızı doğru yazın.");
+  if (yazilanAd.split(" ").length < 2) throw new Hata(yakinlik ? "Ortağın adını ve soyadını birlikte yazın." : "Adınızı ve soyadınızı birlikte yazın.");
+  if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata(yakinlik ? "Ortağın ortaklık numarasını doğru yazın." : "Ortaklık numaranızı doğru yazın.");
   if (!cihaz) throw new Hata("Cihaz bilgisi gerekli.");
-  // Ortağın yakını (eşi, çocuğu, damadı, misafiri…): ortağın numarasıyla, kendi adı ve telefonuyla katılır
-  const YAKINLIKLAR = ["Eşi", "Kızı", "Oğlu", "Damadı", "Gelini", "Torunu", "Annesi / Babası", "Kardeşi", "Misafiri", "Kiracısı", "Diğer"];
-  const yakinlik = YAKINLIKLAR.includes(temiz(g.yakinlik, 30)) ? temiz(g.yakinlik, 30) : "";
-  if (temiz(g.yakinlik, 30) && !yakinlik) throw new Hata("Ortakla yakınlığınızı listeden seçin.");
   // Türkiye numarası: 0532 123 45 67 biçiminde saklanır; yurt dışı numarası (+49 …) olduğu gibi
   let telefon: string;
   if (tel.startsWith("90") && tel.length === 12) tel = tel.slice(2);
@@ -488,12 +504,12 @@ async function ortakKayit(g: any) {
   // Yazdığı ad ya da ortak listesinde bu numaradaki ad, kişisel kod listesindeki bir adla eşleşirse engellenir.
   const { data: kodlular } = await db.from("tg_uyeleri").select("ad, unvan");
   const { data: listede } = await db.from("ortak_rehberi").select("ad_ozet, tel_ozetleri").eq("no", no).maybeSingle();
-  let kodlu: any = (kodlular ?? []).find((t: any) => adNorm(t.ad) === adNorm(ad));
-  // Ortağın kendisi TG/YK üyesiyse yakını yine de ortak numarasıyla katılabilir
+  // Ortağın kendisi TG/YK üyesiyse yakını yine de ortak numarasıyla katılabilir (yakında bu kontrol yapılmaz)
+  let kodlu: any = yakinlik ? null : (kodlular ?? []).find((t: any) => adNorm(t.ad) === adNorm(ad));
   if (!kodlu && listede && !yakinlik) {
     for (const t of kodlular ?? []) if (await rehberOzeti(adNorm(t.ad)) === listede.ad_ozet) { kodlu = t; break; }
   }
-  if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Ekranın en üstündeki "Şahsi kodunuzla buradan girin" düğmesine dokunun.`, 403);
+  if (kodlu) throw new Hata(`${kodlu.unvan} olduğunuzdan size verilen şahsi kodunuz ile giriş yapmak zorundasınız. Size gönderilen TG / YK giriş bağlantısını kullanın.`, 403);
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   // Erişimi kaldırılmış telefon da yeniden başvurabilir: kayıt baştan onay bekler.
@@ -506,7 +522,7 @@ async function ortakKayit(g: any) {
   // Yazdığı telefon, kooperatifin ortak listesinde bu numara için kayıtlı telefonlardan biriyse (ya da geçerli davet kodu
   // yazdıysa) yönetici onayı beklemeden hemen girer. Tutmazsa yönetici onayına düşer.
   // Yöneticinin daha önce çıkardığı ortak numarası ve dolu grup otomatik giremez.
-  const { uyuyor } = await listeyleKarsilastir(listede, ad, telefon);
+  const { uyuyor } = await listeyleKarsilastir(listede, yazilanAd, telefon);
   let otomatik = uyuyor || !!davetId;
   if (otomatik && var_?.durum === "cikarildi") otomatik = false;
   if (otomatik) {
@@ -517,7 +533,7 @@ async function ortakKayit(g: any) {
   const durum = ayni && var_.durum === "onayli" ? "onayli" : otomatik ? "onayli" : ayni ? var_.durum : "bekliyor";
   const yeniOnay = durum === "onayli" && var_?.durum !== "onayli";
   const anahtar = var_?.anahtar ?? anahtarUret();
-  const unvan = yakinlik ? `${no} No'lu Ortağın Yakını (${yakinlik})` : `${no} No'lu Ortak`;
+  const unvan = yakinlik ? `${no} No'lu Ortağın Yakını` : `${no} No'lu Ortak`;
   const { error } = await db.from("uyeler").upsert({
     cihaz, anahtar, ad, rol: "uye", durum, unvan, ortak_no: no, telefon,
     onay_at: durum === "onayli" ? (yeniOnay ? new Date().toISOString() : var_.onay_at) : null, son_gorulme: new Date().toISOString(),
@@ -531,14 +547,18 @@ async function ortakKayit(g: any) {
     const { data: mevcutlar } = await db.from("uyeler").select("cihaz").eq("ortak_no", no).eq("durum", "onayli").neq("cihaz", cihaz);
     for (const m of mevcutlar ?? []) {
       await bildir({ cihaz: m.cihaz }, "⚠ Numaranızla yeni katılım", yakinlik
-        ? `${ad}, ortaklığınızın yakını (${yakinlik}) olarak uygulamaya ${durum === "onayli" ? "katıldı" : "katılmak istiyor"}. Tanımıyorsanız hemen kooperatif yönetimine bildirin.`
+        ? `Ortaklığınızın bir yakını ${telefon} numaralı telefondan uygulamaya ${durum === "onayli" ? "katıldı" : "katılmak istiyor"}. Tanımıyorsanız hemen kooperatif yönetimine bildirin.`
         : `${no} numaralı ortaklığınız adına başka bir telefondan uygulamaya katılındı. Siz yapmadıysanız hemen kooperatif yönetimine bildirin.`);
     }
-    // Otomatik girenler için yöneticiye bildirim gitmez (400 bildirim olmasın); listede görünürler
-    if (durum === "bekliyor") {
-      await bildir(["baskan"], yakinlik ? "Onay bekleyen ortak yakını" : "Onay bekleyen ortak", yakinlik
-        ? `${ad}, ${no} No'lu ortağın yakını (${yakinlik}) olarak katılmak istiyor (${telefon}). ${uyuyor ? "🔵 Telefonu ortağın kayıtlarında var." : "🔴 Telefonu ortağın kayıtlarında yok."}`
-        : `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Telefonu kooperatif kayıtlarıyla örtüşmüyor!"}`, { sayfa: "uyeler" });
+    // Otomatik girenler için bildirim gitmez (400 bildirim olmasın); listede görünürler.
+    // Onay bekleyen yakın parsel temsilcisine (temsilci yoksa yöneticiye), onay bekleyen ortak yöneticiye bildirilir.
+    if (durum === "bekliyor" && yakinlik) {
+      const t = await temsilciBul(no);
+      const govde = `${ad}, ${no} No'lu ortağın yakını olarak katılmak istiyor (${telefon}). Telefonu ortağın kooperatif kayıtlarında yok.`;
+      if (t) await temsilciyeBildir(t, "👨‍👩‍👧 Onayınızı bekleyen ortak yakını", govde, { sayfa: "yakinlar" });
+      else await bildir(["baskan"], "Onay bekleyen ortak yakını", govde, { sayfa: "uyeler" });
+    } else if (durum === "bekliyor") {
+      await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Telefonu kooperatif kayıtlarıyla örtüşmüyor!"}`, { sayfa: "uyeler" });
     }
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
@@ -630,6 +650,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         parsel = { temsilciler: await temsilciGorunumu(hepsi ?? []), resimEkler: true };
       }
       if (temsil.length) parsel = { ...(parsel ?? {}), temsilcilik: await temsilciGorunumu(temsil) };
+      // Parsel temsilcisine: kendi parselindeki ortakların onay bekleyen yakınları
+      let bekleyenYakinlar: any[] | undefined;
+      if (temsil.length) bekleyenYakinlar = await yakinBasvurulari(temsil);
       const verenler = [...new Set((data ?? []).filter((k: any) => k.gizli && k.cihaz).map((k: any) => k.cihaz))];
       const { data: vr } = verenler.length ? await db.from("uyeler").select("cihaz, rol").in("cihaz", verenler) : { data: [] };
       const verenRol = new Map((vr ?? []).map((x: any) => [x.cihaz, x.rol]));
@@ -675,7 +698,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         }
       }
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar };
     }
 
     case "yukleme_adresi": {
@@ -880,6 +903,28 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       // Temsilci onaylamadıysa kaydı yazan ortağa haber verilir
       if (k.temsilci_id && k.cihaz) {
         await duyur({ cihaz: k.cihaz }, `Kaydınız onaylanmadı ${k.no}`, `${k.yer}: parsel temsilciniz ${u.ad} bu kaydı onaylamadı. Kendisiyle görüşebilirsiniz.`.slice(0, 200), { sayfa: "parsel" });
+      }
+      return { tamam: true };
+    }
+
+    case "yakin_onayla":
+    case "yakin_reddet": {
+      // Ortak yakınının başvurusunu o parselin temsilcisi (ya da yönetici) onaylar / reddeder
+      const hedef = temiz(g.hedef, 80);
+      const { data: y } = await db.from("uyeler").select("cihaz, ad, ortak_no, unvan, durum").eq("cihaz", hedef).maybeSingle();
+      if (!y || !/Yakını/.test(y.unvan ?? "") || y.durum !== "bekliyor") throw new Hata("Başvuru bulunamadı ya da zaten sonuçlandı.");
+      if (rol !== "baskan") {
+        const temsil = await temsilcilikleri(u);
+        if (!temsil.some((t) => y.ortak_no >= t.no_bas && y.ortak_no <= t.no_bit)) throw new Hata("Bu başvuruyu yalnızca ortağın parsel temsilcisi onaylar.", 403);
+      }
+      if (eylem === "yakin_onayla") {
+        const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
+        if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi).`);
+        await db.from("uyeler").update({ durum: "onayli", onay_at: new Date().toISOString() }).eq("cihaz", hedef);
+        await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "Sporkent İşletme Kooperatifi SAHA TAKİP uygulamasını kullanmaya başlayabilirsiniz.");
+      } else {
+        await db.from("abonelikler").delete().eq("cihaz", hedef);
+        await db.from("uyeler").delete().eq("cihaz", hedef);
       }
       return { tamam: true };
     }
@@ -1138,17 +1183,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         .eq("cihaz", hedef).select("ad, ortak_no, unvan").maybeSingle();
       if (error) throw error;
       if (!data) throw new Hata("Üye bulunamadı.");
-      // Bir ortaklık numarasında tek ortak kaydı: onaylanan ortak, aynı numaralı eski ortak kayıtlarının (eski telefon) yerine geçer.
-      // Ortağın yakınlarına (eşi, çocuğu, misafiri…) dokunulmaz; yakın onaylanınca hiçbir kayıt silinmez.
-      if (durum === "onayli" && data.ortak_no && !/Yakını/.test(data.unvan ?? "")) {
-        const { data: eskiler } = await db.from("uyeler").select("cihaz").eq("ortak_no", data.ortak_no).neq("cihaz", hedef)
-          .not("unvan", "ilike", "%Yakını%");
-        const ec = (eskiler ?? []).map((e: any) => e.cihaz).filter((c: string) => c !== u.cihaz);
-        if (ec.length) {
-          await db.from("abonelikler").delete().in("cihaz", ec);
-          await db.from("uyeler").delete().in("cihaz", ec);
-        }
-      }
+      // Bir ortak birden fazla telefondan, yakınları da kendi telefonlarından girebilir: onaylamak başka kaydı silmez.
       if (durum === "cikarildi") {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
       } else {
