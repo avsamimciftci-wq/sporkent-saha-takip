@@ -997,32 +997,43 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       // "34abc123" → "34 ABC 123": rakam ve harf grupları arasına boşluk
       const plaka = (temiz(g.plaka, 20).toLocaleUpperCase("tr").replace(/[^0-9A-ZÇĞİÖŞÜ]+/g, "").match(/\d+|[A-ZÇĞİÖŞÜ]+/g) ?? []).join(" ");
       if (plaka.replace(/\s/g, "").length < 4 || !/\d/.test(plaka) || !/[A-ZÇĞİÖŞÜ]/.test(plaka)) throw new Hata("Plaka numarasını doğru yazın (örn. 34 ABC 123).");
-      const sahibi = arac === "yakin" ? temiz(g.arac_sahibi, 80) : "";
-      if (arac === "yakin" && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata("Aracın sahibi olan yakınınızın adını ve soyadını yazın.");
-      // Yakının aracında yakının telefonu zorunlu
-      const sahibiTelHam = arac === "yakin" ? temiz(g.arac_sahibi_tel, 30) : "";
+      // Ad: yakının aracında yakının adı; ortak yakını kendi aracını bildiriyorsa kendi adı (kaydında ortağın adı durur)
+      const yakinKayitli = /Yakını/.test(uu.unvan ?? "");
+      const adGerek = arac === "yakin" || yakinKayitli;
+      const sahibi = adGerek ? temiz(g.arac_sahibi, 80).replace(/\s+/g, " ") : "";
+      if (adGerek && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata(arac === "yakin" ? "Aracın sahibi olan yakınınızın adını ve soyadını yazın." : "Adınızı ve soyadınızı yazın.");
+      // Telefon: yakının aracında yakınınki zorunlu; kendi aracında kayıtlı telefon, yoksa yazılan
+      const telGerek = arac === "yakin" || !uu.telefon;
+      const sahibiTelHam = telGerek ? temiz(g.arac_sahibi_tel, 30) : "";
       let sahibiTel = "";
-      if (arac === "yakin") {
+      if (telGerek) {
         let d = sahibiTelHam.replace(/\D/g, "");
         if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
         if (/^[2-5]\d{9}$/.test(d)) sahibiTel = `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
         else if (/^(\+|00)/.test(sahibiTelHam) && d.replace(/^00/, "").length >= 9 && d.length <= 15) sahibiTel = "+" + d.replace(/^00/, "");
-        else throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
+        else throw new Hata(arac === "yakin" ? "Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67)." : "Cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
       }
+      const daire = uu.ortak_no ?? Number(temiz(g.daire, 6));
+      if (!Number.isInteger(daire) || daire < 1 || daire > 9999) throw new Hata("Daire (ortaklık) numarasını yazın.");
       const { data: t, error } = await db.from("plaka_talepleri").insert({
         cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no ?? null, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
       }).select("id, created_at").single();
       if (error) throw error;
       const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${kimlik})`;
+      // E-postadaki sıra kooperatifin araç listesiyle aynı: Plaka, Adı, Soyadı, Gsm, Daire
+      const kelimeler = (adGerek ? sahibi : u.ad.replace(/\s*\(yakını\)$/i, "")).split(/\s+/).filter(Boolean)
+        .map((k: string) => k.charAt(0).toLocaleUpperCase("tr") + k.slice(1).toLocaleLowerCase("tr"));
+      const soyad = kelimeler.length > 1 ? kelimeler.pop() : "";
       const metin = [
-        "SPORKENT ASİSTAN uygulamasından Plaka-Kimlik Bildirimi:",
+        `Plaka: ${plaka.replace(/\s/g, "")}`,
+        `Adı: ${kelimeler.join(" ")}`,
+        `Soyadı: ${soyad || "-"}`,
+        `Gsm: ${(telGerek ? sahibiTel : uu.telefon).replace(/\s/g, "")}`,
+        `Daire: SPORKENT${daire}`,
         "",
-        `Plaka: ${plaka}`,
-        `Araç: ${arac === "kendi" ? "Ortağın kendi aracı" : `Ortağın yakınının aracı`}`,
-        ...(arac === "yakin" ? [`Araç sahibi: ${sahibi}`, `Araç sahibinin telefonu: ${sahibiTel}`] : []),
-        `Talep eden: ${u.ad} (${uu.unvan ?? kimlik})`,
-        `Telefon: ${uu.telefon ?? "-"}`,
-        `Talep no: ${t.id} · ${new Date(t.created_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
+        `Araç: ${arac === "kendi" ? "Bildirenin kendi aracı" : "Bildirenin yakınının aracı"}`,
+        `Bildiren: ${u.ad} (${uu.unvan ?? kimlik})`,
+        `SPORKENT ASİSTAN · Talep no: ${t.id} · ${new Date(t.created_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
       ].join("\n");
       const gitti = await epostaGonder(PLAKA_EPOSTA, konu, metin);
       if (gitti) await db.from("plaka_talepleri").update({ eposta_gitti: true }).eq("id", t.id);
@@ -1234,8 +1245,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      await duyur("hepsi", `🍽️ Restoran: ${ad}`, (metin || "Restoran bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "restoran", resim, haric: u.cihaz });
-      return { id: p.id };
+      // Paylaşan kişi de alır: paylaşımın gittiğini kendi telefonunda görür
+      const giden = await duyur("hepsi", `🍽️ Restoran: ${ad}`, (metin || "Restoran bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "restoran", resim });
+      return { id: p.id, ...giden };
     }
 
     case "restoran_sil": {
@@ -1422,7 +1434,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "servis": {
       const { data } = await db.from("servis_guzergah").select("id, cizgi, duraklar, sure_sn, mesafe_m, kaydeden, created_at")
         .eq("aktif", true).order("id", { ascending: false }).limit(1).maybeSingle();
-      return { guzergah: data ?? null };
+      const { data: st } = await db.from("ayarlar").select("deger").eq("ad", "servis_saatleri").maybeSingle();
+      let saatler: string[] = [];
+      try { const x = JSON.parse(String(st?.deger ?? "[]")); if (Array.isArray(x)) saatler = x.map(String); } catch { /* bozuk kayıt: boş liste */ }
+      return { guzergah: data ?? null, saatler };
+    }
+
+    case "servis_saat_kaydet": {
+      // Sefer saatlerini yalnızca yönetici değiştirir; "SS:DD" biçiminde, sıralı ve tekrarsız saklanır
+      yonetici();
+      const ham = (Array.isArray(g.saatler) ? g.saatler : []).map((x: any) => temiz(x, 5));
+      if (ham.some((x: string) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(x))) throw new Hata("Saatleri doğru yazın (örn. 10:00).");
+      const saatler = [...new Set<string>(ham)].sort();
+      if (!saatler.length) throw new Hata("En az bir sefer saati olmalı.");
+      if (saatler.length > 40) throw new Hata("En fazla 40 sefer saati girilebilir.");
+      const { error } = await db.from("ayarlar").upsert({ ad: "servis_saatleri", deger: JSON.stringify(saatler) });
+      if (error) throw error;
+      return { saatler };
     }
 
     case "servis_kaydet": {
