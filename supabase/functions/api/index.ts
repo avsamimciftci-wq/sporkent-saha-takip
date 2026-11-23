@@ -1033,7 +1033,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         `Adı: ${kelimeler.join(" ")}`,
         `Soyadı: ${soyad || "-"}`,
         `Gsm: ${(arac === "yakin" ? sahibiTel : kayitTel ?? "-").replace(/\s/g, "")}`,
-        `Daire: ${kayitNo ? `SPORKENT${kayitNo}` : "-"}`,
+        `Daire: ${kayitNo ? `SPORKENT${String(kayitNo).padStart(3, "0")}` : "-"}`,
         "",
         `Araç: ${arac === "kendi" ? "Bildirenin kendi aracı" : "Bildirenin yakınının aracı"}`,
         `Bildiren: ${u.ad} (${uu.unvan ?? kimlik})`,
