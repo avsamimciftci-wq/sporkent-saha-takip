@@ -793,7 +793,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .restoran-dugmeler .wp { background: #1b8a4a; }
 .restoran-yonet { margin: 0 0 16px; border: 2px solid #c62828; }
 .restoran-form-baslik { display: block; font-size: 20px; color: #b71c1c; margin-bottom: 10px; }
-.restoran-tur { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.restoran-tur { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
 .restoran-tur button { font: inherit; font-weight: 800; font-size: 15px; line-height: 1.3; padding: 10px 4px; border-radius: 12px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); cursor: pointer; }
 .restoran-tur button.secili { background: #c62828; border-color: #c62828; color: #fff; }
 .restoran-tel-ayar { margin-top: 12px; font-size: 15px; }
@@ -802,7 +802,6 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .paylasim { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 16px; padding: 12px; margin-bottom: 14px; box-shadow: var(--golge); }
 .paylasim-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; color: var(--soluk); margin-bottom: 8px; }
 .paylasim img { display: block; width: 100%; border-radius: 10px; }
-.paylasim-video { display: block; width: 100%; border-radius: 10px; background: #000; max-height: 70vh; }
 .paylasim-pdf { display: flex; align-items: center; justify-content: center; min-height: 64px; border-radius: 12px; background: #fff3e0; border: 2px solid #ef6c00; color: #8a3a00; font-weight: 800; font-size: 19px; text-decoration: none; }
 .paylasim-metin { margin: 10px 2px 2px; font-size: 18px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
 /* Duyurular: restoran paylaşımıyla aynı yapı, lacivert renkte */

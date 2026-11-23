@@ -756,11 +756,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "yukleme_adresi": {
-      // Restoran paylaşımında PDF ve video da yüklenir; diğer her şey JPEG fotoğraf
+      // Duyuru ve restoran paylaşımında PDF de yüklenir; diğer her şey JPEG fotoğraf
       // Duyuru dosyasını yalnızca yönetici yükler
       if (g.tur === "duyuru") yonetici();
       const coklu = g.tur === "restoran" || g.tur === "duyuru";
-      const uzanti = coklu && ["jpg", "pdf", "mp4", "mov", "webm"].includes(g.uzanti) ? g.uzanti : "jpg";
+      const uzanti = coklu && ["jpg", "pdf"].includes(g.uzanti) ? g.uzanti : "jpg";
       const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
@@ -1099,7 +1099,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
-    // ---------- Restoran: paylaşımlar (görsel, metin, PDF, video) ve sipariş telefonu ----------
+    // ---------- Restoran: paylaşımlar (görsel, metin, PDF) ve sipariş telefonu ----------
     // ---------- Duyurular: yalnızca yönetici paylaşır, herkes görür, her paylaşım herkese bildirilir ----------
     case "duyuru_liste": {
       const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "duyuru").order("created_at", { ascending: false }).limit(100);
@@ -1116,7 +1116,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "duyuru_paylas": {
       yonetici();
-      const tur = ["gorsel", "metin", "pdf", "video"].includes(g.tur) ? g.tur : "";
+      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Duyuru türünü seçin.");
       const metin = temiz(g.metin, 3000);
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
@@ -1126,7 +1126,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (error) throw error;
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)", video: " (video)" }[tur as "gorsel"];
+      const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)" }[tur as "gorsel"];
       // Gönderen yönetici de alır: duyurunun gittiğini kendi telefonunda görür
       const giden = await duyur("hepsi", `📢 Duyuru${ek}`, (metin || "Duyurular bölümünde yeni bir duyuru var.").slice(0, 180), { sayfa: "duyuru", resim });
       return { id: p.id, ...giden };
@@ -1222,7 +1222,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "restoran_paylas": {
       restoranYonetir();
-      const tur = ["gorsel", "metin", "pdf", "video"].includes(g.tur) ? g.tur : "";
+      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
       const metin = temiz(g.metin, 3000);
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
@@ -1231,7 +1231,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: p, error } = await db.from("restoran_paylasim").insert({ tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
       if (error) throw error;
       // Uygulamayı kullanan herkese (ortak yakınları dahil) sesli bildirim; görselde resim de görünür
-      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF", video: "🎬 Yeni video" }[tur as "gorsel"];
+      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
       await duyur("hepsi", `🍽️ Restoran: ${ad}`, (metin || "Restoran bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "restoran", resim, haric: u.cihaz });
