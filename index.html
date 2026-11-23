@@ -36,6 +36,18 @@
     </div>
   </div>
 
+  <!-- Bildirim kilidi: bildirimler açılmadan uygulama kullanılamaz -->
+  <div id="bildirim-kilit" class="bildirim-kilit" role="dialog" aria-modal="true" aria-labelledby="kilit-baslik" hidden>
+    <div class="kart kilit-kutu">
+      <img src="icons/logo-192.png" alt="" width="84" height="84">
+      <h1 id="kilit-baslik">🔔 Bildirimleri açın</h1>
+      <p class="kilit-uyari">Bildirimleri açmadan bu programı <b>kullanamazsınız.</b></p>
+      <div id="kilit-metin"></div>
+      <button id="kilit-dugme" class="ana-dugme kilit-dugme" type="button">🔔 Bildirimleri Aç</button>
+      <p id="kilit-hata" class="kilit-hata" role="alert" hidden></p>
+    </div>
+  </div>
+
   <!-- Ana sayfa: bölümler -->
   <main id="ekran-ana" class="ekran" hidden>
     <p class="ana-karsilama"><span id="ana-hitap"></span> <b id="ana-ad"></b></p>
@@ -234,11 +246,14 @@
         <label><input type="radio" name="arac" value="yakin"><span>👨‍👩‍👧 Yakınımın aracı</span></label>
       </div>
       <div id="plaka-sahibi" hidden>
-        <label>Aracın sahibi olan yakınınızın adı ve soyadı
+        <label id="plaka-ad-alan"><span id="plaka-ad-etiket">Aracın sahibi olan yakınınızın adı ve soyadı</span>
           <input name="arac_sahibi" maxlength="80" autocomplete="off" placeholder="Örn. Zeynep Yılmaz">
         </label>
-        <label>Yakınınızın cep telefonu
+        <label id="plaka-tel-alan"><span id="plaka-tel-etiket">Yakınınızın cep telefonu</span>
           <input name="arac_sahibi_tel" type="tel" maxlength="20" autocomplete="off" placeholder="0532 123 45 67">
+        </label>
+        <label id="plaka-daire-alan">Daire (ortaklık) numarası
+          <input name="daire" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Örn. 12">
         </label>
       </div>
       <label><b class="plaka-soru">2. Plaka numarası</b>
@@ -264,10 +279,6 @@
     <div id="ozet" class="ozet"></div>
     <button id="gecikme-uyari" class="gecikme-uyari" hidden></button>
     <p id="gorunurluk" class="ipucu" style="margin:-4px 0 12px"></p>
-    <div id="bildirim-kutu" class="bilgi" hidden>
-      <span id="bildirim-metin">Bildirimleri açın, yeni kayıt ve “yapıldı” haberleri telefonunuza gelsin.</span>
-      <button id="bildirim-ac" class="kucuk-dugme">Bildirimleri aç</button>
-    </div>
     <div id="liste" class="liste"></div>
     <button id="yeni-ac" class="yuzen">+ Yeni kayıt</button>
   </main>
@@ -332,7 +343,7 @@
     <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button>
       <section class="servis-saat">
         <p>Aracımız, aşağıda belirtilen saatlerde, <b>Dut Ağacından</b> hareket etmek suretiyle servis hizmeti vermektedir.</p>
-        <ul><li>10:00</li><li>11:00</li><li>12:00</li><li>14:00</li><li>15:00</li><li>16:00</li><li>17:00</li><li>18:00</li><li>19:00</li><li>20:00</li></ul>
+        <div id="servis-saatler"></div>
       </section>
       <h1 class="sayfa-bant bant-servis">🚐 Servis Güzergahı</h1></div>
     <div id="servis" class="kart"></div>

@@ -1032,3 +1032,25 @@ html.ana-acik body { padding-bottom: 0; }
 .servis-saat p { margin: 0 0 12px; font-size: 18px; line-height: 1.45; }
 .servis-saat ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .servis-saat li { text-align: center; font-size: 21px; font-weight: 800; line-height: 1.2; padding: 5px 4px; border-radius: 10px; background: #fff3e0; color: #8a3a00; border: 1px solid #ffcc80; }
+
+/* Bildirim kilidi */
+.bildirim-kilit { position: fixed; inset: 0; z-index: 9000; overflow-y: auto; background: var(--zemin, #f3f5f3); display: grid; place-items: center; padding: 20px 16px; }
+.bildirim-kilit[hidden] { display: none; }
+body.kilitli { overflow: hidden; }
+.kilit-kutu { width: 100%; max-width: 460px; text-align: center; padding: 22px 18px; box-sizing: border-box; }
+.kilit-kutu img { border-radius: 20px; }
+.kilit-kutu h1 { margin: 10px 0 14px; font-size: 27px; }
+.kilit-uyari { margin: 0 0 14px; padding: 14px; border-radius: 14px; background: #ffebee; border: 2px solid #c62828; color: #b71c1c; font-size: 20px; line-height: 1.4; font-weight: 700; }
+#kilit-metin { font-size: 19px; line-height: 1.5; }
+#kilit-metin p { margin: 0 0 12px; }
+#kilit-metin ol { text-align: left; margin: 0 0 14px; padding-left: 26px; }
+#kilit-metin li { margin-bottom: 8px; }
+.kilit-dugme { width: 100%; font-size: 21px; min-height: 62px; }
+.kilit-hata { margin: 12px 0 0; color: #c62828; font-weight: 800; font-size: 17px; }
+/* Servis saatleri düzenleme (yönetici) */
+.saat-degistir { width: 100%; margin-top: 12px; }
+.servis-saat .saat-duzen li { display: flex; align-items: center; justify-content: space-between; padding: 3px 4px 3px 12px; }
+.saat-duzen button { font: inherit; font-size: 18px; min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: #ffcdd2; color: #b71c1c; cursor: pointer; }
+.saat-ekle { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 12px 0; align-items: center; }
+.saat-ekle input { font: inherit; font-size: 20px; min-height: 48px; min-width: 0; width: 100%; box-sizing: border-box; margin: 0; padding: 6px 10px; border-radius: 10px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); }
+.saat-ekle .kucuk-dugme { min-height: 48px; white-space: nowrap; }

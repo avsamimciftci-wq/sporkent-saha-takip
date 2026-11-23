@@ -759,36 +759,72 @@
     } catch {}
   }
 
-  const iosTarayicida = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches && !navigator.standalone;
-
   // İzin durumunu sunucuya bildir (yalnızca değişince): yönetici kimin bildirim alamadığını görür
   function izinBildir(izin) {
     if (sakla.al("sk_izin") === izin) return;
     api("izin_bildir", { izin }).then(() => sakla.koy("sk_izin", izin)).catch(() => {});
   }
 
-  function bildirimKutusu() {
-    const kutu = $("#bildirim-kutu");
-    if (!oturum?.vapid) { kutu.hidden = true; return; }
-    // Müdür ve şefe iş emirleri bildirimle gelir: kapalıysa uyarı kırmızı ve büyük
-    const onemli = ["mudur", "sef"].includes(oturum.rol);
-    kutu.classList.toggle("bildirim-acil", onemli);
-    const basi = onemli ? "⚠ Bildirimleriniz kapalı! Yönetim iş emirleri ve yeni işler size ulaşmıyor. " : "";
-    if (iosTarayicida()) {
-      izinBildir("ios-tarayici");
-      $("#bildirim-metin").textContent = basi + "iPhone'da bildirim için: Paylaş ⬆︎ → “Ana Ekrana Ekle”, sonra uygulamayı ana ekrandan açın.";
-      $("#bildirim-ac").hidden = true; kutu.hidden = false; return;
+  // Bu telefonda bildirim açık mı. iPhone izni bazen "reddedildi" bildirdiği hâlde abonelik duruyor:
+  // iPhone'da kayıtlı bir abonelik varsa da açık sayılır (kimse yanlışlıkla dışarıda kalmasın)
+  async function bildirimAbonelik() {
+    try { return (await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription()) || null; } catch { return null; }
+  }
+  let izinOnay = false; // düğmeye dokununca telefon "izin verildi" dedi
+  async function bildirimAcik() {
+    if (!bildirimDestek()) return false;
+    if (Notification.permission === "granted" || izinOnay) return true;
+    return iosCihaz && !!(await bildirimAbonelik());
+  }
+  // Bildirimler açılmadan uygulama kullanılamaz. Ana ekrana eklenmemişse zaten kurulum ekranı çıkar; süren devriye bölünmez.
+  async function bildirimKilidi() {
+    const k = $("#bildirim-kilit"), acik = kurulumGerekli() || izSuruyor() || (await bildirimAcik());
+    k.hidden = acik;
+    document.body.classList.toggle("kilitli", !acik);
+    for (const e of document.body.children) if (e !== k && e.tagName !== "SCRIPT") e.inert = !acik;
+    if (!acik) kilitCiz();
+    return !acik;
+  }
+  function kilitCiz() {
+    const d = $("#kilit-dugme"), m = $("#kilit-metin");
+    if (!bildirimDestek()) {
+      d.textContent = "🔄 Yeniden dene";
+      m.innerHTML = `<p>Bu telefon şu anda bildirimleri desteklemiyor. ${iosCihaz
+        ? "iPhone'unuzun yazılımını güncelleyin: <b>Ayarlar › Genel › Yazılım Güncelleme</b> (en az iOS 16.4)."
+        : "Telefonunuzu ve <b>Chrome</b> uygulamasını güncelleyin, sonra uygulamayı Chrome ile yeniden ana ekrana ekleyin."}</p>`;
+    } else if (Notification.permission === "denied") {
+      d.textContent = "🔄 Açtım, kontrol et";
+      m.innerHTML = `<p>Bildirim izni kapatılmış. Telefonun ayarlarından açın:</p>` + (iosCihaz
+        ? `<ol><li>Telefonun <b>Ayarlar</b>'ını açın.</li><li><b>Bildirimler</b>'e dokunun.</li><li>Listeden <b>SPORKENT ASİSTAN</b>'ı (ya da Sporkent'i) bulun.</li><li><b>Bildirimlere İzin Ver</b>'i açın.</li><li>Uygulamayı kapatıp yeniden açın.</li></ol>`
+        : `<ol><li>Ana ekrandaki <b>Sporkent</b> simgesine uzun basın.</li><li><b>Uygulama bilgisi</b> (ⓘ) yazısına dokunun.</li><li><b>Bildirimler</b>'e dokunup açın.</li><li>Uygulamayı kapatıp yeniden açın.</li></ol>`);
+    } else {
+      d.textContent = "🔔 Bildirimleri Aç";
+      m.innerHTML = `<p>Duyurular ve haberler size bildirimle ulaşır. Aşağıdaki düğmeye dokunun, çıkan soruya <b>“İzin Ver”</b> deyin.</p>`;
     }
-    if (!bildirimDestek()) { izinBildir("desteklenmiyor"); kutu.hidden = true; return; }
-    const izin = Notification.permission;
-    if (izin !== "granted") izinBildir(izin);
-    kutu.hidden = izin === "granted";
-    $("#bildirim-ac").hidden = false;
-    $("#bildirim-metin").textContent = izin === "denied"
-      ? basi + "Bu telefonda bildirim izni kapatılmış. Açmak için: uygulama simgesine uzun basın → “Uygulama bilgisi” (ⓘ) → “Bildirimler” → Açık. Sonra uygulamayı kapatıp yeniden açın."
-      : basi + "Aşağıdaki düğmeye basın ve çıkan soruya “İzin ver” deyin.";
-    // İzin varsa her açılışta sunucuya yeniden kaydol: kayıt silinmişse kendiliğinden düzelir
-    if (izin === "granted") bildirimAc(true);
+  }
+  $("#kilit-dugme").addEventListener("click", async () => {
+    const h = $("#kilit-hata"); h.hidden = true;
+    if (bildirimDestek()) {
+      // İzin sorusu yalnızca dokunma anında çıkar: öncesinde bekleme olmamalı
+      let izin; try { izin = await Notification.requestPermission(); } catch { izin = Notification.permission; }
+      if (izin === "granted") izinOnay = true;
+    }
+    if (await bildirimKilidi()) {
+      h.textContent = "Bildirimler hâlâ kapalı. Açmadan programı kullanamazsınız."; h.hidden = false;
+      if (oturum?.anahtar) izinBildir(bildirimDestek() ? Notification.permission : "desteklenmiyor");
+    } else if (oturum?.anahtar) bildirimAc(true);
+  });
+  // Ayarlardan dönünce kilit kendiliğinden kalkar / izin kapatıldıysa yeniden gelir
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) bildirimKilidi(); });
+  for (const olay of ["pageshow", "focus"]) window.addEventListener(olay, () => bildirimKilidi());
+  try { navigator.permissions?.query({ name: "notifications" }).then((x) => { x.onchange = () => { if (x.state !== "granted") izinOnay = false; bildirimKilidi(); }; }).catch(() => {}); } catch {}
+
+  // Açılışta: bildirim açıksa sunucuya yeniden kaydol (kayıt silinmişse kendiliğinden düzelir), kapalıysa yöneticiye bildir
+  async function bildirimKutusu() {
+    if (!oturum?.vapid) return;
+    if (!bildirimDestek()) return izinBildir("desteklenmiyor");
+    if (await bildirimAcik()) return bildirimAc(true);
+    izinBildir(Notification.permission);
   }
 
   function base64Bayt(s) {
@@ -799,18 +835,18 @@
 
   async function bildirimAc(sessiz) {
     try {
-      const izin = await Notification.requestPermission();
-      if (izin !== "granted") {
-        izinBildir(izin);
-        if (!sessiz) { mesaj("Bildirim izni verilmedi. Telefon ayarlarından açabilirsiniz."); bildirimKutusu(); }
-        return;
-      }
+      // Sessiz çağrıda izin SORULMAZ: iPhone dokunma dışındaki soruyu reddedebiliyor
+      const izin = !sessiz && Notification.permission !== "granted" ? await Notification.requestPermission() : izinOnay ? "granted" : Notification.permission;
       const kayit = await navigator.serviceWorker.ready;
       let abonelik = await kayit.pushManager.getSubscription();
+      if (izin !== "granted" && !(iosCihaz && abonelik)) {
+        izinBildir(izin);
+        if (!sessiz) mesaj("Bildirim izni verilmedi. Telefon ayarlarından açabilirsiniz.");
+        return;
+      }
       if (!abonelik) abonelik = await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64Bayt(oturum.vapid) });
       await api("abone_ol", { abonelik: abonelik.toJSON() });
       sakla.koy("sk_abone", oturum.rol); sakla.koy("sk_izin", "granted");
-      $("#bildirim-kutu").hidden = true;
       if (!sessiz) mesaj("Bildirimler açıldı.");
     } catch (e) { if (!sessiz) mesaj("Bildirim açılamadı: " + e.message); }
   }
@@ -1026,7 +1062,8 @@
         if (e.data?.tip !== "bildirim" || !oturum) return;
         if (!onayli()) return durumKontrol();
         // Uygulama önündeyken gelen bildirim zaten ekranda açılıyor; çubukta ve simgede birikmesin
-        if (!document.hidden) bildirimleriTemizle();
+        // Duyuru ve restoran bildirimi çubukta kalır: paylaşan kişi de bildirimin geldiğini görür
+        if (!document.hidden && !["duyuru", "restoran"].includes(e.data.sayfa)) bildirimleriTemizle();
         if (e.data.sayfa === "uyeler") yonetimAc();
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
@@ -1034,6 +1071,7 @@
         else yenile();
       });
     }
+    bildirimKilidi();
     if (!oturum || kurulumGerekli()) { girisEkrani(); return goster("giris"); }
     // Eski sürümden kalan oturum (kodla çalışıyordu): bir kez kodla katılım isteği gönder
     if (!oturum.anahtar) {
@@ -2051,11 +2089,48 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   async function servisAc() {
     if (location.hash !== "#servis") history.replaceState(history.state, "", "#servis");
     goster("servis");
+    saatDuzen = null; servisSaatCiz();
     if (servisKayit) return servisCiz();
     $("#servis").innerHTML = `<p class="bos">Yükleniyor…</p>`;
-    try { servisVeri = (await api("servis")).guzergah; } catch (e) { $("#servis").innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
+    try {
+      const r = await api("servis"); servisVeri = r.guzergah;
+      if (Array.isArray(r.saatler)) { sakla.koy("sk_servis_saat", r.saatler); if (!saatDuzen) servisSaatCiz(); }
+    } catch (e) { $("#servis").innerHTML = `<p class="hata">${kac(e.message)}</p>`; return; }
     servisCiz();
   }
+  // ---------- Sefer saatleri: herkes görür, yönetici değiştirir ----------
+  var saatDuzen = null; // düzenlenirken geçici liste
+  function servisSaatCiz() {
+    const k = $("#servis-saatler"), liste = saatDuzen || sakla.al("sk_servis_saat");
+    if (!liste) { k.innerHTML = `<p class="bos">Yükleniyor…</p>`; return; }
+    k.innerHTML = saatDuzen ? `
+      <ul class="saat-duzen">${liste.map((x) => `<li>${kac(x)}<button type="button" data-saat-sil="${kac(x)}" aria-label="${kac(x)} seferini sil">✖</button></li>`).join("")}</ul>
+      <div class="saat-ekle"><input id="saat-yeni" type="time" aria-label="Yeni sefer saati"><button type="button" class="kucuk-dugme" id="saat-ekle">＋ Saat ekle</button></div>
+      <div class="dugmeler"><button type="button" class="ikincil" id="saat-vazgec">Vazgeç</button><button type="button" class="ana-dugme" id="saat-kaydet">Kaydet</button></div>` : `
+      <ul>${liste.map((x) => `<li>${kac(x)}</li>`).join("")}</ul>
+      ${yonetici() ? `<button type="button" class="ikincil saat-degistir" id="saat-degistir">✏️ Saatleri değiştir</button>` : ""}`;
+  }
+  $("#servis-saatler").addEventListener("click", async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.id === "saat-degistir") { saatDuzen = [...(sakla.al("sk_servis_saat") || [])]; return servisSaatCiz(); }
+    if (b.id === "saat-vazgec") { saatDuzen = null; return servisSaatCiz(); }
+    if (b.dataset.saatSil) { saatDuzen = saatDuzen.filter((x) => x !== b.dataset.saatSil); return servisSaatCiz(); }
+    if (b.id === "saat-ekle") {
+      const v = $("#saat-yeni").value.slice(0, 5);
+      if (!/^\d\d:\d\d$/.test(v)) return mesaj("Önce eklenecek saati seçin.");
+      if (saatDuzen.includes(v)) return mesaj("Bu saat zaten var.");
+      saatDuzen = [...saatDuzen, v].sort(); return servisSaatCiz();
+    }
+    if (b.id === "saat-kaydet") {
+      // Seçilip "Saat ekle"ye basılmamış saat kaybolmasın
+      if ($("#saat-yeni").value) return mesaj("Seçtiğiniz saati eklemek için önce “Saat ekle”ye basın.");
+      b.disabled = true; b.textContent = "Kaydediliyor…";
+      try {
+        const r = await api("servis_saat_kaydet", { saatler: saatDuzen });
+        sakla.koy("sk_servis_saat", r.saatler); saatDuzen = null; servisSaatCiz(); mesaj("Servis saatleri değiştirildi.");
+      } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = "Kaydet"; }
+    }
+  });
   function servisCiz() {
     const k = $("#servis"); if (!k) return;
     if (servisKayit && !servisKayit.bitti) {
@@ -2283,7 +2358,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         const r = await api(b + "_paylas", { tur, metin: f.metin.value, yol });
         mesaj(b === "duyuru"
           ? (typeof r?.basarili === "number" ? `Duyuru yayımlandı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Duyuru yayımlandı. Herkese bildirim gönderildi.")
-          : "Paylaşıldı. Herkese bildirim gönderildi.");
+          : (typeof r?.basarili === "number" ? `Paylaşıldı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Paylaşıldı. Herkese bildirim gönderildi."));
         await paylasimAc(b);
       } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = eski; }
     });
@@ -2389,19 +2464,26 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#plaka") history.replaceState(null, "", "#plaka");
     goster("plaka");
   }
-  $("#plaka-form").addEventListener("change", (e) => {
-    if (e.target.name !== "arac") return;
-    const yakin = e.target.value === "yakin";
-    $("#plaka-sahibi").hidden = !yakin;
-    $("#plaka-form").arac_sahibi.required = yakin;
-    $("#plaka-form").arac_sahibi_tel.required = yakin; // yakının aracında yakının telefonu zorunlu
-  });
+  // E-posta için eksik kalan bilgiler sorulur: yakının aracında ad ve telefon; ortak yakınının kendi aracında kendi adı
+  // (kaydında ortağın adı durur); yöneticide telefon ve daire
+  function plakaAlanlari() {
+    const f = $("#plaka-form"), arac = f.arac.value, yakinArac = arac === "yakin", yon = yonetici();
+    const ad = yakinArac || (arac === "kendi" && /Yakını/.test(oturum?.unvan || ""));
+    const tel = yakinArac || (arac === "kendi" && yon), daire = !!arac && yon;
+    for (const [alan, kutu, gerek] of [["#plaka-ad-alan", f.arac_sahibi, ad], ["#plaka-tel-alan", f.arac_sahibi_tel, tel], ["#plaka-daire-alan", f.daire, daire]]) {
+      $(alan).hidden = !gerek; kutu.required = gerek;
+    }
+    $("#plaka-ad-etiket").textContent = yakinArac ? "Aracın sahibi olan yakınınızın adı ve soyadı" : "Adınız ve soyadınız";
+    $("#plaka-tel-etiket").textContent = yakinArac ? "Yakınınızın cep telefonu" : "Cep telefonunuz";
+    $("#plaka-sahibi").hidden = !(ad || tel || daire);
+  }
+  $("#plaka-form").addEventListener("change", (e) => { if (e.target.name === "arac") plakaAlanlari(); });
   $("#plaka-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target, d = f.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Gönderiliyor…";
     try {
-      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value });
+      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value, daire: f.daire.value });
       if (r.eposta) {
         mesaj("Bildiriminiz kooperatife e-postayla gönderildi.");
       } else {
@@ -2409,7 +2491,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         mesaj("Bildiriminiz kaydedildi. Açılan e-postada “Gönder”e dokunun.");
         location.href = `mailto:${r.kime}?subject=${encodeURIComponent(r.konu)}&body=${encodeURIComponent(r.metin)}`;
       }
-      f.reset(); $("#plaka-sahibi").hidden = true;
+      f.reset(); plakaAlanlari();
       setTimeout(anaAc, 1500);
     } catch (err) { mesaj(err.message); }
     finally { d.disabled = false; d.textContent = "📧 Kooperatife Gönder"; }
@@ -2880,7 +2962,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const s = e.target.closest(".satir"); if (s) detayGoster(Number(s.dataset.id));
   });
 
-  $("#bildirim-ac").addEventListener("click", () => bildirimAc(false));
   $("#bekle-bildirim").addEventListener("click", () => bildirimAc(false));
   // Yapılanlar / Yapılmayanlar düğmeleri listeyi süzer
   $("#ozet").addEventListener("click", (e) => {
