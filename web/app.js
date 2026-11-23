@@ -1322,7 +1322,7 @@ SPORKENT ASİSTAN uygulaması kullanıma açıldı. Kooperatifin duyurularını 
 
 Katılmak için:
 1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
-2. Açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+2. Açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
 3. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın ve "Kooperatif Ortağıyım"ı seçin.
 4. Adınızı soyadınızı, ortaklık numaranızı ve kooperatifte kayıtlı cep telefonunuzu yazıp "Kayıt ol"a basın.
 
@@ -1342,7 +1342,7 @@ SPORKENT ASİSTAN uygulamasına aşağıdaki bağlantıdan katılabilirsiniz:
 
 ${UYGULAMA_ADRESI}
 
-1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
 3. "Kooperatif Ortağıyım" seçeneğine dokunun. Adınızı soyadınızı, ortaklık numaranızı (${r.no}), kooperatifte kayıtlı cep telefonu numaranızı ve aşağıdaki davet kodunu yazıp "Kayıt ol"a basın.
 
@@ -1390,7 +1390,7 @@ SPORKENT ASİSTAN uygulamasına size özel giriş bağlantısı:
 
 ${TG_ADRESI}
 
-1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın.
+1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
 2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
 3. "Şahsi kodla giriş" ekranı açılır. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
 
