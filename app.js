@@ -777,8 +777,9 @@
     return iosCihaz && !!(await bildirimAbonelik());
   }
   // Bildirimler açılmadan uygulama kullanılamaz. Ana ekrana eklenmemişse zaten kurulum ekranı çıkar; süren devriye bölünmez.
+  // Bildirimi hiç desteklemeyen (eski) telefon kilitlenmez: kişinin açma imkânı yok, uygulamayı bildirimsiz kullanır.
   async function bildirimKilidi() {
-    const k = $("#bildirim-kilit"), acik = kurulumGerekli() || izSuruyor() || (await bildirimAcik());
+    const k = $("#bildirim-kilit"), acik = kurulumGerekli() || !bildirimDestek() || izSuruyor() || (await bildirimAcik());
     k.hidden = acik;
     document.body.classList.toggle("kilitli", !acik);
     for (const e of document.body.children) if (e !== k && e.tagName !== "SCRIPT") e.inert = !acik;
@@ -787,12 +788,7 @@
   }
   function kilitCiz() {
     const d = $("#kilit-dugme"), m = $("#kilit-metin");
-    if (!bildirimDestek()) {
-      d.textContent = "🔄 Yeniden dene";
-      m.innerHTML = `<p>Bu telefon şu anda bildirimleri desteklemiyor. ${iosCihaz
-        ? "iPhone'unuzun yazılımını güncelleyin: <b>Ayarlar › Genel › Yazılım Güncelleme</b> (en az iOS 16.4)."
-        : "Telefonunuzu ve <b>Chrome</b> uygulamasını güncelleyin, sonra uygulamayı Chrome ile yeniden ana ekrana ekleyin."}</p>`;
-    } else if (Notification.permission === "denied") {
+    if (Notification.permission === "denied") {
       d.textContent = "🔄 Açtım, kontrol et";
       m.innerHTML = `<p>Bildirim izni kapatılmış. Telefonun ayarlarından açın:</p>` + (iosCihaz
         ? `<ol><li>Telefonun <b>Ayarlar</b>'ını açın.</li><li><b>Bildirimler</b>'e dokunun.</li><li>Listeden <b>SPORKENT ASİSTAN</b>'ı (ya da Sporkent'i) bulun.</li><li><b>Bildirimlere İzin Ver</b>'i açın.</li><li>Uygulamayı kapatıp yeniden açın.</li></ol>`
@@ -804,14 +800,12 @@
   }
   $("#kilit-dugme").addEventListener("click", async () => {
     const h = $("#kilit-hata"); h.hidden = true;
-    if (bildirimDestek()) {
-      // İzin sorusu yalnızca dokunma anında çıkar: öncesinde bekleme olmamalı
-      let izin; try { izin = await Notification.requestPermission(); } catch { izin = Notification.permission; }
-      if (izin === "granted") izinOnay = true;
-    }
+    // İzin sorusu yalnızca dokunma anında çıkar: öncesinde bekleme olmamalı
+    let izin; try { izin = await Notification.requestPermission(); } catch { izin = Notification.permission; }
+    if (izin === "granted") izinOnay = true;
     if (await bildirimKilidi()) {
       h.textContent = "Bildirimler hâlâ kapalı. Açmadan programı kullanamazsınız."; h.hidden = false;
-      if (oturum?.anahtar) izinBildir(bildirimDestek() ? Notification.permission : "desteklenmiyor");
+      if (oturum?.anahtar) izinBildir(Notification.permission);
     } else if (oturum?.anahtar) bildirimAc(true);
   });
   // Ayarlardan dönünce kilit kendiliğinden kalkar / izin kapatıldıysa yeniden gelir
