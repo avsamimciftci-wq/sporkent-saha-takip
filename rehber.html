@@ -193,6 +193,32 @@
       <div class="e-yuzen">+ Yeni kayıt</div>${ek}`;
     const izin = (metin) => `<div class="e-perde"><div class="e-pencere"><b>${metin}</b><div class="dugmeler"><span style="color:#888">Engelle</span><span>İzin ver</span></div></div></div>`;
 
+    // iPhone'da ana ekrana ekleme düğmesi yoktur, yerine adımlar çıkar. Safari'nin menüsü iOS 26'da değişti
+    // ("iPhone OS" numarası orada donuk olduğundan Version/ okunur). Sürüm bilinmiyorsa ve PDF'te iki tarif de gösterilir.
+    function iphoneYukle() {
+      const adimlar = (ilk) => `${bant}<div class="e-kart"><b style="font-size:15px;display:block;text-align:center">Ana ekrana ekleyin</b><div style="background:#fff4d6;border:1px solid #e0a800;border-radius:8px;padding:6px;margin:8px 0;text-align:center">Telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></div><div style="background:#eef6f2;border-radius:8px;padding:8px">${ilk}<br>• <b>“Ana Ekrana Ekle”</b>ye dokunun.<br>• Sağ üstteki <b>“Ekle”</b>ye dokunun.</div></div>`;
+      const sayfa18 = adimlar("• En altta, <b>tam ortadaki</b> ⬆︎ <b>Paylaş</b>'a dokunun.");
+      const sayfa26 = adimlar("• En altta, sağdaki <b>⋯</b>'ya dokunun.<br>• <b>“Paylaş”</b>a dokunun.");
+      const liste = `<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`;
+      const ekle = { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/logo-192.png) center/cover;border:1px solid #ddd"></span><div>SPORKENT ASİSTAN</div></div>`, parmak: [88, 9] };
+      const cubuk26 = `<div class="e-safari" style="align-items:center;gap:8px;padding:8px 10px 12px"><span>‹</span><span class="e-adres" style="text-align:center;padding:7px 8px">🔒 Sporkent</span><b style="background:#1b2421;color:#fff;border-radius:50%;width:28px;height:28px;line-height:26px;text-align:center">⋯</b></div>`;
+      const son = "Listeyi yukarı kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.";
+      const not = "Listede yoksa en alttaki “Eylemleri Düzenle”den ekleyin. iPhone'da bildirimler yalnızca ana ekrandan açarsanız gelir; bu adımı atlamayın.";
+      const a18 = (b) => ({ baslik: b, not, aciklama: `Bağlantıyı <b>Safari</b>'de açın. En altta, <b>tam ortadaki Paylaş</b> simgesine (kare içinde yukarı ok ⬆︎) dokunun. ${son}`,
+        kareler: [
+          { ekran: `${sayfa18}<div class="e-safari" style="display:grid;grid-template-columns:repeat(5,1fr);justify-items:center;align-items:center"><span>‹</span><span>›</span><b style="border:2px solid;border-radius:5px;font-size:20px;line-height:1;padding:2px 6px">⬆︎</b><span>📖</span><span>⧉</span></div>`, parmak: [50, 95] },
+          { ekran: sayfa18 + liste, parmak: [45, 88] }, ekle ] });
+      const a26 = (b) => ({ baslik: b, not, aciklama: `Bağlantıyı <b>Safari</b>'de açın. En altta, sağdaki <b>⋯ (üç nokta)</b> simgesine, açılan menüde <b>“Paylaş”</b>a dokunun. ${son}`,
+        kareler: [
+          { ekran: sayfa26 + cubuk26, parmak: [91, 94] },
+          { ekran: `${sayfa26}${cubuk26}<div class="e-menu" style="top:auto;bottom:54px"><div class="vurgu">⬆︎ Paylaş</div><div>Yer işaretlerine ekle</div><div>Yeni sekme</div></div>`, parmak: [60, 71] },
+          { ekran: sayfa26 + liste, parmak: [45, 88] }, ekle ] });
+      const ua = navigator.userAgent, v = /iphone/i.test(ua) && !/CriOS|EdgiOS|FxiOS/i.test(ua) && !/[?&]pdf=/.test(location.search) ? +(ua.match(/Version\/(\d+)/)?.[1] || 0) : 0;
+      if (v >= 26) return [a26("Ana ekrana ekleyin")];
+      if (v) return [a18("Ana ekrana ekleyin")];
+      return [a18("Ana ekrana ekleyin (altta ⋯ yoksa)"), a26("Ana ekrana ekleyin (altta ⋯ varsa)")];
+    }
+
     // Her adım: başlık, açıklama, kareler (ekran + parmağın dokunduğu yer, % olarak)
     const ADIMLAR = {
       ortak_bas: [
@@ -209,16 +235,7 @@
             { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>SPORKENT ASİSTAN</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 60] },
           ] },
       ],
-      iphone_yukle: [
-        { baslik: "Ana ekrana ekleyin", aciklama: "Bağlantıyı <b>Safari</b>'de açın. <b>“📲 Ana Ekrana Ekle”</b> düğmesine dokunun; ekranda adımlar çıkar. Alttaki <b>paylaş düğmesine (kare içinde yukarı ok ⬆︎)</b> dokunun. Listeyi biraz kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.",
-          not: "iPhone'da bildirimler yalnızca uygulamayı ana ekrana ekleyip oradan açarsanız gelir. Bu adımı atlamayın.",
-          kareler: [
-            { ekran: `<div class="durum-cubugu"></div>${kurulum}`, parmak: [50, 46] },
-            { ekran: `<div class="durum-cubugu"></div>${kurulum}<div class="e-safari"><span>‹</span><span>›</span><span>⬆︎</span><span>📖</span><span>⧉</span></div>`, parmak: [50, 94] },
-            { ekran: `<div class="durum-cubugu"></div>${kurulum}<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`, parmak: [45, 82] },
-            { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/logo-192.png) center/cover;border:1px solid #ddd"></span><div>SPORKENT ASİSTAN</div></div>`, parmak: [88, 9] },
-          ] },
-      ],
+      iphone_yukle: iphoneYukle(),
       ortak_son: [
         { baslik: "Simgeden açın", aciklama: "Artık telefonunuzun ana ekranında <b>Sporkent logosu</b> var. Uygulamayı her zaman <b>bu simgeye dokunarak</b> açın.",
           kareler: [
