@@ -961,15 +961,38 @@
         <li>Sağ üstte, adres çubuğundaki <b>Paylaş</b> <span class="paylas-simge">⬆</span> simgesine dokunun.</li>
         <li>Açılan listede <b>“Ana Ekrana Ekle”</b>ye dokunun.</li>
         <li>Sağ üstteki <b>“Ekle”</b>ye dokunun.</li></ol>`;
+    // Diğer tarayıcılarda (Edge, Firefox, Opera, DuckDuckGo, Yandex) menüler başka: Safari'ye yönlendir
+    if (/EdgiOS|FxiOS|OPiOS|OPT\/|OPX\/|DuckDuckGo|Ddg\/|YaBrowser/i.test(ua)) return `<p class="kur-not">Bu sayfayı <b>Safari ile açın</b>:</p><ol class="ios-adim">
+        <li>Aşağıdaki tuşa basın, bağlantı kopyalanır.</li>
+        <li>Telefonunuzdaki <b>Safari</b> 🧭 uygulamasını açın.</li>
+        <li>Adres çubuğuna basılı tutup <b>“Yapıştır ve Git”</b>e dokunun. Adımlar orada çıkar.</li></ol>
+      <button id="link-kopyala" class="ana-dugme" type="button">🔗 Bağlantıyı kopyala</button>`;
+    const ekle = `<li>Listeyi yukarı kaydırıp <b>“Ana Ekrana Ekle”</b>ye dokunun.<br><small>Listede yoksa en alttaki <b>“Eylemleri Düzenle”</b>ye dokunup oradan ekleyin.</small></li>
+        <li>Sağ üstteki <b>“Ekle”</b>ye dokunun. Sporkent simgesi ana ekranınıza gelir.</li>`;
+    const paylas = `<span class="paylas-simge">⬆</span>`;
+    const altOrta = `<li>Ekranın en altında, <b>tam ortadaki</b> ${paylas} <b>Paylaş</b> simgesine dokunun.<br><small>Görünmüyorsa sayfayı biraz aşağı çekin.</small></li>`;
+    const ucNokta = `<li>Ekranın en altında, sağdaki <b class="ios-uc">⋯</b> (üç nokta) simgesine dokunun.<br><small>⋯ görünmüyor, ${paylas} Paylaş görünüyorsa ona dokunup 3. adıma geçin.</small></li>
+        <li>Açılan menüde <b>“Paylaş”</b>a dokunun.</li>`;
+    if (/ipad|macintosh/i.test(ua)) return `<p class="kur-not">iPad'de <b>3 adım:</b></p><ol class="ios-adim">
+        <li>Sağ üstteki ${paylas} <b>Paylaş</b> simgesine dokunun.</li>${ekle}</ol>`;
+    // Safari'nin yeri iOS 26'da değişti. "iPhone OS" numarası orada donuk (18_x) olduğundan Version/ okunur.
+    const safari = +(ua.match(/Version\/(\d+)/)?.[1] || 0);
+    if (!safari) return `<p class="kur-not">Ekranınızın en altına bakın:</p>
+      <p class="kur-not"><b>⋯ (üç nokta) yoksa:</b></p><ol class="ios-adim">${altOrta}${ekle}</ol>
+      <p class="kur-not"><b>⋯ (üç nokta) varsa:</b></p><ol class="ios-adim">${ucNokta}${ekle}</ol>`;
+    if (safari < 26) return `<p class="kur-not">iPhone'da ekleme, telefonun kendi menüsünden yapılır. <b>3 adım:</b></p>
+      <ol class="ios-adim">${altOrta}${ekle}</ol>
+      <div class="ios-ok orta">↓</div>`;
     return `<p class="kur-not">iPhone'da ekleme, telefonun kendi menüsünden yapılır. <b>4 adım:</b></p>
-      <ol class="ios-adim">
-        <li>Ekranın en altında, sağdaki <b class="ios-uc">⋯</b> (üç nokta) simgesine dokunun.<br><small>Eski iPhone'larda altta ortadaki <span class="paylas-simge">⬆</span> Paylaş simgesine dokunun ve 3. adıma geçin.</small></li>
-        <li>Açılan menüde <b>“Paylaş”</b>a dokunun.</li>
-        <li>Listeyi biraz yukarı kaydırıp <b>“Ana Ekrana Ekle”</b>ye dokunun.</li>
-        <li>Sağ üstteki <b>“Ekle”</b>ye dokunun. Sporkent simgesi ana ekranınıza gelir.</li>
-      </ol>
+      <ol class="ios-adim">${ucNokta}${ekle}</ol>
       <div class="ios-ok">↘</div>`;
   }
+  $("#kur-adim").addEventListener("click", async (e) => {
+    if (!e.target.closest("#link-kopyala")) return;
+    const adres = location.href.split("#")[0];
+    try { await navigator.clipboard.writeText(adres); mesaj("Bağlantı kopyalandı. Şimdi Safari'yi açıp yapıştırın."); }
+    catch { prompt("Bağlantıyı seçip kopyalayın:", adres); }
+  });
   // Şahsi kodla giriş düğmesi ortaklara gösterilmez: TG / YK üyeleri kendi linkiyle gelir.
   // Link bilgisi kaybolursa (iPhone ana ekran uygulaması), giriş ekranlarında üst banttaki logoya art arda 5 kez dokunulunca açılır.
   let gizliDokunus = 0, gizliZaman = null;
