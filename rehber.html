@@ -106,6 +106,17 @@
     .yaziyor::after { content: "|"; animation: yanip .8s infinite; }
     @keyframes yanip { 50% { opacity: 0; } }
 
+    .e-don { background: #1565c0; border: 1px solid #fff; border-radius: 8px; padding: 2px 6px; font-size: 9px; line-height: 1.15; text-align: center; }
+    .e-secim { display: flex; gap: 8px; align-items: center; color: #fff; border-radius: 10px; padding: 10px 8px; margin-top: 8px; }
+    .e-secim span { font-size: 24px; } .e-secim small { font-size: 10px; }
+    .e-selam { height: 22px; padding: 4px 8px 0; font-size: 11px; white-space: nowrap; }
+    .e-kutular { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 56px repeat(4, 71px); gap: 5px; padding: 0 8px; color: #fff; text-align: center; }
+    .e-kutular > div { border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; padding: 2px; }
+    .e-kutular span { font-size: 22px; } .e-kutular b { font-size: 11.5px; }
+    .e-kutular small { background: rgba(255,255,255,.22); border-radius: 8px; padding: 1px 6px; font-size: 9px; margin-top: 2px; }
+    .e-kutular .genis { grid-column: 1 / -1; flex-direction: row; gap: 10px; } .e-kutular .genis small { display: block; }
+    .e-bolum { margin: 6px 8px 0; border-radius: 8px; padding: 6px; color: #fff; font-weight: 800; text-align: center; }
+
     /* Alt düğmeler */
     .gezinti {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
@@ -144,6 +155,7 @@
     .pdf-kare { text-align: center; font-weight: 800; color: #e8772e; font-size: 20px; }
     .pdf-kare .telefon { position: relative; left: auto; top: auto; transform: none; margin: 6px auto 0; box-shadow: none; }
     .pdf-ok { align-self: center; font-size: 30px; color: #e8772e; font-weight: 800; }
+    .pdf-kare .ekran { text-align: left; font-weight: 400; }
     .pdf-kare .ekran .kare { opacity: 1; transition: none; }
     .pdf-kare .parmak { transition: none; }
   </style>
@@ -180,16 +192,27 @@
 
   <script>
   (() => {
-    const BAGLANTI = "avsamimciftci-wq.github.io/sporkent-saha-takip";
+    const BAGLANTI = "avsamimciftci-wq.github.io/sporkent-saha-takip"; // tarayıcının adres çubuğunda görünen
+    const DAVET = "tinyurl.com/sporkent-ortak"; // ortaklara gönderilen kısa bağlantı
     const bant = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt="">SPORKENT ASİSTAN</div>`;
     const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
-    const giris = (ad, kod, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Giriş</b><br><br>Kullanıcı adı<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Şifre<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${kod}</div><div class="e-dugme">Giriş yap</div></div>`;
     const kurulum = `${bant}<div class="e-kart" style="text-align:center"><b style="font-size:15px">Ana ekrana ekleyin</b><div style="background:#fff4d6;border:1px solid #e0a800;border-radius:8px;padding:6px;margin:8px 0">Bu otomasyonu kullanmak için telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></div><div class="e-dugme">📲 Ana Ekrana Ekle</div></div>`;
-    const kayit = (ad, no, tel, yaz) => `${bant}<div class="e-kart"><b style="font-size:15px">Ortak kaydı</b><br><br>Adınız ve soyadınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Ortaklık numaranız<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${no}</div>Cep telefonunuz<div class="e-alan ${yaz === 3 ? "yaziyor" : ""}">${tel}</div><div style="font-size:11px;color:#5d6b66">🔒 Bilgileriniz yalnızca kooperatif içi iletişim için kullanılır.</div><div class="e-dugme">Kayıt ol</div></div>`;
-    const liste = (ek = "") => `${bant}
-      <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Henüz yapılmayanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>1</b><br>Yapılanlar</div></div>
-      <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-acik">Açık</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
-      <div class="e-satir"><div class="e-foto" style="background:#e3f4ea">💡</div><div><span class="rozet r-tamam">Yapıldı</span><br><b>Sahil lambası</b><br>Yanmıyordu</div></div>
+    const bantDon = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt=""><span style="flex:1">SPORKENT ASİSTAN</span><span class="e-don">🏠<br>Ana Sayfaya Dön</span></div>`;
+    const kilit = `<div class="durum-cubugu"></div><div class="e-kart" style="text-align:center;margin-top:60px"><img src="icons/logo-192.png" alt="" width="56" height="56" style="border-radius:12px"><br><b style="font-size:16px">🔔 Bildirimleri açın</b><div style="background:#ffebee;border:2px solid #c62828;color:#b71c1c;border-radius:10px;padding:7px;margin:8px 0;font-weight:700">Bildirimleri açmadan bu programı kullanamazsınız.</div>Aşağıdaki düğmeye dokunun, çıkan soruya <b>“İzin Ver”</b> deyin.<div class="e-dugme" style="margin-top:10px">🔔 Bildirimleri Aç</div></div>`;
+    const secim = `${bant}<div class="e-kart"><b style="font-size:15px;display:block;text-align:center;margin-bottom:8px">Nasıl giriş yapacaksınız?</b><div class="e-secim" style="background:linear-gradient(145deg,#2e7d6b,#1f4e45)"><span>🏠</span><div><b>Kooperatif Ortağıyım</b><br><small>Kendi ortaklık numaramla kayıt oluyorum</small></div></div><div class="e-secim" style="background:linear-gradient(145deg,#ef6c00,#b23c00)"><span>👨‍👩‍👧</span><div><b>Ortağın Yakınıyım</b><br><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></div></div><div style="text-align:center;font-size:11px;text-decoration:underline;margin-top:8px">🔑 Temsilciler Grubu (TG) ya da Yönetim Kurulu üyesiyseniz <b>buraya dokunun</b></div></div>`;
+    const kayit = (ad, no, tel, yaz, tik) => `${bant}<div class="e-kart"><b style="font-size:15px">Ortak kaydı</b><br><br>Adınız ve soyadınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Ortaklık numaranız<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${no}</div>Cep telefonunuz<div class="e-alan ${yaz === 3 ? "yaziyor" : ""}">${tel}</div><div style="display:flex;gap:6px;align-items:center;margin:4px 0 8px;font-weight:700"><span style="border:2px solid #1f4e45;border-radius:4px;width:18px;height:18px;line-height:14px;text-align:center;flex:none">${tik ? "✓" : ""}</span>Aydınlatma metnini okudum.</div><div class="e-dugme">Kayıt ol</div></div>`;
+    const kutu = (ikon, ad, renk, alt = "") => `<div style="background:linear-gradient(145deg,${renk})"><span>${ikon}</span><b>${ad}</b>${alt ? `<small>${alt}</small>` : ""}</div>`;
+    // Ana sayfa kutularının yeri (%): parmak bunlara dokunur
+    const YER = { parsel: [50, 23], duyuru: [26, 37], saha: [74, 37], restoran: [26, 53], servis: [74, 53], aidat: [26, 69], plaka: [74, 69], iletisim: [26, 85], sokak: [74, 85] };
+    const ana = (yeni = "") => `${bant}<div class="e-selam">Ortağımız Sayın <b>Ayşe Yılmaz</b></div><div class="e-kutular">
+      <div class="genis" style="background:linear-gradient(145deg,#c2185b,#880e4f)"><span>👤</span><div><b>Parsel Temsilcisi</b><small>Ali Örnek</small></div></div>
+      ${kutu("📢", "Duyurular", "#283593,#121858", yeni)}${kutu("🛠️", "Saha Takip", "#2e7d6b,#1f4e45")}${kutu("🍽️", "Restoran", "#c62828,#7f1010")}${kutu("🚐", "Servis", "#ef6c00,#b23c00")}${kutu("💳", "Aidat", "#f9a825,#c17900")}${kutu("🚗", "Plaka-Kimlik Bildirimi", "#455a64,#1c313a")}${kutu("☎️", "İletişim", "#1e88e5,#0d47a1")}${kutu("🗺️", "Sokak Numaraları", "#00897b,#00574b")}</div>`;
+    const sayfa = (baslik, renk, icerik) => `${bantDon}<div class="e-bolum" style="background:#f9a825;color:#1b2421">← Ana Sayfa</div><div class="e-bolum" style="background:${renk}">${baslik}</div>${icerik}`;
+    const ara = `<div style="display:flex;gap:6px;margin-top:8px"><div class="e-dugme" style="flex:1;background:#1565c0">📞 Ara</div><div class="e-dugme" style="flex:1.2;background:#1b8a3d">💬 WhatsApp</div></div>`;
+    const plaka = (sec, no) => sayfa("🚗 Plaka-Kimlik Bildirimi", "#37474f", `<div class="e-kart"><b>1. Araç kimin?</b><div style="display:flex;gap:6px;margin:6px 0 10px"><div class="e-dugme ${sec ? "" : "acik"}" style="flex:1;${sec ? "background:#37474f" : ""}">🙋 Kendi aracım</div><div class="e-dugme acik" style="flex:1">👨‍👩‍👧 Yakınımın aracı</div></div><b>2. Plaka numarası</b><div class="e-alan ${no ? "" : "yaziyor"}" style="font-size:18px;font-weight:800;text-align:center">${no}</div><div class="e-dugme">📧 Kooperatife Gönder</div></div>`);
+    const liste = (ek = "") => `${bantDon}
+      <div style="display:flex;gap:6px;margin:8px"><div style="flex:1;text-align:center;padding:6px;border-radius:8px;background:#2e7d32;color:#fff;font-weight:700"><b>1</b><br>Henüz yapılmayanlar</div><div style="flex:1;text-align:center;padding:6px;border-radius:8px;border:2px solid #c62828;background:#fdecea;color:#c62828;font-weight:700"><b>8</b><br>Yapılanlar</div></div>
+      <div class="e-satir"><div class="e-foto" style="background:#fde8e6">🚿</div><div><span class="rozet r-tamam">Henüz yapılmayan</span><br><b>3 numaralı duş</b><br>Su akmıyor</div></div>
       <div class="e-yuzen">+ Yeni kayıt</div>${ek}`;
     const izin = (metin) => `<div class="e-perde"><div class="e-pencere"><b>${metin}</b><div class="dugmeler"><span style="color:#888">Engelle</span><span>İzin ver</span></div></div></div>`;
 
@@ -224,7 +247,7 @@
       ortak_bas: [
         { baslik: "Bağlantıya dokunun", aciklama: "Size WhatsApp'tan gelen <b>mavi bağlantıya</b> bir kez dokunun. Uygulama telefonunuzun internet tarayıcısında açılır.",
           kareler: [
-            { ekran: `<div class="durum-cubugu"></div><div style="background:#075e54;color:#fff;padding:8px;font-weight:700">Sporkent Grubu</div><div style="background:#e5ddd5;height:100%;padding:10px"><div style="background:#fff;border-radius:8px;padding:8px;width:85%">Sporkent Asistan uygulamamız:<br><u style="color:#1a73e8">${BAGLANTI}</u></div></div>`, parmak: [38, 21] },
+            { ekran: `<div class="durum-cubugu"></div><div style="background:#075e54;color:#fff;padding:8px;font-weight:700">Sporkent Grubu</div><div style="background:#e5ddd5;height:100%;padding:10px"><div style="background:#fff;border-radius:8px;padding:8px;width:85%">SPORKENT ASİSTAN uygulaması kullanıma açıldı.<br>1. Bu bağlantıya dokunun:<br><u style="color:#1a73e8">${DAVET}</u></div></div>`, parmak: [43, 27] },
           ] },
       ],
       android_yukle: [
@@ -232,56 +255,101 @@
           not: "Bu işi yalnızca bir kez yaparsınız. Pencere açılmazsa sağ üstteki üç noktaya (⋮) dokunup “Ana ekrana ekle”yi seçin.",
           kareler: [
             { ekran: `${tarayiciAndroid}${kurulum}`, parmak: [50, 52] },
-            { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>SPORKENT ASİSTAN</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 60] },
+            { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/logo-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>SPORKENT ASİSTAN</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 58] },
           ] },
       ],
       iphone_yukle: iphoneYukle(),
       ortak_son: [
         { baslik: "Simgeden açın", aciklama: "Artık telefonunuzun ana ekranında <b>Sporkent logosu</b> var. Uygulamayı her zaman <b>bu simgeye dokunarak</b> açın.",
           kareler: [
-            { ekran: `<div class="e-ana"><div><div class="ikon" style="background:#4caf50">📞</div>Telefon</div><div><div class="ikon" style="background:#25d366">💬</div>WhatsApp</div><div><div class="ikon" style="background:#fff">🌐</div>Chrome</div><div><div class="ikon sk"></div>SPORKENT ASİSTAN</div></div>`, parmak: [86, 13] },
+            { ekran: `<div class="e-ana"><div><div class="ikon" style="background:#4caf50">📞</div>Telefon</div><div><div class="ikon" style="background:#25d366">💬</div>WhatsApp</div><div><div class="ikon" style="background:#fff">🌐</div>İnternet</div><div><div class="ikon sk"></div>SPORKENT ASİSTAN</div></div>`, parmak: [86, 13] },
           ] },
-        { baslik: "Bilgilerinizi yazın", aciklama: "<b>Adınızı ve soyadınızı</b>, <b>ortaklık numaranızı</b> ve <b>cep telefonunuzu</b> yazın. Sonra <b>“Kayıt ol”</b> düğmesine dokunun. Şifre gerekmez.",
-          not: "Görevliler (TG, YK, müdür, şef, muhasebe) alttaki “Görevli misiniz? Kişisel kodla giriş” yazısına dokunup kendi kodlarıyla girer.",
+        { baslik: "Bildirimleri açın", aciklama: "Yeşil <b>“🔔 Bildirimleri Aç”</b> düğmesine dokunun. Telefon sorunca <b>“İzin ver”</b> deyin. Bildirimler açılmadan uygulama kullanılamaz.",
+          not: "Yanlışlıkla reddettiyseniz ekranda telefon ayarından nasıl açılacağı yazar; o adımları izleyin.",
           kareler: [
-            { ekran: kayit("Ayşe Yılmaz", "", "", 1), parmak: [50, 30] },
-            { ekran: kayit("Ayşe Yılmaz", "12", "", 2), parmak: [50, 42] },
-            { ekran: kayit("Ayşe Yılmaz", "12", "0532 123 45 67"), parmak: [50, 66] },
+            { ekran: kilit, parmak: [50, 62] },
+            { ekran: `${kilit}${izin("SPORKENT ASİSTAN bildirim göndermek istiyor")}`, parmak: [78, 55] },
           ] },
-        { baslik: "Onay bekleyin", aciklama: "İlk girişte <b>“Onay bekleniyor”</b> yazar. Yönetim Kurulu Başkanı sizi onaylayınca ekran <b>kendiliğinden açılır</b>. Bir şey yapmanıza gerek yok.",
+        { baslik: "Kim olduğunuzu seçin", aciklama: "Kooperatif ortağıysanız <b>“Kooperatif Ortağıyım”</b>a, ortağın eşi, çocuğu, damadı, gelini ya da misafiriyseniz <b>“Ortağın Yakınıyım”</b>a dokunun.",
+          not: "TG ve Yönetim Kurulu üyeleri alttaki 🔑 yazısına dokunup kendilerine verilen kişisel kodla girer.",
           kareler: [
-            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ayşe Yılmaz · 12 No'lu Ortak<br><br><span style="color:#5d6b66">Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120] },
-            { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#fff url(icons/logo-192.png) center/cover"></div><div><b>Gruba kabul edildiniz</b><br>Kullanmaya başlayabilirsiniz.</div></div>`, parmak: [50, 120] },
+            { ekran: secim, parmak: [50, 29] },
+            { ekran: secim, parmak: [50, 45], yada: true },
           ] },
-        { baslik: "Bildirimleri açın", aciklama: "Listenin üstündeki <b>“Bildirimleri aç”</b> düğmesine dokunun. Telefon sorunca <b>“İzin ver”</b> deyin. Böylece yapılan işlerin haberi telefonunuza gelir.",
+        { baslik: "Bilgilerinizi yazın", aciklama: "<b>Adınızı soyadınızı</b>, <b>ortaklık numaranızı</b> ve kooperatifte kayıtlı <b>cep telefonunuzu</b> yazın. <b>“Aydınlatma metnini okudum”</b>u işaretleyip <b>“Kayıt ol”</b>a dokunun. Şifre ya da kod gerekmez.",
+          not: "Ortağın yakınıysanız: ortağın adını, ortağın ortaklık numarasını ve kendi cep telefonunuzu yazın.",
           kareler: [
-            { ekran: `${bant}<div class="e-kart" style="display:flex;gap:6px;align-items:center;background:#e8f0ec">Bildirimleri açın<div class="e-dugme" style="padding:5px 8px">Bildirimleri aç</div></div>`, parmak: [72, 21] },
-            { ekran: `${bant}${izin("SPORKENT ASİSTAN bildirim göndermek istiyor")}`, parmak: [80, 54] },
+            { ekran: kayit("Ayşe Yılmaz", "", "", 1), parmak: [50, 32] },
+            { ekran: kayit("Ayşe Yılmaz", "12", "", 2), parmak: [50, 44] },
+            { ekran: kayit("Ayşe Yılmaz", "12", "0532 123 45 67", 3, true), parmak: [13, 65] },
+            { ekran: kayit("Ayşe Yılmaz", "12", "0532 123 45 67", 0, true), parmak: [50, 74] },
           ] },
-        { baslik: "Sorun bildirin", aciklama: "Sağ alttaki <b>“+ Yeni kayıt”</b>a dokunun. <b>📷 Fotoğraf çek</b>in ya da soluk mavi <b>🖼️ Galeriden Fotoğraf Yükle</b> ile telefondaki bir fotoğrafı seçin. <b>Yeri</b> yazın (örn. 3 numaralı duş). <b>Sorunu</b> yazın; konuşarak yazmak için telefon klavyenizdeki <b>🎤 mikrofon</b> tuşunu kullanın. En son <b>“Gönder”</b>e dokunun.",
-          not: "TG üyelerinin yazdığı kayıt önce yönetimin onayına gider. Onaylanınca iş listesine düşer ve herkes görür.",
+        { baslik: "Uygulama açılır", aciklama: "Telefonunuz kooperatifteki kayıtla eşleşirse uygulama <b>hemen açılır</b>. Eşleşmezse <b>“Onay bekleniyor”</b> yazar: ortakları yönetim, ortak yakınlarını parsel temsilcisi onaylar. Onaylanınca <b>kendiliğinden</b> açılır.",
           kareler: [
+            { ekran: ana(), parmak: [50, 120] },
+            { ekran: `${bant}<div class="e-kart" style="text-align:center"><div style="font-size:30px">⏳</div><b style="font-size:15px">Onay bekleniyor</b><br>Ayşe Yılmaz · 12 No'lu Ortak<br><br><span style="color:#5d6b66">Kaydınız yöneticiye iletildi. Onaylandığında bu ekran kendiliğinden açılır.</span></div>`, parmak: [50, 120], yada: true },
+          ] },
+        { baslik: "Ana sayfa", aciklama: "Her renkli kutu bir bölümdür; dokununca açılır. Bir bölümdeyken sağ üstteki mavi <b>“🏠 Ana Sayfaya Dön”</b> düğmesi sizi buraya geri getirir.",
+          kareler: [
+            { ekran: ana(), parmak: YER.iletisim },
+            { ekran: `${bantDon}<div style="padding:10px 8px;font-weight:800;font-size:15px">☎ İletişim</div><div class="e-satir"><div class="e-foto" style="background:#e3f2fd">📞</div><div>Müdür<br><b>Aramak için dokunun</b></div></div><div class="e-satir"><div class="e-foto" style="background:#e3f2fd">📞</div><div>Muhasebe<br><b>Aramak için dokunun</b></div></div>`, parmak: [82, 10] },
+          ] },
+        { baslik: "Duyurular", aciklama: "Kooperatif bir duyuru yapınca telefonunuza <b>sesli bildirim</b> gelir. Bildirime ya da lacivert <b>“Duyurular”</b> kutusuna dokunun. Duyuru yazı, resim ya da PDF olabilir.",
+          kareler: [
+            { ekran: ana("🔴 1 yeni duyuru"), parmak: YER.duyuru },
+            { ekran: sayfa("📢 Duyurular", "#283593", `<div class="e-kart"><span style="color:#5d6b66">📝 Yönetim Kurulu</span><br><b style="font-size:14px">Örnek duyuru</b><br>Kooperatif yönetiminin duyuruları burada görünür.</div>`), parmak: [50, 120] },
+          ] },
+        { baslik: "Sorun bildirin", aciklama: "<b>“Saha Takip”</b>e, sonra sağ alttaki <b>“+ Yeni kayıt”</b>a dokunun. <b>📷 Fotoğraf çekin</b> ya da galeriden seçin, <b>yeri</b> ve <b>sorunu</b> yazıp <b>“Gönder”</b>e dokunun. Konuşarak yazmak için klavyedeki 🎤 tuşunu kullanın.",
+          not: "Kaydınız önce parsel temsilcinizin onayına gider; onaylanınca herkes görür ve müdüre bildirilir. Fotoğraf zorunlu değildir.",
+          kareler: [
+            { ekran: ana(), parmak: YER.saha },
             { ekran: liste(), parmak: [80, 93] },
-            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div class="e-dugme acik" style="margin:8px 0;padding:16px">📷 Fotoğraf çek</div><div class="e-dugme" style="margin:0 0 8px;background:#e3f2fd;color:#0d47a1;border:1px solid #90caf9">🖼️ Galeriden Fotoğraf Yükle</div>Yer<div class="e-alan"></div>Sorun<div class="e-alan" style="min-height:40px"></div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 26] },
-            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div style="margin:8px 0;height:50px;border-radius:8px;background:linear-gradient(135deg,#9bb,#577)"></div>Yer<div class="e-alan">3 numaralı duş</div>Sorun<div class="e-alan yaziyor" style="min-height:40px">Su akmıyor</div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 58] },
-            { ekran: `${bant}<div class="e-kart"><b>Yeni kayıt</b><div style="margin:8px 0;height:50px;border-radius:8px;background:linear-gradient(135deg,#9bb,#577)"></div>Yer<div class="e-alan">3 numaralı duş</div>Sorun<div class="e-alan" style="min-height:40px">Su akmıyor</div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 80] },
+            { ekran: `${bantDon}<div class="e-kart"><b>Yeni kayıt</b><div class="e-dugme acik" style="margin:8px 0;padding:16px">📷 Fotoğraf çek</div><div class="e-dugme" style="margin:0 0 8px;background:#e3f2fd;color:#0d47a1;border:1px solid #90caf9">🖼️ Galeriden Fotoğraf Yükle</div>Yer<div class="e-alan"></div>Sorun<div class="e-alan" style="min-height:40px"></div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 28] },
+            { ekran: `${bantDon}<div class="e-kart"><b>Yeni kayıt</b><div style="margin:8px 0;height:50px;border-radius:8px;background:linear-gradient(135deg,#9bb,#577)"></div>Yer<div class="e-alan">3 numaralı duş</div>Sorun<div class="e-alan" style="min-height:40px">Su akmıyor</div><div class="e-dugme">Gönder</div></div>`, parmak: [50, 62] },
           ] },
-        { baslik: "Yapılan işi görün", aciklama: "Müdür işi bitirince telefonunuza <b>sesli bildirim</b> gelir. Uygulamada <b>önce ve sonra fotoğrafı</b> yan yana görünür. Bildirilen sorunları ve <b>yapılan işleri gruptaki herkes</b> görür.",
+        { baslik: "Yapılan işi görün", aciklama: "İş bitince telefonunuza <b>sesli bildirim</b> gelir. Uygulamada <b>önce ve sonra fotoğrafı</b> yan yana görünür. Bildirilen sorunları ve <b>yapılan işleri herkes</b> görür.",
           kareler: [
             { ekran: `${liste()}<div class="e-bildirim"><div class="e-foto" style="background:#bfe3cb">✅</div><div><b>Yapıldı • 3 numaralı duş</b><br>Batarya değiştirildi</div></div>`, parmak: [50, 10] },
-            { ekran: `${bant}<div class="e-kart"><b style="color:#1f4e45;font-size:13px">← İş Listesini Gör</b><span class="rozet r-tamam" style="float:right">Yapıldı</span><br><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="display:flex;gap:6px;margin:8px 0"><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#caa,#866)"></div><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#9db,#486)"></div></div><span style="color:#5d6b66">Sorun</span><span style="color:#5d6b66;float:right">Yapıldı</span></div>`, parmak: [50, 120] },
+            { ekran: `${bantDon}<div class="e-kart"><b style="background:#f9a825;border-radius:6px;padding:3px 6px">← İş Listesini Gör</b><span class="rozet r-tamam" style="float:right">Yapıldı</span><br><br><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="display:flex;gap:6px;margin:8px 0"><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#caa,#866)"></div><div style="flex:1;height:70px;border-radius:6px;background:linear-gradient(135deg,#9db,#486)"></div></div><span style="color:#5d6b66">Sorun</span><span style="color:#5d6b66;float:right">Yapıldı</span></div>`, parmak: [50, 120] },
+          ] },
+        { baslik: "Parsel temsilciniz", aciklama: "En üstteki pembe <b>“Parsel Temsilcisi”</b> kutusuna dokunun. Temsilcinizin adı ve telefonu çıkar. <b>Ara</b>, <b>WhatsApp</b> ya da <b>Mesaj</b> ile tek dokunuşta ulaşırsınız.",
+          not: "Resimdeki ad ve numara örnektir.",
+          kareler: [
+            { ekran: ana(), parmak: YER.parsel },
+            { ekran: sayfa("👤 Parsel Temsilcisi", "#ad1457", `<div class="e-kart" style="text-align:center"><div style="font-size:34px">👤</div><b style="font-size:15px">Ali Örnek</b><br>📞 0532 123 45 67${ara}<div class="e-dugme" style="background:#6a1b9a;margin-top:6px">✉️ Mesaj</div></div>`), parmak: [27, 55] },
+          ] },
+        { baslik: "Restoran ve Servis", aciklama: "<b>Restoran</b>: menüyü görün, sipariş için <b>📞 Ara</b> ya da <b>💬 WhatsApp</b>'a dokunun. <b>Servis</b>: aracın kalkış saatleri ve güzergâhı burada.",
+          not: "Resimdeki menü, numara ve saatler örnektir; güncelleri uygulamada yazar.",
+          kareler: [
+            { ekran: ana(), parmak: YER.restoran },
+            { ekran: sayfa("🍽️ Restoran", "#b71c1c", `<div class="e-kart" style="text-align:center"><b style="color:#b71c1c">Sipariş için</b><br><b style="font-size:15px">📞 0532 123 45 67</b>${ara}</div><div class="e-kart" style="text-align:center"><b style="color:#b71c1c;font-size:14px">Haftanın Menüsü</b><br>Mercimek Çorbası<br>Izgara Köfte<br>Fırın Sütlaç</div>`), parmak: [70, 46] },
+            { ekran: ana(), parmak: YER.servis, yada: true },
+            { ekran: `${bantDon}<div class="e-bolum" style="background:#f9a825;color:#1b2421">← Ana Sayfa</div><div class="e-kart">Aracımız bu saatlerde <b>Dut Ağacından</b> hareket eder.<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px;text-align:center;font-weight:800">${["10:00", "11:00", "12:00", "14:00", "15:00", "16:00"].map((x) => `<span style="background:#fff3e0;border-radius:6px;padding:4px">${x}</span>`).join("")}</div></div><div class="e-bolum" style="background:#d84315">🚐 Servis Güzergahı</div><div class="e-kart" style="height:90px;background:linear-gradient(135deg,#cfe8cf,#a9d3e8);display:grid;place-items:center;font-size:30px">🗺️</div>`, parmak: [50, 120] },
+          ] },
+        { baslik: "Araç plakanızı bildirin", aciklama: "<b>“Plaka-Kimlik Bildirimi”</b>ne dokunun. Aracın <b>kimin</b> olduğunu seçin, <b>plakayı</b> yazın, <b>“Kooperatife Gönder”</b>e dokunun. Telefonunuz e-posta ekranını açarsa orada da <b>“Gönder”</b>e dokunun.",
+          not: "Yakınınızın aracıysa onun adı, soyadı ve cep telefonu da sorulur.",
+          kareler: [
+            { ekran: ana(), parmak: YER.plaka },
+            { ekran: plaka(false, ""), parmak: [28, 42] },
+            { ekran: plaka(true, "35 ABC 123"), parmak: [50, 66] },
+          ] },
+        { baslik: "Aidat, İletişim, Sokak Numaraları", aciklama: "<b>Aidat</b>: yıl içindeki ödemeler. <b>İletişim</b>: müdür, muhasebe, e-posta; dokununca açılır. <b>Sokak Numaraları</b>: sitenin haritası, iki parmakla büyütün.",
+          kareler: [
+            { ekran: ana(), parmak: YER.aidat },
+            { ekran: ana(), parmak: YER.iletisim, yada: true },
+            { ekran: ana(), parmak: YER.sokak, yada: true },
           ] },
         { baslik: "Yönetici, müdür ve şef için: Yapıldı", aciklama: "Gelen soruna dokunun. İşi bitirince <b>📷 yapılan işin fotoğrafını</b> çekin ve <b>“✔ Yapıldı”</b>ya dokunun. Haber bütün gruba gider.",
           not: "Bu adım sadece yönetici (YK başkanı), müdür ve şef içindir. Diğerleri bu düğmeyi görmez.",
           kareler: [
-            { ekran: `${bant}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div class="e-dugme acik" style="margin:6px 0;padding:12px">📷 Yapılan işin fotoğrafını çek</div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 67] },
-            { ekran: `${bant}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div style="height:42px;border-radius:6px;background:linear-gradient(135deg,#9db,#486);margin:6px 0"></div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 78] },
+            { ekran: `${bantDon}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div class="e-dugme acik" style="margin:6px 0;padding:12px">📷 Yapılan işin fotoğrafını çek</div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 51] },
+            { ekran: `${bantDon}<div class="e-kart"><b style="font-size:14px">3 numaralı duş</b><br>Su akmıyor<div style="height:60px;border-radius:6px;background:linear-gradient(135deg,#caa,#866);margin:6px 0"></div><b>Sorunu giderdiniz mi?</b><div style="height:42px;border-radius:6px;background:linear-gradient(135deg,#9db,#486);margin:6px 0"></div><div class="e-dugme">✔ Yapıldı</div></div>`, parmak: [50, 60] },
           ] },
-        { baslik: "Hepsi bu kadar!", aciklama: "Uygulamayı kapatmanıza gerek yok, <b>çıkış yapmayın</b>. Bir dahaki sefere ana ekrandaki Sporkent simgesine dokunmanız yeter.",
+        { baslik: "Hepsi bu kadar!", aciklama: "Uygulamadan <b>çıkış yapmayın</b>; telefonunuz sizi hatırlar. Bir dahaki sefere ana ekrandaki Sporkent simgesine dokunmanız yeter. Takılırsanız <b>parsel temsilcinizi</b> arayın.",
           not: "Çok nadiren çıkış gerekirse: üstteki yeşil banda parmağınızla 3 saniye basılı tutun.",
           kareler: [
-            { ekran: liste(), parmak: [50, 8], uzun: true },
-            { ekran: `${liste()}<div class="e-perde"><div class="e-pencere"><b>Çıkış yapılsın mı?</b><div class="dugmeler"><span>Vazgeç</span><span style="color:#b42318">Çıkış yap</span></div></div></div>`, parmak: [72, 54] },
+            { ekran: ana(), parmak: [50, 8], uzun: true },
+            { ekran: `${ana()}<div class="e-perde"><div class="e-pencere"><b>Çıkış yapılsın mı?</b><div class="dugmeler"><span>Vazgeç</span><span style="color:#b42318">Çıkış yap</span></div></div></div>`, parmak: [42, 54] },
           ] },
       ],
     };
@@ -299,12 +367,12 @@
         <h1>Sporkent İşletme Kooperatifi<br>SPORKENT ASİSTAN</h1>
         <h2>Kurulum ve kullanım kılavuzu</h2>
         <span class="tel-adi">${ad} telefonlar için</span>
-        <div class="bag">Uygulamanın adresi:<br><b>${BAGLANTI}</b><br><span style="font-size:16px;color:#5d6b66">Bu bağlantı size WhatsApp'tan da gönderilir.</span></div>
+        <div class="bag">Uygulamanın adresi:<br><b>${DAVET}</b><br><span style="font-size:16px;color:#5d6b66">Bu bağlantı size WhatsApp'tan da gönderilir.</span></div>
         <ol class="pdf-icerik">${tum.map((a) => `<li>${a.baslik}</li>`).join("")}</ol>
       </section>`;
       const sayfalar = tum.map((a, i) => {
         const z = olcek(a.kareler.length);
-        const kareler = a.kareler.map((k, n) => `${n ? `<div class="pdf-ok">→</div>` : ""}<div class="pdf-kare">${a.kareler.length > 1 ? n + 1 : ""}
+        const kareler = a.kareler.map((k, n) => `${n ? `<div class="pdf-ok"${k.yada ? ` style="font-size:16px"` : ""}>${k.yada ? "ya da" : "→"}</div>` : ""}<div class="pdf-kare">${a.kareler.length > 1 ? n + 1 : ""}
           <div class="telefon" style="zoom:${z}"><div class="ekran"><div class="kare aktif">${k.ekran}</div>
           ${k.parmak[1] <= 100 ? `<div class="parmak" style="left:${k.parmak[0]}%;top:${k.parmak[1]}%"></div>` : ""}</div></div></div>`).join("");
         return `<section class="pdf-adim">
