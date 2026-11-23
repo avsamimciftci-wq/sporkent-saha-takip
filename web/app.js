@@ -2458,18 +2458,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#plaka") history.replaceState(null, "", "#plaka");
     goster("plaka");
   }
-  // E-posta için eksik kalan bilgiler sorulur: yakının aracında ad ve telefon; ortak yakınının kendi aracında kendi adı
-  // (kaydında ortağın adı durur); yöneticide telefon ve daire
+  // Ortaklık numarası ve telefon kayıttan alınır, sorulmaz. Yalnızca programda olmayan bilgi sorulur:
+  // yakının aracında yakının adı ve telefonu; ortak yakınının kendi aracında kendi adı (kaydında ortağın adı durur)
   function plakaAlanlari() {
-    const f = $("#plaka-form"), arac = f.arac.value, yakinArac = arac === "yakin", yon = yonetici();
+    const f = $("#plaka-form"), arac = f.arac.value, yakinArac = arac === "yakin";
     const ad = yakinArac || (arac === "kendi" && /Yakını/.test(oturum?.unvan || ""));
-    const tel = yakinArac || (arac === "kendi" && yon), daire = !!arac && yon;
-    for (const [alan, kutu, gerek] of [["#plaka-ad-alan", f.arac_sahibi, ad], ["#plaka-tel-alan", f.arac_sahibi_tel, tel], ["#plaka-daire-alan", f.daire, daire]]) {
+    for (const [alan, kutu, gerek] of [["#plaka-ad-alan", f.arac_sahibi, ad], ["#plaka-tel-alan", f.arac_sahibi_tel, yakinArac]]) {
       $(alan).hidden = !gerek; kutu.required = gerek;
     }
     $("#plaka-ad-etiket").textContent = yakinArac ? "Aracın sahibi olan yakınınızın adı ve soyadı" : "Adınız ve soyadınız";
-    $("#plaka-tel-etiket").textContent = yakinArac ? "Yakınınızın cep telefonu" : "Cep telefonunuz";
-    $("#plaka-sahibi").hidden = !(ad || tel || daire);
+    $("#plaka-sahibi").hidden = !ad;
   }
   $("#plaka-form").addEventListener("change", (e) => { if (e.target.name === "arac") plakaAlanlari(); });
   $("#plaka-form").addEventListener("submit", async (e) => {
@@ -2477,7 +2475,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const f = e.target, d = f.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Gönderiliyor…";
     try {
-      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value, daire: f.daire.value });
+      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value });
       if (r.eposta) {
         mesaj("Bildiriminiz kooperatife e-postayla gönderildi.");
       } else {

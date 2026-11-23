@@ -1002,19 +1002,23 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const adGerek = arac === "yakin" || yakinKayitli;
       const sahibi = adGerek ? temiz(g.arac_sahibi, 80).replace(/\s+/g, " ") : "";
       if (adGerek && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata(arac === "yakin" ? "Aracın sahibi olan yakınınızın adını ve soyadını yazın." : "Adınızı ve soyadınızı yazın.");
-      // Telefon: yakının aracında yakınınki zorunlu; kendi aracında kayıtlı telefon, yoksa yazılan
-      const telGerek = arac === "yakin" || !uu.telefon;
-      const sahibiTelHam = telGerek ? temiz(g.arac_sahibi_tel, 30) : "";
+      // Telefon yalnızca yakının aracında sorulur (yakınınki); kendi aracında kayıttaki telefon kullanılır
+      const sahibiTelHam = arac === "yakin" ? temiz(g.arac_sahibi_tel, 30) : "";
       let sahibiTel = "";
-      if (telGerek) {
+      if (arac === "yakin") {
         let d = sahibiTelHam.replace(/\D/g, "");
         if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
         if (/^[2-5]\d{9}$/.test(d)) sahibiTel = `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
         else if (/^(\+|00)/.test(sahibiTelHam) && d.replace(/^00/, "").length >= 9 && d.length <= 15) sahibiTel = "+" + d.replace(/^00/, "");
-        else throw new Hata(arac === "yakin" ? "Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67)." : "Cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
+        else throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
       }
-      const daire = uu.ortak_no ?? Number(temiz(g.daire, 6));
-      if (!Number.isInteger(daire) || daire < 1 || daire > 9999) throw new Hata("Daire (ortaklık) numarasını yazın.");
+      // Daire = bildirimi yapanın ortaklık numarası; sorulmaz, kayıttan alınır.
+      // Yönetici koduyla girenin kaydında ortaklık numarası ve telefon yoktur: ayarlardaki yonetici_plaka {"no":…,"tel":"…"} kullanılır
+      let kayitNo: number | null = uu.ortak_no ?? null, kayitTel: string | null = uu.telefon ?? null;
+      if (rol === "baskan" && (!kayitNo || !kayitTel)) {
+        const { data: yp } = await db.from("ayarlar").select("deger").eq("ad", "yonetici_plaka").maybeSingle();
+        try { const x = JSON.parse(String(yp?.deger ?? "{}")); kayitNo ??= Number(x.no) || null; kayitTel ??= x.tel || null; } catch { /* bozuk kayıt: boş kalır */ }
+      }
       const { data: t, error } = await db.from("plaka_talepleri").insert({
         cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no ?? null, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
       }).select("id, created_at").single();
@@ -1028,8 +1032,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         `Plaka: ${plaka.replace(/\s/g, "")}`,
         `Adı: ${kelimeler.join(" ")}`,
         `Soyadı: ${soyad || "-"}`,
-        `Gsm: ${(telGerek ? sahibiTel : uu.telefon).replace(/\s/g, "")}`,
-        `Daire: SPORKENT${daire}`,
+        `Gsm: ${(arac === "yakin" ? sahibiTel : kayitTel ?? "-").replace(/\s/g, "")}`,
+        `Daire: ${kayitNo ? `SPORKENT${kayitNo}` : "-"}`,
         "",
         `Araç: ${arac === "kendi" ? "Bildirenin kendi aracı" : "Bildirenin yakınının aracı"}`,
         `Bildiren: ${u.ad} (${uu.unvan ?? kimlik})`,
