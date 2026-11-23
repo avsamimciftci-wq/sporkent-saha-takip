@@ -2171,10 +2171,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Ortaklar ${t.no_bas}–${t.no_bit} numaralar. Resim ana sayfadaki "Parsel Temsilcisi" düğmesinde görünür.</small>` : ""}
       </div>`;
   }
-  // ---------- Paylaşım bölümleri: Duyurular ve Restoran (görsel, metin, PDF, video) ----------
+  // ---------- Paylaşım bölümleri: Duyurular ve Restoran (görsel, metin, PDF) ----------
   // Duyuruyu yalnızca yönetici, restoran paylaşımını restoran yetkilisi ve yönetici yapar ve siler;
   // herkes görür, her paylaşım uygulamayı kullanan herkese sesli bildirimle duyurulur.
-  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], video: ["🎬", "Video", "video/*"] };
+  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"] };
   const PAYLASIM_BOLUMU = {
     restoran: { ornekMetin: "Örn. Bu akşam balık günü!", ornekAciklama: "Örn. Haftanın menüsü", bos: "Henüz paylaşım yok." },
     duyuru: { ornekMetin: "Örn. Cumartesi günü saat 10.00'da sitede ilaçlama yapılacaktır.", ornekAciklama: "Örn. Genel Kurul daveti", bos: "Henüz duyuru yok." },
@@ -2193,7 +2193,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   function paylasimHtml(b, p, yonetir) {
     let ic = "";
     if (p.tur === "gorsel") ic = p.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(p.url)}" aria-label="Tam ekran aç"><img src="${kac(p.url)}" alt=""></button>` : `<div class="foto-bos">Görsel açılamadı</div>`;
-    else if (p.tur === "video") ic = p.url ? `<video class="paylasim-video" src="${kac(p.url)}" controls playsinline preload="metadata"></video>` : "";
     else if (p.tur === "pdf") ic = p.url ? `<a class="paylasim-pdf" href="${kac(p.url)}" target="_blank" rel="noopener">📄 PDF'yi aç</a>` : "";
     return `<article class="paylasim${b === "duyuru" ? " duyuru" : ""}">
       <div class="paylasim-ust"><span>${PAYLASIM_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
@@ -2236,14 +2235,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       ${siparis}
       ${v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`}`;
   }
-  // Görsel küçültülüp JPEG olarak, PDF ve video olduğu gibi yüklenir (en fazla 50 MB)
+  // Görsel küçültülüp JPEG olarak, PDF olduğu gibi yüklenir (en fazla 50 MB)
   async function paylasimDosyaYukle(b, f) {
     const tur = paylasimTur[b];
     let blob = f, uzanti, tip;
     if (tur === "gorsel") { blob = await kucult(f, 2400); uzanti = "jpg"; tip = "image/jpeg"; }
-    else if (tur === "pdf") { uzanti = "pdf"; tip = "application/pdf"; }
-    else { uzanti = /quicktime|\.mov$/i.test(f.type + f.name) ? "mov" : /webm/i.test(f.type) ? "webm" : "mp4"; tip = f.type || "video/mp4"; }
-    if (blob.size > 50 * 1048576) throw new Error("Dosya çok büyük (en fazla 50 MB). Daha kısa bir video seçin.");
+    else { uzanti = "pdf"; tip = "application/pdf"; }
+    if (blob.size > 50 * 1048576) throw new Error("Dosya çok büyük (en fazla 50 MB).");
     const { yol, adres } = await api("yukleme_adresi", { tur: b, uzanti });
     const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": tip, "x-upsert": "false" }, body: blob });
     if (!r.ok) throw new Error("Dosya yüklenemedi, tekrar deneyin.");
