@@ -190,6 +190,9 @@
     setTimeout(() => { if (typeof izCubuk === "function") izCubuk(); }, 0);
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     kullanimSay(ad);
+    const bolumTip = { duyuru: ["duyuru"], restoran: ["restoran"], aidat: ["aidat"], program: ["program"], yonetim: ["uye", "uyebekler"], yakinlar: ["yakin"] }[ad];
+    if (ad === "ana" && yenilikHazir) setTimeout(yenilikKontrol, 0); // ana sayfada görülmemiş yenilik varsa pencere hep önde
+    if (bolumTip && onayli() && yenilikHazir) yenilikIsaretle((y) => bolumTip.includes(y.tip));
     document.documentElement.classList.toggle("ana-acik", ad === "ana");
     if (ad === "ana") ustYukseklik();
     // Ana sayfada bölüm düğmeleri büyük kutular olarak görünür; alt menü bölüm sayfalarında çıkar
@@ -207,7 +210,8 @@
   let bekleyenSayisi = 0;
   let varsSure = null; // yeni işlerin yapılma süresi (yönetici ve yönetim kurulu görür)
   async function yenile() {
-    if (!onayli()) return;
+    // Ekran kapalıyken (arka planda) gelen bildirimde tazeleme yapılmaz: dönünce zaten tazelenir
+    if (!onayli() || document.hidden) return;
     try {
       const r = await api("liste");
       kayitlar = r.kayitlar || [];
@@ -227,16 +231,14 @@
         if ((r.bekleyen || 0) > bekleyenSayisi) { sesCal(); mesaj(`Onay bekleyen ${r.bekleyen} kişi var.`); }
         bekleyenSayisi = r.bekleyen || 0;
       }
+      sunucuYenilik = r.yenilikler || [];
       listeCiz();
-      yenileriAc();
+      yenilikKontrol();
     } catch (e) {
       if (!e.cikis && !e.bekliyor) mesaj(e.message);
     }
   }
 
-  // ---------- Yeni iş gelince: sesli uyarı + pencere kendiliğinden açılır ----------
-  // Herkes için: yeni açılan sorunlar ve yeni "yapıldı" işler.
-  const anahtar = (k) => k.id + ":" + (k.durum === "tamam" ? "t" : "a") + (k.gizli && k.cevaplar?.length ? ":c" + k.cevaplar.length : "");
   // YK iş emrine gelen cevabı bu telefonda açıp okudu mu (okunmadıysa kırmızı yanıp söner)
   const cevapOkunan = () => sakla.al("sk_cevap_okunan") || {};
   const cevapOkunmadi = (k) => k.gizli && (k.cevaplar?.length || 0) > (cevapOkunan()[k.id] || 0);
@@ -273,24 +275,95 @@
     o[k.id] = k.cevaplar.length; sakla.koy("sk_cevap_okunan", o);
   }
 
-  function yenileriAc() {
-    const gorulen = sakla.al("sk_gorulen");
-    const yeniler = gorulen ? kayitlar.filter((k) => !gorulen.includes(anahtar(k))) : [];
-    sakla.koy("sk_gorulen", kayitlar.map(anahtar).slice(0, 500));
-    if (!yeniler.length) return;
-    // Yeni YK cevabı: daha önce görülmüş iş emrine cevap eklenmiş
-    const cevapli = yeniler.filter((k) => k.gizli && k.cevaplar?.length && gorulen.some((x) => x.startsWith(k.id + ":")));
-    sesCal(cevapli.length > 0);
-    const son = (k) => (cevapli.includes(k) ? k.cevaplar.at(-1).at : k.kapanis_at || k.created_at);
-    const en = yeniler.sort((a, b) => son(b).localeCompare(son(a)))[0];
-    const baslik = cevapli.includes(en) ? `💬 Yeni cevap: ${en.yer} — ${en.cevaplar.at(-1).ad}: ${en.cevaplar.at(-1).metin}`
-      : en.durum === "tamam" ? `Yapıldı: ${en.yer}` : onayBekliyor(en) ? `Onay bekleyen kayıt: ${en.yer}` : `Yeni sorun: ${en.yer}`;
-    // Yeni kayıt formu doluyken yazılanı kaybettirme, sadece haber ver
-    if (!$("#ekran-yeni").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden)) return mesaj(baslik);
-    detayGoster(en.id);
-    if (cevapli.includes(en)) setTimeout(() => $(".yk-cevaplar")?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
-    mesaj(yeniler.length > 1 ? `${baslik} (+${yeniler.length - 1} yeni)` : baslik);
+  // ---------- Yenilikler penceresi ----------
+  // Program açılınca, arka plandan dönünce ve açıkken yeni bir şey olunca: görülmemiş bütün gelişmeler pencerede listelenir.
+  // Yalnızca kişi gerçekten görünce "görüldü" sayılır: pencerede "Tamam, gördüm" ya da o işin / bölümün açılması.
+  // (Ekran kapalıyken gelen bildirim hiçbir şeyi görüldü yapmaz.)
+  let sunucuYenilik = [];
+  const YENILIK_TIP = {
+    onay: ["⏳", "Onayınızı bekleyen kayıt", "onay"], sorun: ["🛠️", "Yeni sorun", "saha"], emir: ["🔒", "Yeni YK iş emri", "yk"], yapildi: ["✅", "İş yapıldı", "yapildi"],
+    cevap: ["💬", "Yeni cevap", "cevap"], gecikti: ["⚠", "Süresinde yapılmadı", "gecikti"], yakin: ["👨‍👩‍👧", "Onayınızı bekleyen ortak yakını", "onay"],
+    duyuru: ["📢", "Yeni duyuru", "duyuru"], restoran: ["🍽️", "Restoran", "restoran"], aidat: ["💳", "Aidat bilgisi eklendi", "aidat"], program: ["📅", "İş programına eklendi", "program"],
+    uyebekler: ["👤", "Onay bekleyen üye", "onay"], uye: ["🎉", "Programa yeni katılım", "uye"], plaka: ["🚗", "Plaka-Kimlik bildirimi", "plaka"], devriye: ["🚶", "Devriye tamamlandı", "devriye"],
+  };
+  const YENILIK_AC = { duyuru: "duyuru", restoran: "restoran", aidat: "aidat", uyebekler: "uyeler", uye: "uyeler", yakin: "yakinlar" };
+  // Bir kaydın yenilikleri; kişinin kendi yaptığı iş kendisine yenilik sayılmaz
+  function kayitYenilikleri(k) {
+    const y = [], ben = oturum?.ad, ek = (son, tip, at, metin, kim) => at && y.push({ a: k.id + ":" + son, tip, at, metin, kim, kayit: k });
+    if (onayBekliyor(k)) { if (benOnaylarim(k)) ek("b", "onay", k.created_at, k.sorun, k.bildiren); return y; }
+    if (k.durum === "tamam") { if (k.kapatan !== ben) ek("t", "yapildi", k.kapanis_at, k.sonuc || k.sorun, k.kapatan); }
+    else {
+      if (!k.benim && k.bildiren !== ben && k.onaylayan !== ben) ek("a", k.gizli ? "emir" : "sorun", k.onaylama_at || k.created_at, k.sorun, k.bildiren);
+      if (k.yanit && k.yanit_veren !== ben) ek("y" + k.yanit_at, "cevap", k.yanit_at, k.yanit, k.yanit_veren);
+      if (gecikti(k) && ["baskan", "mudur", "sef", "yonetim"].includes(oturum?.rol) && !(k.gizli && sureGormez())) ek("g" + k.son_tarih, "gecikti", new Date(Date.parse(k.son_tarih) + 864e5).toISOString(), k.sorun);
+    }
+    if (k.gizli) (k.cevaplar || []).forEach((c, i) => c.ad !== ben && ek("c" + (i + 1), "cevap", c.at, c.metin, c.ad));
+    if (k.benim) (k.temsilci_cevaplari || []).forEach((c, i) => c.ad !== ben && ek("m" + (i + 1), "cevap", c.at, c.metin, c.ad));
+    return y;
   }
+  const butunYenilikler = () => [...kayitlar.flatMap(kayitYenilikleri), ...sunucuYenilik,
+    ...bekleyenYakinlar.map((y) => ({ a: "y" + String(y.cihaz).slice(0, 12), tip: "yakin", at: y.created_at, metin: `${y.ad} · ${y.ortak_no} No'lu ortağın yakını` }))];
+  // Görülenler: telefonda saklanır. İlk seferde yalnızca son günlerin gelişmeleri yeni sayılır
+  function yenilikGorulen(hepsi) {
+    const g = sakla.al("sk_yenilik");
+    if (g) return new Set(g);
+    const sinir = new Date(Date.now() - (sakla.al("sk_gorulen") ? 2 : 7) * 864e5).toISOString(), duyuru = sakla.al("sk_duyuru_gorulen") || "";
+    const ilk = new Set(hepsi.filter((y) => y.at < sinir || (y.tip === "duyuru" && y.at <= duyuru)).map((y) => y.a));
+    sakla.koy("sk_yenilik", [...ilk]); sakla.sil("sk_gorulen");
+    return ilk;
+  }
+  function yenilikIsaretle(kosul) {
+    const hepsi = butunYenilikler(), g = yenilikGorulen(hepsi), once = g.size;
+    for (const y of hepsi) if (kosul(y)) g.add(y.a);
+    if (g.size === once) return;
+    sakla.koy("sk_yenilik", [...g].slice(-1500));
+    if (!$("#yenilik").hidden) yenilikCiz();
+  }
+  const gorulmemis = () => { const h = butunYenilikler(), g = yenilikGorulen(h); return h.filter((y) => !g.has(y.a)).sort((a, b) => b.at.localeCompare(a.at)); };
+  let yenilikHazir = false; // açılıştaki ilk yönlendirme bitti mi
+  const duyurulan = new Set(); // bu açılışta sesle haber verilenler
+  // Yazı yazılırken, devriye sürerken ya da bildirim kilidi varken pencere araya girmez
+  const mesgul = () => !$("#bildirim-kilit").hidden || izSuruyor() || !$("#ekran-yeni").hidden || !$("#cikis-sor").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden && ($("#kapat-form").sonuc?.value || !$("#sonra-onizleme").hidden))
+    || [...document.querySelectorAll(".ekran:not([hidden]) textarea, .ekran:not([hidden]) input:not([type=checkbox]):not([type=radio]):not([type=file])")].some((x) => x === document.activeElement || (x.offsetParent && x.matches("textarea") && x.value));
+  // zorla: açılış, arka plandan dönüş ve ana sayfaya dönüş; yoksa yalnızca az önce gelen yenilikte açılır
+  function yenilikKontrol(zorla) {
+    if (document.hidden || !onayli() || kurulumGerekli() || !yenilikHazir) return;
+    const l = gorulmemis(), taze = l.filter((y) => !duyurulan.has(y.a));
+    if (!l.length) { $("#yenilik").hidden = true; return; }
+    if (taze.length) { for (const y of taze) duyurulan.add(y.a); sesCal(taze.some((y) => y.tip === "cevap" && y.kayit?.gizli), !zorla); } // açılışta ekran yanıp sönmez: pencere okunabilsin
+    if (mesgul()) { if (taze.length) mesaj(`${yenilikBaslik(taze[0])}${taze.length > 1 ? ` (+${taze.length - 1} yeni)` : ""}`); return; }
+    if (zorla || taze.length || (!$("#ekran-ana").hidden && $("#yenilik").hidden)) { $("#yenilik").hidden = false; yenilikCiz(); $("#yenilik-liste").scrollTop = 0; }
+    else if (!$("#yenilik").hidden) yenilikCiz();
+  }
+  const yenilikBaslik = (y) => `${YENILIK_TIP[y.tip][0]} ${YENILIK_TIP[y.tip][1]}: ${y.kayit ? y.kayit.yer : y.metin}`;
+  function yenilikCiz() {
+    const l = gorulmemis(), kutu = $("#yenilik");
+    if (!l.length) { kutu.hidden = true; return; }
+    $("#yenilik-baslik").textContent = l.length === 1 ? "1 yenilik var" : `${l.length} yenilik var`;
+    $("#yenilik-liste").innerHTML = l.map((y) => {
+      const [simge, ad, renk] = YENILIK_TIP[y.tip], foto = y.kayit && (y.tip === "yapildi" ? y.kayit.foto_sonra_url : y.kayit.foto_once_url);
+      return `<button type="button" class="yenilik-kart yt-${renk}" data-yenilik="${kac(y.a)}">
+        <span class="yenilik-ust"><b>${simge} ${ad}</b><small>${tarihSaat(y.at)}</small></span>
+        <span class="yenilik-ic">${foto ? `<img src="${kac(foto)}" alt="" loading="lazy">` : ""}<span>
+          ${y.kayit ? `<b class="yenilik-yer">${kac(y.kayit.yer)}</b>` : ""}<span class="yenilik-metin">${kac(y.metin)}</span>${y.kim ? `<small>${kac(y.kim)}${y.kayit?.gizli && y.tip !== "emir" ? " · 🔒 YK" : ""}</small>` : ""}</span></span>
+        <span class="yenilik-ac">${y.tip === "plaka" ? "Gördüm ✓" : "Açmak için dokunun ›"}</span></button>`;
+    }).join("");
+  }
+  $("#yenilik").addEventListener("click", (e) => {
+    if (e.target.closest("#yenilik-tamam")) { const l = new Set(gorulmemis().map((y) => y.a)); $("#yenilik").hidden = true; return yenilikIsaretle((y) => l.has(y.a)); }
+    const b = e.target.closest("[data-yenilik]"); if (!b) return;
+    const y = gorulmemis().find((x) => x.a === b.dataset.yenilik); if (!y) return yenilikCiz();
+    if (y.tip === "plaka") return yenilikIsaretle((x) => x.a === y.a); // ayrıntısı e-postada, açılacak sayfası yok
+    $("#yenilik").hidden = true;
+    history.pushState({ ana: 1 }, "", location.hash || "#ana");
+    yenilikIsaretle((x) => x.a === y.a);
+    if (y.kayit) {
+      detayGoster(y.kayit.id);
+      if (y.tip === "cevap") setTimeout(() => $(".yk-cevaplar")?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    } else if (y.tip === "program") programAc();
+    else if (y.tip === "devriye") gorevlerAc("gunluk");
+    else if (YENILIK_AC[y.tip]) MODUL_AC[YENILIK_AC[y.tip]]();
+  });
 
   let sesBaglam = null;
   function sesAc() {
@@ -306,9 +379,9 @@
     f.addEventListener("animationend", () => f.remove());
     document.body.appendChild(f);
   }
-  function sesCal(herkeseFlas = false) {
+  function sesCal(herkeseFlas = false, flas = true) {
     // Ekran yanıp sönmesi müdür ve şefte; YK cevabı gelince herkeste
-    if (herkeseFlas || ["mudur", "sef"].includes(oturum?.rol)) ekranFlas();
+    if (flas && (herkeseFlas || ["mudur", "sef"].includes(oturum?.rol))) ekranFlas();
     try { navigator.vibrate?.([500, 150, 500, 150, 500, 150, 800]); } catch {}
     if (!sesBaglam) return;
     const t = sesBaglam.currentTime;
@@ -418,11 +491,9 @@
     rozet.hidden = !ykAcik;
   }
 
-  // Yapılmayanlar: gecikenler ve son günü yakın olanlar üstte. Yapılanlar: en yeni üstte.
-  // Okunmamış YK cevabı olan iş en üstte
-  const siraya = (liste, f) => liste.sort((a, b) => (!!cevapOkunmadi(b) - !!cevapOkunmadi(a)) || (f === "tamam"
-    ? b.kapanis_at.localeCompare(a.kapanis_at)
-    : (a.son_tarih || "9999").localeCompare(b.son_tarih || "9999") || a.created_at.localeCompare(b.created_at)));
+  // Saha Takip ve YK Saha Takip: yeniden eskiye. Yapılanlar yapılma zamanına, yapılmayanlar açılma zamanına göre.
+  const siraya = (liste, f) => liste.sort((a, b) => f === "tamam"
+    ? b.kapanis_at.localeCompare(a.kapanis_at) : b.created_at.localeCompare(a.created_at));
 
   const satirHtml = (k) => `
       <button class="satir ${gecikti(k) ? "gecikti" : ""}" data-id="${k.id}">
@@ -601,6 +672,7 @@
         <small class="ipucu">Yalnızca yönetici görür. Uygun olmayan kaydı fotoğraflarıyla birlikte herkesten kaldırır.</small>
       </div>` : ""}`;
     goster("detay");
+    yenilikIsaretle((y) => y.kayit?.id === k.id);
     cevapOkundu(k); // açıldı: listede artık yanıp sönmez (bu ekranda okunmamışlar yanıp sönmeye devam eder)
     if (kapat) kapatBagla(k);
     // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
@@ -618,7 +690,6 @@
       d.disabled = true; d.textContent = "Gönderiliyor…";
       try {
         Object.assign(k, await api("yk_cevap", { id: k.id, metin }));
-        sakla.koy("sk_gorulen", [anahtar(k), ...(sakla.al("sk_gorulen") || [])]);
         cevapOkundu(k);
         listeCiz(); detayGoster(k.id);
         mesaj("Cevap gönderildi. Yönetim Kurulu bölümündekilere bildirildi.");
@@ -735,7 +806,6 @@
         // Fotoğraf isteğe bağlı: bazı işlerin fotoğrafı olmaz
         const yol = foto.al() ? await fotoYukle(foto.al()) : null;
         await api("kapat", { id: k.id, foto: yol, sonuc: new FormData(form).get("sonuc"), ad: oturum.ad });
-        sakla.koy("sk_gorulen", [k.id + ":t", ...(sakla.al("sk_gorulen") || [])]);
         form.remove();
         await yenile();
         detayGoster(k.id);
@@ -806,7 +876,7 @@
     if (await bildirimKilidi()) {
       h.textContent = "Bildirimler hâlâ kapalı. Açmadan programı kullanamazsınız."; h.hidden = false;
       if (oturum?.anahtar) izinBildir(Notification.permission);
-    } else if (oturum?.anahtar) bildirimAc(true);
+    } else { if (oturum?.anahtar) bildirimAc(true); yenilikKontrol(true); }
   });
   // Ayarlardan dönünce kilit kendiliğinden kalkar / izin kapatıldıysa yeniden gelir
   document.addEventListener("visibilitychange", () => { if (!document.hidden) bildirimKilidi(); });
@@ -847,7 +917,7 @@
 
   // ---------- Giriş / onay bekleme / çıkış ----------
   function cikisYap() {
-    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen"); sakla.sil("sk_parsel"); parsel = null;
+    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen"); sakla.sil("sk_yenilik"); sunucuYenilik = []; duyurulan.clear(); $("#yenilik").hidden = true; sakla.sil("sk_parsel"); parsel = null;
     kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); girisEkrani(); goster("giris");
   }
 
@@ -1074,7 +1144,7 @@
       const ilkKontrol = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener("controllerchange", () => { if (ilkKontrol) location.reload(); });
       navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((k) => k.update()).catch(() => {});
-      // Uygulama açıkken bildirim gelirse hemen tazele (pencere ve ses yenileriAc'tan)
+      // Uygulama açıkken bildirim gelirse hemen tazele (pencere ve ses yenilikKontrol'den)
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.tip !== "bildirim" || !oturum) return;
         if (!onayli()) return durumKontrol();
@@ -1111,6 +1181,14 @@
     if (!location.hash || location.hash === "#ana") anaAc(); else goster("liste");
     bildirimKutusu();
     await yenile();
+    acilisSayfasi();
+    yenilikHazir = true;
+    // Bildirime dokunarak açılan bölümün yeniliği görülmüş sayılır
+    const acik = { "#duyuru": ["duyuru"], "#restoran": ["restoran"], "#aidat": ["aidat"], "#program": ["program"], "#uyeler": ["uye", "uyebekler"], "#yakinlar": ["yakin"] }[location.hash];
+    if (acik) yenilikIsaretle((y) => acik.includes(y.tip));
+    yenilikKontrol(true);
+  }
+  function acilisSayfasi() {
     if (!location.hash || location.hash === "#ana") return anaAc();
     if (location.hash === "#servis") return servisAc();
     if (location.hash === "#parsel") return parselAc();
@@ -1473,7 +1551,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       mesaj({ uye_onayla: "Onaylandı, kişiye haber gitti.", uye_cikar: "Gruptan çıkarıldı.", uye_geri_al: "Gruba geri alındı.",
         uye_sil: "Silindi.", kod_degistir: "Kod değiştirildi.", hepsini_sil: "Tüm kayıtlar silindi.",
         varsayilan_sure: "Yeni işlerin süresi değiştirildi." }[eylem]);
-      if (eylem === "hepsini_sil") { kayitlar = []; sakla.sil("sk_gorulen"); }
+      if (eylem === "hepsini_sil") { kayitlar = []; }
       await yonetimAc();
     } catch (err) { mesaj(err.message); b.disabled = false; }
   });
@@ -2396,7 +2474,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     try { duyuruSon.tarihler = (await api("duyuru_liste")).paylasimlar.map((p) => p.created_at); yaz(); } catch {}
   }
   // Duyurular açılınca hepsi okunmuş sayılır
-  const duyuruGorulduIsaretle = (v) => { if (v.paylasimlar[0]) sakla.koy("sk_duyuru_gorulen", v.paylasimlar[0].created_at); duyuruSon.tarihler = v.paylasimlar.map((p) => p.created_at); };
+  const duyuruGorulduIsaretle = (v) => { yenilikIsaretle((y) => y.tip === "duyuru"); if (v.paylasimlar[0]) sakla.koy("sk_duyuru_gorulen", v.paylasimlar[0].created_at); duyuruSon.tarihler = v.paylasimlar.map((p) => p.created_at); };
 
   // ---------- Kullanım raporu (yalnızca yönetici) ----------
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
@@ -3036,8 +3114,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       mesaj(r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad ? `Kayıt ${r.kayit.no} parsel temsilcinize (${r.temsilci_ad}) iletildi. Onaylarsa genel Saha Takip'e düşecek.`
         : r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
-      // Kendi açtığımız kayıt için pencere açılmasın
-      sakla.koy("sk_gorulen", [anahtar(r.kayit), ...(sakla.al("sk_gorulen") || [])]);
       if (r.kayit.gizli) { ykFiltre = "acik"; ykSahaAc(); } else goster("liste");
       await yenile();
     } catch (err) {
@@ -3074,7 +3150,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // Uygulamaya dönüldüğünde ve açıkken 20 sn'de bir tazele (bildirim gecikse de yeni iş görünür)
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !oturum) return;
-    if (onayli()) { bildirimleriTemizle(); yenile(); } else durumKontrol();
+    // Arka plandan dönünce: yenile, sonra görülmemiş bütün yenilikler pencerede
+    if (onayli()) { bildirimleriTemizle(); yenile().then(() => yenilikKontrol(true)); } else durumKontrol();
   });
   // Simgeden açılınca her zaman visibilitychange gelmeyebiliyor
   for (const olay of ["pageshow", "focus"]) {
