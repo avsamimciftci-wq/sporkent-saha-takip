@@ -793,7 +793,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       }
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
       return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar,
-        yenilikler: await yenilikBul(u, rol).catch(() => []) };
+        yenilikler: await yenilikBul(u, rol).catch(() => []),
+        // Yenilikler penceresi ilk kez kurulurken: bu kişinin daha önce açıp gördüğü kayıtlar yeniden gösterilmesin
+        gordum: g.ilk ? ((await db.from("goruntulemeler").select("kayit_id, ilk_at").or(`cihaz.eq.${u.cihaz},and(ad.eq."${String(u.ad).replace(/["\\]/g, "")}",rol.eq.${rol})`)).data ?? []) : undefined };
     }
 
     case "yukleme_adresi": {

@@ -213,7 +213,8 @@
     // Ekran kapalıyken (arka planda) gelen bildirimde tazeleme yapılmaz: dönünce zaten tazelenir
     if (!onayli() || document.hidden) return;
     try {
-      const r = await api("liste");
+      const r = await api("liste", sakla.al("sk_yenilik") && sakla.al("sk_yenilik_kim") === oturum.ad ? {} : { ilk: true });
+      gordum = r.gordum || gordum;
       kayitlar = r.kayitlar || [];
       ykUyeler = r.ykUyeler || [];
       if (r.varsayilan_sure) varsSure = r.varsayilan_sure;
@@ -303,13 +304,18 @@
   }
   const butunYenilikler = () => [...kayitlar.flatMap(kayitYenilikleri), ...sunucuYenilik,
     ...bekleyenYakinlar.map((y) => ({ a: "y" + String(y.cihaz).slice(0, 12), tip: "yakin", at: y.created_at, metin: `${y.ad} · ${y.ortak_no} No'lu ortağın yakını` }))];
-  // Görülenler: telefonda saklanır. İlk seferde yalnızca son günlerin gelişmeleri yeni sayılır
+  // Görülenler: telefonda, kişiye göre saklanır (çıkıp aynı kişi girerse okudukları yeniden çıkmaz).
+  // İlk seferde yalnızca son günün (yeni kuran için son 2 günün) okunmamış gelişmeleri yeni sayılır.
+  let gordum = []; // sunucuya göre bu kişinin daha önce açtığı kayıtlar (yalnızca ilk seferde gelir)
   function yenilikGorulen(hepsi) {
-    const g = sakla.al("sk_yenilik");
-    if (g) return new Set(g);
-    const sinir = new Date(Date.now() - (sakla.al("sk_gorulen") ? 2 : 7) * 864e5).toISOString(), duyuru = sakla.al("sk_duyuru_gorulen") || "";
-    const ilk = new Set(hepsi.filter((y) => y.at < sinir || (y.tip === "duyuru" && y.at <= duyuru)).map((y) => y.a));
-    sakla.koy("sk_yenilik", [...ilk]); sakla.sil("sk_gorulen");
+    const g = sakla.al("sk_yenilik"), kim = sakla.al("sk_yenilik_kim");
+    if (g && (!kim || kim === oturum?.ad)) { if (!kim) sakla.koy("sk_yenilik_kim", oturum?.ad); return new Set(g); }
+    const sinir = new Date(Date.now() - (sakla.al("sk_gorulen") ? 1 : 2) * 864e5).toISOString(), duyuru = sakla.al("sk_duyuru_gorulen") || "", okunan = cevapOkunan();
+    const okundu = (y) => (y.tip === "duyuru" && y.at <= duyuru)
+      || (y.kayit && gordum.some((x) => x.kayit_id === y.kayit.id && Date.parse(x.ilk_at) >= Date.parse(y.at)))
+      || (y.tip === "cevap" && y.kayit?.gizli && Number(y.a.split(":c")[1]) <= (okunan[y.kayit.id] || 0));
+    const ilk = new Set(hepsi.filter((y) => Date.parse(y.at) < Date.parse(sinir) || okundu(y)).map((y) => y.a));
+    sakla.koy("sk_yenilik", [...ilk]); sakla.koy("sk_yenilik_kim", oturum?.ad); sakla.sil("sk_gorulen");
     return ilk;
   }
   function yenilikIsaretle(kosul) {
@@ -917,7 +923,7 @@
 
   // ---------- Giriş / onay bekleme / çıkış ----------
   function cikisYap() {
-    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen"); sakla.sil("sk_yenilik"); sunucuYenilik = []; duyurulan.clear(); $("#yenilik").hidden = true; sakla.sil("sk_parsel"); parsel = null;
+    oturum = null; sakla.sil("sk_oturum"); sakla.sil("sk_abone"); sakla.sil("sk_gorulen"); sunucuYenilik = []; duyurulan.clear(); $("#yenilik").hidden = true; sakla.sil("sk_parsel"); parsel = null;
     kayitlar = []; bekleyenSayisi = 0; clearInterval(bekleZamani); girisEkrani(); goster("giris");
   }
 
@@ -1173,6 +1179,8 @@
     api("durum", { acilis: true, kurulu: anaEkranda() }).then((r) => {
       if (!r || r.durum !== "onayli") return;
       const once = JSON.stringify([oturum.ad, oturum.rol, oturum.unvan]);
+      // Kişinin adı yönetimce değiştirildiyse okudukları yine onun sayılır
+      if (r.ad && r.ad !== oturum.ad && sakla.al("sk_yenilik_kim") === oturum.ad) sakla.koy("sk_yenilik_kim", r.ad);
       Object.assign(oturum, { ad: r.ad || oturum.ad, rol: r.rol || oturum.rol, unvan: r.unvan ?? null });
       if (once === JSON.stringify([oturum.ad, oturum.rol, oturum.unvan])) return;
       sakla.koy("sk_oturum", oturum);
