@@ -223,6 +223,46 @@ async function fotoUrlleri(kayitlar: any[]) {
   }));
 }
 
+// Program açılınca gösterilen "Yenilikler" penceresi: son 14 günün kayıt dışındaki gelişmeleri (bildirimi gidenler).
+// Kişinin kendi yaptığı iş kendisine yenilik sayılmaz. a: telefonun "gördüm" diye hatırladığı anahtar
+async function yenilikBul(u: any, rol: Rol) {
+  const once = new Date(Date.now() - 14 * 864e5).toISOString();
+  const kisa = (t: unknown) => String(t ?? "").slice(0, 160);
+  const bos = Promise.resolve({ data: [] as any[] });
+  const son = (tablo: string, alan: string, zaman = "created_at") =>
+    db.from(tablo).select(alan).gte(zaman, once).order(zaman, { ascending: false }).limit(20) as any;
+  const [pay, aidat, prog, uye, plaka, dev] = await Promise.all([
+    son("restoran_paylasim", "id, bolum, tur, metin, rol, cihaz, created_at"),
+    rol === "restoran" ? bos : son("aidat_resimleri", "id, baslik, ekleyen, created_at"),
+    PROGRAM_GIREN.includes(rol) ? son("is_programi", "id, tarih, saat, baslik, ekleyen, cihaz, created_at") : bos,
+    rol === "baskan" ? son("uyeler", "cihaz, ad, rol, unvan, durum, created_at, onay_at") : bos,
+    rol === "baskan" || rol === "muhasebe" ? son("plaka_talepleri", "id, cihaz, ad, plaka, created_at") : bos,
+    rol === "baskan" ? son("devriye_turlari", "id, cihaz, ad, basla, bitis, mesafe_m", "bitis") : bos,
+  ]);
+  const y: any[] = [];
+  const baska = (x: any) => x.cihaz !== u.cihaz && !String(x.cihaz ?? "").startsWith("test-");
+  for (const x of (pay.data ?? []).filter(baska)) {
+    const duyuru = x.bolum === "duyuru";
+    y.push({ a: (duyuru ? "d" : "r") + x.id, tip: duyuru ? "duyuru" : "restoran", at: x.created_at,
+      metin: kisa(x.metin) || ({ gorsel: "Resim paylaşıldı.", pdf: "PDF belge paylaşıldı." } as any)[x.tur] || "Yeni paylaşım." });
+  }
+  for (const x of (aidat.data ?? []).filter((x: any) => x.ekleyen !== u.ad)) y.push({ a: "a" + x.id, tip: "aidat", at: x.created_at, metin: kisa(x.baslik) || "Yıl içindeki ödemeler güncellendi." });
+  for (const x of (prog.data ?? []).filter(baska)) {
+    const [yil, ay, gun] = String(x.tarih).split("-");
+    y.push({ a: "p" + x.id, tip: "program", at: x.created_at, metin: kisa(`${gun}.${ay}.${yil}${x.saat ? " " + String(x.saat).slice(0, 5) : ""}: ${x.baslik} · ${x.ekleyen}`) });
+  }
+  for (const x of (uye.data ?? []).filter(baska)) {
+    const kim = `${x.ad} (${x.unvan || ROL_ADI[x.rol as Rol] || x.rol})`;
+    if (x.durum === "bekliyor") y.push({ a: "ub" + x.cihaz.slice(0, 12), tip: "uyebekler", at: x.created_at, metin: kisa(`${kim} katılmak istiyor.`) });
+    else if (x.durum === "onayli" && x.rol !== "baskan") y.push({ a: "uk" + x.cihaz.slice(0, 12), tip: "uye", at: x.onay_at ?? x.created_at, metin: kisa(`${kim} programa katıldı.`) });
+  }
+  for (const x of (plaka.data ?? []).filter(baska)) y.push({ a: "pl" + x.id, tip: "plaka", at: x.created_at, metin: kisa(`${x.plaka} · ${x.ad}`) });
+  for (const x of (dev.data ?? []).filter(baska)) {
+    y.push({ a: "dv" + x.id, tip: "devriye", at: x.bitis, metin: `${x.ad} · ${Math.max(1, Math.round((Date.parse(x.bitis) - Date.parse(x.basla)) / 60000))} dk · ${((x.mesafe_m ?? 0) / 1000).toFixed(1).replace(".", ",")} km` });
+  }
+  return y;
+}
+
 type Hedef = Rol[] | "hepsi" | { cihaz: string };
 
 async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId?: number; resim?: string | null; sayfa?: string; haric?: string } = {}) {
@@ -677,7 +717,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "liste": {
       // Restoran yetkilisi saha kayıtlarını görmez
-      if (rol === "restoran") return { kayitlar: [], rol, unvan: (u as any).unvan ?? null };
+      if (rol === "restoran") return { kayitlar: [], rol, unvan: (u as any).unvan ?? null, yenilikler: await yenilikBul(u, rol) };
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
       // Onay bekleyen kaydı yazan kişi ve onaylayacak olan görür: ortağın kaydını parsel temsilcisi,
@@ -752,7 +792,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         }
       }
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
-      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar };
+      return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar,
+        yenilikler: await yenilikBul(u, rol).catch(() => []) };
     }
 
     case "yukleme_adresi": {
