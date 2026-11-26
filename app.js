@@ -2773,7 +2773,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       k.textContent = r && !r.hidden && r.textContent ? r.textContent : "";
     }
     // Onayımı bekleyen kayıt (parsel temsilcisi / yönetim) varsa Saha Takip düğmesinde yazsın
-    const onayimda = kayitlar.filter(benOnaylarim).length;
+    // Temsilcinin onayına düşen kayıtlar "Saha Takip Onayları" tuşunda yazar; Saha Takip tuşunda tekrar yazmaz
+    const onayimda = kayitlar.filter((k) => benOnaylarim(k) && !(parsel?.temsilcilik && k.temsilci_id)).length;
     if (onayimda) $("#ana-kutular [data-ac=saha] small").textContent = `⏳ ${onayimda} kayıt onayınızı bekliyor`;
     kutulariSigdir();
   }
