@@ -1079,59 +1079,59 @@ body.kilitli { overflow: hidden; }
   :root:not([data-theme="light"]) .yt-cevap, :root:not([data-theme="light"]) .yt-onay, :root:not([data-theme="light"]) .yt-aidat { --r: #ffb74d; }
 }
 
-/* ---------- Pastel tema (Öneri A): açık zemin, koyu yazı; koyu temada yumuşak düz renk ---------- */
+/* ---------- Pastel tema (Öneri A, %30 koyulaştırılmış): pastel zemin, koyu yazı; koyu temada yumuşak düz renk ---------- */
 .ana-kutu, .yonetim-kutu, .secim-dugme, .sayfa-bant { text-shadow: none; }
 .ana-kutu, .yonetim-kutu { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.ana-kutu.ak-parsel { background: #f7e1ea; color: #7a2445; border: 1.5px solid #7a244533; }
-.ana-kutu.ak-parsel small { background: #7a244514; color: #7a2445; }
-.ana-kutu.ak-yakinlar { background: #fce6d4; color: #8a4313; border: 1.5px solid #8a431333; }
-.ana-kutu.ak-yakinlar small { background: #8a431314; color: #8a4313; }
-.ana-kutu.ak-kayitonay { background: #ebe5f7; color: #4d3a7a; border: 1.5px solid #4d3a7a33; }
-.ana-kutu.ak-kayitonay small { background: #4d3a7a14; color: #4d3a7a; }
-.ana-kutu.ak-duyuru { background: #fbe3e0; color: #8e2b25; border: 1.5px solid #8e2b2533; }
-.ana-kutu.ak-duyuru small { background: #8e2b2514; color: #8e2b25; }
-.ana-kutu.ak-saha { background: #dcefe6; color: #1f5a46; border: 1.5px solid #1f5a4633; }
-.ana-kutu.ak-saha small { background: #1f5a4614; color: #1f5a46; }
-.ana-kutu.ak-restoran { background: #e2e7f7; color: #2e3f7a; border: 1.5px solid #2e3f7a33; }
-.ana-kutu.ak-restoran small { background: #2e3f7a14; color: #2e3f7a; }
-.ana-kutu.ak-servis { background: #fdebd2; color: #7f430b; border: 1.5px solid #7f430b33; }
-.ana-kutu.ak-servis small { background: #7f430b14; color: #7f430b; }
-.ana-kutu.ak-aidat { background: #faf0cc; color: #66500f; border: 1.5px solid #66500f33; }
-.ana-kutu.ak-aidat small { background: #66500f14; color: #66500f; }
-.ana-kutu.ak-plaka { background: #e4e9ee; color: #34434f; border: 1.5px solid #34434f33; }
-.ana-kutu.ak-plaka small { background: #34434f14; color: #34434f; }
-.ana-kutu.ak-iletisim { background: #ddedf9; color: #1d5684; border: 1.5px solid #1d568433; }
-.ana-kutu.ak-iletisim small { background: #1d568414; color: #1d5684; }
-.ana-kutu.ak-sokak { background: #d9f0ed; color: #155e57; border: 1.5px solid #155e5733; }
-.ana-kutu.ak-sokak small { background: #155e5714; color: #155e57; }
-.ana-kutu.ak-yk { background: #eee3f6; color: #5b2a7a; border: 1.5px solid #5b2a7a33; }
-.ana-kutu.ak-yk small { background: #5b2a7a14; color: #5b2a7a; }
-.ana-kutu.ak-uyeler { background: #e7e9eb; color: #3a4246; border: 1.5px solid #3a424633; }
-.ana-kutu.ak-uyeler small { background: #3a424614; color: #3a4246; }
-.ana-kutu.ak-rapor { background: #dcf0f2; color: #18606b; border: 1.5px solid #18606b33; }
-.ana-kutu.ak-rapor small { background: #18606b14; color: #18606b; }
-.sayfa-bant.bant-parsel { background: #f7e1ea; color: #7a2445; border: 1.5px solid #7a244533; }
-.sayfa-bant.bant-yakin { background: #fce6d4; color: #8a4313; border: 1.5px solid #8a431333; }
-.sayfa-bant.bant-duyuru { background: #fbe3e0; color: #8e2b25; border: 1.5px solid #8e2b2533; }
-.sayfa-bant.bant-restoran { background: #e2e7f7; color: #2e3f7a; border: 1.5px solid #2e3f7a33; }
-.sayfa-bant.bant-servis { background: #fdebd2; color: #7f430b; border: 1.5px solid #7f430b33; }
-.sayfa-bant.bant-plaka { background: #e4e9ee; color: #34434f; border: 1.5px solid #34434f33; }
-.sayfa-bant.bant-rapor { background: #dcf0f2; color: #18606b; border: 1.5px solid #18606b33; }
-.sayfa-bant.bant-yonetim { background: #dcefe6; color: #1f5a46; border: 1.5px solid #1f5a4633; }
-.sayfa-bant.bant-yksaha { background: #e2e7f7; color: #2e3f7a; border: 1.5px solid #2e3f7a33; }
-.sayfa-bant.bant-program { background: #d9f0ed; color: #155e57; border: 1.5px solid #155e5733; }
-.sayfa-bant.bant-gorev { background: #fdebd2; color: #7f430b; border: 1.5px solid #7f430b33; }
-.sayfa-bant.bant-haftalik { background: #eee3f6; color: #5b2a7a; border: 1.5px solid #5b2a7a33; }
-.yonetim-kutu.kutu-yksaha { background: #ddedf9; color: #1d5684; border: 1.5px solid #1d568433; }
-.yonetim-kutu.kutu-yksaha small { background: #1d568414; color: #1d5684; }
-.yonetim-kutu.kutu-program { background: #d9f0ed; color: #155e57; border: 1.5px solid #155e5733; }
-.yonetim-kutu.kutu-program small { background: #155e5714; color: #155e57; }
-.yonetim-kutu.kutu-haftalik { background: #eee3f6; color: #5b2a7a; border: 1.5px solid #5b2a7a33; }
-.yonetim-kutu.kutu-haftalik small { background: #5b2a7a14; color: #5b2a7a; }
-.secim-dugme.secim-ortak { background: #dcefe6; color: #1f5a46; border: 1.5px solid #1f5a4633; }
-.secim-dugme.secim-yakin { background: #fce6d4; color: #8a4313; border: 1.5px solid #8a431333; }
-.secim-dugme.secim-tg { background: #eee3f6; color: #5b2a7a; border: 1.5px solid #5b2a7a33; }
-.yonetim-kutu.kutu-gorev { background: linear-gradient(145deg, rgba(253,235,210,.88), rgba(250,226,196,.92)), url("veri/site_filigran.jpg") center 40% / cover, #fdebd2; color: #7f430b; border: 1.5px solid #7f430b33; text-shadow: none; }
+.ana-kutu.ak-parsel { background: #deb7c5; color: #681f3b; border: 1.5px solid #681f3b33; }
+.ana-kutu.ak-parsel small { background: #681f3b14; color: #681f3b; }
+.ana-kutu.ak-yakinlar { background: #e5c1a9; color: #753910; border: 1.5px solid #75391033; }
+.ana-kutu.ak-yakinlar small { background: #75391014; color: #753910; }
+.ana-kutu.ak-kayitonay { background: #c8bfdd; color: #413168; border: 1.5px solid #41316833; }
+.ana-kutu.ak-kayitonay small { background: #41316814; color: #413168; }
+.ana-kutu.ak-duyuru { background: #e2b9b5; color: #79251f; border: 1.5px solid #79251f33; }
+.ana-kutu.ak-duyuru small { background: #79251f14; color: #79251f; }
+.ana-kutu.ak-saha { background: #b0cdc2; color: #1a4c3c; border: 1.5px solid #1a4c3c33; }
+.ana-kutu.ak-saha small { background: #1a4c3c14; color: #1a4c3c; }
+.ana-kutu.ak-restoran { background: #b8c0db; color: #273668; border: 1.5px solid #27366833; }
+.ana-kutu.ak-restoran small { background: #27366814; color: #273668; }
+.ana-kutu.ak-servis { background: #e4c6a4; color: #6c3909; border: 1.5px solid #6c390933; }
+.ana-kutu.ak-servis small { background: #6c390914; color: #6c3909; }
+.ana-kutu.ak-aidat { background: #ddcca0; color: #57440d; border: 1.5px solid #57440d33; }
+.ana-kutu.ak-aidat small { background: #57440d14; color: #57440d; }
+.ana-kutu.ak-plaka { background: #bbc2c9; color: #2c3943; border: 1.5px solid #2c394333; }
+.ana-kutu.ak-plaka small { background: #2c394314; color: #2c3943; }
+.ana-kutu.ak-iletisim { background: #b1c9de; color: #194970; border: 1.5px solid #19497033; }
+.ana-kutu.ak-iletisim small { background: #19497014; color: #194970; }
+.ana-kutu.ak-sokak { background: #aaceca; color: #12504a; border: 1.5px solid #12504a33; }
+.ana-kutu.ak-sokak small { background: #12504a14; color: #12504a; }
+.ana-kutu.ak-yk { background: #cbb9d9; color: #4d2468; border: 1.5px solid #4d246833; }
+.ana-kutu.ak-yk small { background: #4d246814; color: #4d2468; }
+.ana-kutu.ak-uyeler { background: #c0c4c6; color: #31383c; border: 1.5px solid #31383c33; }
+.ana-kutu.ak-uyeler small { background: #31383c14; color: #31383c; }
+.ana-kutu.ak-rapor { background: #accbd0; color: #14525b; border: 1.5px solid #14525b33; }
+.ana-kutu.ak-rapor small { background: #14525b14; color: #14525b; }
+.sayfa-bant.bant-parsel { background: #deb7c5; color: #681f3b; border: 1.5px solid #681f3b33; }
+.sayfa-bant.bant-yakin { background: #e5c1a9; color: #753910; border: 1.5px solid #75391033; }
+.sayfa-bant.bant-duyuru { background: #e2b9b5; color: #79251f; border: 1.5px solid #79251f33; }
+.sayfa-bant.bant-restoran { background: #b8c0db; color: #273668; border: 1.5px solid #27366833; }
+.sayfa-bant.bant-servis { background: #e4c6a4; color: #6c3909; border: 1.5px solid #6c390933; }
+.sayfa-bant.bant-plaka { background: #bbc2c9; color: #2c3943; border: 1.5px solid #2c394333; }
+.sayfa-bant.bant-rapor { background: #accbd0; color: #14525b; border: 1.5px solid #14525b33; }
+.sayfa-bant.bant-yonetim { background: #b0cdc2; color: #1a4c3c; border: 1.5px solid #1a4c3c33; }
+.sayfa-bant.bant-yksaha { background: #b8c0db; color: #273668; border: 1.5px solid #27366833; }
+.sayfa-bant.bant-program { background: #aaceca; color: #12504a; border: 1.5px solid #12504a33; }
+.sayfa-bant.bant-gorev { background: #e4c6a4; color: #6c3909; border: 1.5px solid #6c390933; }
+.sayfa-bant.bant-haftalik { background: #cbb9d9; color: #4d2468; border: 1.5px solid #4d246833; }
+.yonetim-kutu.kutu-yksaha { background: #b1c9de; color: #194970; border: 1.5px solid #19497033; }
+.yonetim-kutu.kutu-yksaha small { background: #19497014; color: #194970; }
+.yonetim-kutu.kutu-program { background: #aaceca; color: #12504a; border: 1.5px solid #12504a33; }
+.yonetim-kutu.kutu-program small { background: #12504a14; color: #12504a; }
+.yonetim-kutu.kutu-haftalik { background: #cbb9d9; color: #4d2468; border: 1.5px solid #4d246833; }
+.yonetim-kutu.kutu-haftalik small { background: #4d246814; color: #4d2468; }
+.secim-dugme.secim-ortak { background: #b0cdc2; color: #1a4c3c; border: 1.5px solid #1a4c3c33; }
+.secim-dugme.secim-yakin { background: #e5c1a9; color: #753910; border: 1.5px solid #75391033; }
+.secim-dugme.secim-tg { background: #cbb9d9; color: #4d2468; border: 1.5px solid #4d246833; }
+.yonetim-kutu.kutu-gorev { background: linear-gradient(145deg, rgba(228,198,164,.86), rgba(222,188,152,.90)), url("veri/site_filigran.jpg") center 40% / cover, #e4c6a4; color: #6c3909; border: 1.5px solid #6c390933; text-shadow: none; }
 .yonetim-kutu.kutu-gorev span { filter: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   .ana-kutu.ak-parsel { background: #a3566f; color: #fff; border-color: transparent; } .ana-kutu.ak-parsel small { background: rgba(255,255,255,.2); color: #fff; }
