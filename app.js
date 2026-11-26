@@ -1005,7 +1005,7 @@
     // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
     if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
     if (kurulmali && masaustu) {
-      $("#kurulum").innerHTML = `<div class="kurulum-simge"><img src="icons/logo-192.png" alt="" width="84" height="84"></div>
+      $("#kurulum").innerHTML = `<div class="kurulum-simge"><img src="icons/asistan-192.png" alt="" width="84" height="84"></div>
         <h1>Telefonunuzdan açın</h1>
         <p class="kurulum-metin">Bu otomasyon <b>yalnızca telefondan</b> kullanılabilir. Bilgisayardan kullanılamaz.</p>
         <p class="kur-adim">Aşağıdaki bağlantıyı telefonunuzda açın, sonra ana ekranınıza ekleyin:<br><b class="masaustu-link">tinyurl.com/sporkent-takip</b></p>`;
@@ -1309,7 +1309,6 @@
     }
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     $("#yonetim").innerHTML = `
-      <div class="detay-ust"><button class="geri" type="button" data-ana>← Ana Sayfa</button></div>
       <h1>Üyeler ve ayarlar</h1>
 
       <section class="davet-bolum">
@@ -2637,6 +2636,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       html = parsel.temsilci
         ? temsilciKart(parsel.temsilci) + `<p class="parsel-not">Saha Takip'e yazdığınız yeni kayıt önce parsel temsilcinize gider. Onaylarsa genel Saha Takip'e düşer ve herkes görür.</p>`
         : `<p class="parsel-not">Ortak numaranız için parsel temsilcisi henüz belirlenmedi.</p>`;
+    } else if (parsel?.temsilcilik?.length && !yonetici()) {
+      // Parsel temsilcisinin kendisi: kendi kartı, ortakların onu nasıl gördüğü
+      html = parsel.temsilcilik.map((t) => temsilciKart(t)).join("") + `<p class="parsel-not">Siz ${parsel.temsilcilik.map((t) => `<b>${kac(t.baslik.replace(/ Parsel Temsilcisi$/, ""))}</b> parselinin (${t.no_bas}–${t.no_bit} numaralı ortaklar)`).join(", ")} temsilcisisiniz. Bu ortaklar sizi böyle görür. Saha Takip'e yazdıkları kayıt ve yakınlarının başvurusu önce size gelir.</p>`;
     } else if (parsel?.temsilciler) {
       html = parsel.temsilciler.length ? parsel.temsilciler.map((t) => temsilciKart(t, parsel.resimEkler)).join("")
         : `<p class="parsel-not">Henüz parsel temsilcisi tanımlanmadı.</p>`;
@@ -2709,10 +2711,11 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     yk.querySelector("small").textContent = bekleyenYakinlar.length ? `⏳ ${bekleyenYakinlar.length} onay bekliyor` : "Bekleyen yok";
     // Parsel Temsilcisi düğmesi ortaklarda ve yöneticide (resmi o ekler); Saha Takip herkeste ayrı düğme
     const pk = $("#ana-kutular [data-ac=parsel]");
-    pk.hidden = !(ortakMi() || yonetici());
-    const pt = ortakMi() ? parsel.temsilci : parsel?.temsilciler?.[0];
+    const benTemsilci = !ortakMi() && !yonetici() ? parsel?.temsilcilik?.[0] : null;
+    pk.hidden = !(ortakMi() || yonetici() || benTemsilci);
+    const pt = ortakMi() ? parsel.temsilci : benTemsilci || parsel?.temsilciler?.[0];
     $("#ana-parsel-foto").innerHTML = pt?.resim_url ? `<img src="${kac(pt.resim_url)}" alt="">` : "👤";
-    pk.querySelector("small").textContent = ortakMi() ? (pt ? `${pt.ad} · ${telefonYaz(pt.telefon)}` : "Henüz belirlenmedi")
+    pk.querySelector("small").textContent = ortakMi() || benTemsilci ? (pt ? `${pt.ad} · ${telefonYaz(pt.telefon)}` : "Henüz belirlenmedi")
       : parsel?.temsilciler?.length ? parsel.temsilciler.map((t) => t.ad).join(", ") : "";
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();

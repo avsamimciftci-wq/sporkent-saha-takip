@@ -8,20 +8,15 @@
   <link rel="manifest" href="manifest.json">
   <!-- TG / YK linkiyle gelen telefon ana ekrana eklerse uygulama hep "şahsi kodla giriş" ile açılsın (iPhone ana ekran uygulaması Safari'nin hafızasını görmez) -->
   <script>if (/[?&](tg|giris=tg)/.test(location.search)) document.querySelector('link[rel=manifest]').href = "manifest-tg.json";</script>
-  <link rel="icon" href="icons/logo-192.png">
-  <link rel="apple-touch-icon" href="icons/logo-192.png">
+  <link rel="icon" href="icons/asistan-192.png">
+  <link rel="apple-touch-icon" href="icons/asistan-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="SPORKENT ASİSTAN">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="ust">
-    <div class="ust-sol">
-      <img class="ust-logo" src="logo.png" alt="Sporkent Yönetim Kurulu">
-      <div>
-        <div class="ust-baslik">SPORKENT ASİSTAN</div>
-      </div>
-    </div>
+    <div class="ust-orta"><img class="ust-filigran" src="logo-yatay.png" alt="Sporkent Asistan"></div>
     <button id="ana-don" class="ust-ana" type="button" data-ana hidden aria-label="Ana sayfaya dön"><span>🏠</span>Ana Sayfaya Dön</button>
   </header>
 
@@ -39,7 +34,7 @@
   <!-- Bildirim kilidi: bildirimler açılmadan uygulama kullanılamaz -->
   <div id="bildirim-kilit" class="bildirim-kilit" role="dialog" aria-modal="true" aria-labelledby="kilit-baslik" hidden>
     <div class="kart kilit-kutu">
-      <img src="icons/logo-192.png" alt="" width="84" height="84">
+      <img src="icons/asistan-192.png" alt="" width="84" height="84">
       <h1 id="kilit-baslik">🔔 Bildirimleri açın</h1>
       <p class="kilit-uyari">Bildirimleri açmadan bu programı <b>kullanamazsınız.</b></p>
       <div id="kilit-metin"></div>
@@ -81,7 +76,7 @@
   <main id="ekran-giris" class="ekran" hidden>
     <!-- Telefonun tarayıcısında açılınca: önce ana ekrana ekletir -->
     <section id="kurulum" class="kart kurulum" hidden>
-      <div class="kurulum-simge"><img src="icons/logo-192.png" alt="" width="84" height="84"></div>
+      <div class="kurulum-simge"><img src="icons/asistan-192.png" alt="" width="84" height="84"></div>
       <h1>Ana ekrana ekleyin</h1>
       <p class="kurulum-metin">Bu otomasyonu kullanmak için telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></p>
       <button id="kur-dugme" class="ana-dugme kur-dugme" type="button">📲 Ana Ekrana Ekle</button>
@@ -159,7 +154,6 @@
 
   <!-- Yönetim işleri: iş programı ve müdür/şef görev takibi -->
   <main id="ekran-yonetimisleri" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button></div>
     <div class="yonetim-kutular">
       <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span class="isci-ikon" aria-hidden="true">👷<b>⛏️</b></span>İş Programı</button>
@@ -222,31 +216,31 @@
 
   <!-- Parsel Temsilcisi: temsilcinin resmi, adı, telefonu ve iletişim düğmeleri -->
   <main id="ekran-parsel" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
     <div id="parsel-icerik"></div>
   </main>
 
   <!-- Duyurular: yönetici metin, görsel ya da PDF paylaşır; herkes görür -->
   <main id="ekran-duyuru" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-duyuru">📢 Duyurular</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-duyuru">📢 Duyurular</h1></div>
     <div id="duyuru"></div>
   </main>
 
   <!-- Kullanım raporu (yalnızca yönetici) -->
   <main id="ekran-rapor" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-rapor">📊 Kullanım Raporu</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-rapor">📊 Kullanım Raporu</h1></div>
     <div id="rapor"></div>
   </main>
 
   <!-- Restoran: menü resimleri ve sipariş telefonu (ara / WhatsApp) -->
   <main id="ekran-restoran" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-restoran">🍽️ Restoran</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-restoran">🍽️ Restoran</h1></div>
     <div id="restoran"></div>
   </main>
 
   <!-- Ortak: araç plakası giriş talebi (kooperatif e-posta adresine gider) -->
   <main id="ekran-plaka" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-plaka">🚗 Plaka-Kimlik Bildirimi</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-plaka">🚗 Plaka-Kimlik Bildirimi</h1></div>
     <form id="plaka-form" class="kart plaka-form">
       <p class="modul-alt" style="margin-top:0">Site girişinde tanınması için aracın plakasını kooperatife bildirin.</p>
       <b class="plaka-soru">1. Araç kimin?</b>
@@ -272,7 +266,7 @@
 
   <!-- Parsel temsilcisi: kendi parselindeki ortakların yakınlarının katılma başvuruları -->
   <main id="ekran-yakinlar" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button><h1 class="sayfa-bant bant-yakin">👨‍👩‍👧 Ortak Yakını Onayları</h1></div>
+    <div class="baslik-cift"><h1 class="sayfa-bant bant-yakin">👨‍👩‍👧 Ortak Yakını Onayları</h1></div>
     <p class="modul-alt">Parselinizdeki ortakların yakınları (eşi, çocuğu, damadı, misafiri…) uygulamaya katılmak istiyor. Telefonu ortağın kooperatif kaydında olmayanlar sizin onayınızı bekler.</p>
     <div id="yakin-liste"></div>
   </main>
@@ -346,7 +340,7 @@
 
   <!-- Servis aracı güzergahı: yönetici servisle bir tur atarken kaydeder -->
   <main id="ekran-servis" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-ana>← Ana Sayfa</button>
+    <div class="baslik-cift">
       <section class="servis-saat">
         <p>Aracımız, aşağıda belirtilen saatlerde, <b>Dut Ağacından</b> hareket etmek suretiyle servis hizmeti vermektedir.</p>
         <div id="servis-saatler"></div>
