@@ -52,12 +52,23 @@
     </div>
   </div>
 
+  <!-- Ortak Saha Takip'e kayıt girince: önce parsel temsilcisinin onayına gider -->
+  <div id="kayit-uyari" class="perde" hidden>
+    <div class="kart soru kayit-uyari-kutu">
+      <h2>⏳ Kaydınız parsel temsilcinize iletildi</h2>
+      <p>Parsel temsilcisi tarafından onaylanması halinde, bu kaydınız Saha Takip'e düşecektir. Sorun yaşamanız halinde lütfen parsel temsilciniz ile iletişime geçiniz.</p>
+      <p id="kayit-uyari-temsilci" class="kayit-uyari-temsilci"></p>
+      <button id="kayit-uyari-tamam" class="ana-dugme" type="button">Tamam</button>
+    </div>
+  </div>
+
   <!-- Ana sayfa: bölümler -->
   <main id="ekran-ana" class="ekran" hidden>
     <p class="ana-karsilama"><span id="ana-hitap"></span> <b id="ana-ad"></b></p>
     <div id="ana-kutular" class="ana-kutular">
       <button type="button" data-ac="parsel" class="ana-kutu ak-parsel tam" hidden><span class="parsel-foto" id="ana-parsel-foto">👤</span><span class="parsel-yazi"><b>Parsel Temsilcisi</b><small></small></span></button>
-      <button type="button" data-ac="yakinlar" class="ana-kutu ak-yakinlar tam" hidden><span>👨‍👩‍👧</span>Ortak Yakını Onayları<small></small></button>
+      <button type="button" data-ac="yakinlar" class="ana-kutu ak-yakinlar" hidden><span>👨‍👩‍👧</span>Ortak Yakını Onayları<small></small></button>
+      <button type="button" data-ac="kayitonay" class="ana-kutu ak-kayitonay" hidden><span>📝</span>Saha Takip Onayları<small></small></button>
       <button type="button" data-ac="duyuru" class="ana-kutu ak-duyuru"><span>📢</span>Duyurular<small></small></button>
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
       <button type="button" data-ac="restoran" class="ana-kutu ak-restoran" hidden><span>🍽️</span>Restoran</button>
@@ -298,6 +309,7 @@
   <main id="ekran-yeni" class="ekran" hidden>
     <form id="yeni-form" class="kart">
       <h1 id="yeni-baslik">Yeni kayıt</h1>
+      <p id="yeni-temsilci-not" class="parsel-not" hidden>Parsel temsilcisi tarafından onaylanması halinde, bu kaydınız Saha Takip'e düşecektir. Sorun yaşamanız halinde lütfen parsel temsilciniz ile iletişime geçiniz.</p>
       <p id="yeni-tur-not" class="yeni-tur-not" hidden>🔒 YK iş emri: yalnızca yönetici, yönetim kurulu, muhasebe, müdür ve şef görür.</p>
 
       <div class="foto-alan">

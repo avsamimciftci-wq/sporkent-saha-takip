@@ -329,7 +329,7 @@
   let yenilikHazir = false; // açılıştaki ilk yönlendirme bitti mi
   const duyurulan = new Set(); // bu açılışta sesle haber verilenler
   // Yazı yazılırken, devriye sürerken ya da bildirim kilidi varken pencere araya girmez
-  const mesgul = () => !$("#bildirim-kilit").hidden || izSuruyor() || !$("#ekran-yeni").hidden || !$("#cikis-sor").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden && ($("#kapat-form").sonuc?.value || !$("#sonra-onizleme").hidden))
+  const mesgul = () => !$("#bildirim-kilit").hidden || izSuruyor() || !$("#ekran-yeni").hidden || !$("#cikis-sor").hidden || !$("#kayit-uyari").hidden || ($("#kapat-form") && !$("#ekran-detay").hidden && ($("#kapat-form").sonuc?.value || !$("#sonra-onizleme").hidden))
     || [...document.querySelectorAll(".ekran:not([hidden]) textarea, .ekran:not([hidden]) input:not([type=checkbox]):not([type=radio]):not([type=file])")].some((x) => x === document.activeElement || (x.offsetParent && x.matches("textarea") && x.value));
   // zorla: açılış, arka plandan dönüş ve ana sayfaya dönüş; yoksa yalnızca az önce gelen yenilikte açılır
   function yenilikKontrol(zorla) {
@@ -1027,6 +1027,7 @@
       : "Kooperatifte kayıtlı cep telefonunuzu yazın. Başka bir numara yazarsanız kaydınız yönetimin onayına gider. Yurt dışı numarası ise başına + koyun (örn. +49 …).";
     $("#mod-degistir").innerHTML = yakin ? "🏠 Kooperatif ortağıysanız <b>buraya dokunun</b>" : "👨‍👩‍👧 Ortağın yakınıysanız (eşi, çocuğu, misafiri…) <b>buraya dokunun</b>";
   }
+  $("#kayit-uyari-tamam").addEventListener("click", () => { $("#kayit-uyari").hidden = true; });
   $("#mod-degistir").addEventListener("click", () => { const y = !sakla.al("sk_yakin"); sakla.koy("sk_yakin", y ? 1 : 0); kayitModu(y); window.scrollTo(0, 0); });
 
   function iosAdimlari() {
@@ -2667,6 +2668,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const t = ortakMi() ? parsel.temsilci : null;
     kutu.innerHTML = t ? `<p class="parsel-not">Yeni kaydınız önce parsel temsilciniz <b>${kac(t.ad)}</b> onaylayınca genel Saha Takip'e düşer.</p>` : "";
     kutu.hidden = !t;
+    $("#yeni-temsilci-not").hidden = !t;
   }
   $("#parsel-icerik").addEventListener("change", async (e) => {
     const id = e.target.dataset?.temsilciResim; if (!id) return;
@@ -2704,7 +2706,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2726,6 +2728,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const yk = $("#ana-kutular [data-ac=yakinlar]");
     yk.hidden = !parsel?.temsilcilik;
     yk.querySelector("small").textContent = bekleyenYakinlar.length ? `⏳ ${bekleyenYakinlar.length} onay bekliyor` : "Bekleyen yok";
+    // Parselindeki ortakların Saha Takip'e yazdığı, temsilcinin onayını bekleyen kayıtlar
+    const ko = $("#ana-kutular [data-ac=kayitonay]"), koSay = kayitlar.filter((k) => k.temsilci_id && benOnaylarim(k)).length;
+    ko.hidden = !parsel?.temsilcilik;
+    ko.querySelector("small").textContent = koSay ? `⏳ ${koSay} kayıt onay bekliyor` : "Bekleyen yok";
     // Parsel Temsilcisi düğmesi ortaklarda ve yöneticide (resmi o ekler); Saha Takip herkeste ayrı düğme
     const pk = $("#ana-kutular [data-ac=parsel]");
     const benTemsilci = !ortakMi() && !yonetici() ? parsel?.temsilcilik?.[0] : null;
@@ -2760,7 +2766,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     ykKutu.classList.toggle("sabit-tam", takas); ykKutu.classList.toggle("tam", takas);
     pk.classList.toggle("sabit-tam", !takas); pk.classList.toggle("tam", !takas); pk.classList.toggle("yarim", takas);
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (en üstteki büyük kutu ve Ortak Yakını Onayları hep tam genişlik)
-    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.sabit-tam):not(.ak-yakinlar)")].filter((k) => !k.hidden);
+    const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.sabit-tam):not(.ak-yakinlar):not(.ak-kayitonay)")].filter((k) => !k.hidden);
     gorunen.forEach((k, i) => k.classList.toggle("tam", i === gorunen.length - 1 && gorunen.length % 2 === 1));
     for (const [kutu, rozet] of [["saha", "#saha-rozet"], ["yonetim", "#yk-rozet"]]) {
       const r = $(rozet), k = $(`#ana-kutular [data-ac=${kutu}] small`);
@@ -2772,7 +2778,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     kutulariSigdir();
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { kayitonay: "saha", duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -3139,7 +3145,12 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         gizli: yonetimIsiGirebilir() && yeniTur === "yonetim",
         sure: yonetimIsiGirebilir() && yeniTur === "yonetim" && !sureGormez() ? emirGun : undefined,
       });
-      mesaj(r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad ? `Kayıt ${r.kayit.no} parsel temsilcinize (${r.temsilci_ad}) iletildi. Onaylarsa genel Saha Takip'e düşecek.`
+      if (r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad) {
+        const t = parsel?.temsilci;
+        $("#kayit-uyari-temsilci").innerHTML = `Parsel temsilciniz: <b>${kac(r.temsilci_ad)}</b>${t?.telefon ? ` · <a href="tel:${kac(String(t.telefon).replace(/\s/g, ""))}">📞 ${kac(telefonYaz(t.telefon))}</a>` : ""}`;
+        $("#kayit-uyari").hidden = false;
+      }
+      if (!(r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad)) mesaj(r.kayit.onay_durumu === "bekliyor" && r.temsilci_ad ? `Kayıt ${r.kayit.no} parsel temsilcinize (${r.temsilci_ad}) iletildi. Onaylarsa genel Saha Takip'e düşecek.`
         : r.kayit.onay_durumu === "bekliyor" ? `Kayıt ${r.kayit.no} yönetime iletildi. Onaylanınca iş listesine düşecek.`
         : r.kayit.gizli ? `Yönetim İş Emri ${r.kayit.no} açıldı. YK Saha Takip'te görünür; müdür ve şefe bildirildi.` : `Kayıt ${r.kayit.no} açıldı. Müdüre bildirildi.`);
       if (r.kayit.gizli) { ykFiltre = "acik"; ykSahaAc(); } else goster("liste");
