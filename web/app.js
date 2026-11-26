@@ -2562,9 +2562,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
 
   // ---------- Ortak: plaka girişi talebi ----------
-  function plakaAc() {
+  let plakaBilgi = null; // { no, tel, degisir }: kayıtta / önceki bildirimde olan ortaklık numarası ve telefon
+  let plakaDegistir = false;
+  async function plakaAc() {
     if (location.hash !== "#plaka") history.replaceState(null, "", "#plaka");
     goster("plaka");
+    plakaDegistir = false;
+    try { plakaBilgi = await api("plaka_bilgi"); } catch { plakaBilgi = null; }
+    const f = $("#plaka-form");
+    if (plakaBilgi?.degisir) { f.daire.value = plakaBilgi.no ?? ""; f.kendi_tel.value = plakaBilgi.tel ?? ""; }
+    plakaAlanlari();
   }
   // Ortaklık numarası ve telefon kayıttan alınır, sorulmaz. Yalnızca programda olmayan bilgi sorulur:
   // yakının aracında yakının adı ve telefonu; ortak yakınının kendi aracında kendi adı (kaydında ortağın adı durur)
@@ -2576,14 +2583,23 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     }
     $("#plaka-ad-etiket").textContent = yakinArac ? "Aracın sahibi olan yakınınızın adı ve soyadı" : "Adınız ve soyadınız";
     $("#plaka-sahibi").hidden = !ad;
+    // TG / YK üyesi: ortaklık numarası (her zaman) ve kendi telefonu (kendi aracında) bilinmiyorsa sorulur
+    const b = plakaBilgi, sorNo = !!b?.degisir && (!b.no || plakaDegistir), sorTel = !!b?.degisir && arac === "kendi" && (!b.tel || plakaDegistir);
+    $("#plaka-kimlik").hidden = !(sorNo || sorTel);
+    for (const [alan, kutu, gerek] of [["#plaka-no-alan", f.daire, sorNo], ["#plaka-kendi-tel-alan", f.kendi_tel, sorTel]]) { $(alan).hidden = !gerek; kutu.required = gerek; }
+    const oz = $("#plaka-kimlik-ozet");
+    oz.hidden = !(b?.degisir && b.no && !sorNo);
+    if (!oz.hidden) oz.innerHTML = `Ortaklık numaranız: <b>${kac(b.no)}</b>${b.tel ? ` · Telefonunuz: <b>${kac(b.tel)}</b>` : ""} · <button type="button" class="metin-dugme" id="plaka-kimlik-degistir">Değiştir</button>`;
   }
+  $("#plaka-form").addEventListener("click", (e) => { if (e.target.closest("#plaka-kimlik-degistir")) { plakaDegistir = true; plakaAlanlari(); } });
   $("#plaka-form").addEventListener("change", (e) => { if (e.target.name === "arac") plakaAlanlari(); });
   $("#plaka-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target, d = f.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Gönderiliyor…";
     try {
-      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value });
+      const r = await api("plaka_talebi", { arac: f.arac.value, plaka: f.plaka.value, arac_sahibi: f.arac_sahibi.value, arac_sahibi_tel: f.arac_sahibi_tel.value,
+        daire: $("#plaka-no-alan").hidden ? undefined : f.daire.value, kendi_tel: $("#plaka-kendi-tel-alan").hidden ? undefined : f.kendi_tel.value });
       if (r.eposta) {
         mesaj("Bildiriminiz kooperatife e-postayla gönderildi.");
       } else {
@@ -2591,7 +2607,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         mesaj("Bildiriminiz kaydedildi. Açılan e-postada “Gönder”e dokunun.");
         location.href = `mailto:${r.kime}?subject=${encodeURIComponent(r.konu)}&body=${encodeURIComponent(r.metin)}`;
       }
-      f.reset(); plakaAlanlari();
+      f.reset(); plakaBilgi = plakaBilgi?.degisir ? { ...plakaBilgi, no: r.no ?? plakaBilgi.no, tel: r.tel ?? plakaBilgi.tel } : plakaBilgi; plakaDegistir = false; plakaAlanlari();
       setTimeout(anaAc, 1500);
     } catch (err) { mesaj(err.message); }
     finally { d.disabled = false; d.textContent = "📧 Kooperatife Gönder"; }
@@ -2702,7 +2718,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
-    $("#ana-kutular [data-ac=plaka]").hidden = !ortakMi() && oturum?.rol !== "baskan";
+    // Ortaklar (ve yakınları), TG ve YK üyeleri, yönetici
+    $("#ana-kutular [data-ac=plaka]").hidden = !(ortakMi() || ["baskan", "yonetim"].includes(oturum?.rol) || (oturum?.rol === "uye" && /^TG/.test(oturum?.unvan || "")));
     // Restoran herkese açık (paylaşımları herkese bildirilir)
     $("#ana-kutular [data-ac=restoran]").hidden = false;
     // Parsel temsilcisine: ortak yakını onayları

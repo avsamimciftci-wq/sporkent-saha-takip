@@ -256,6 +256,17 @@
           <input name="arac_sahibi_tel" type="tel" maxlength="20" autocomplete="off" placeholder="0532 123 45 67">
         </label>
       </div>
+      <!-- TG ve YK üyesi: ortaklık numarası ve telefon kayıtta yok; ilk bildirimde sorulur, sonra hatırlanır -->
+      <div id="plaka-kimlik" hidden>
+        <label id="plaka-no-alan">Ortaklık numaranız
+          <input name="daire" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Örn. 12">
+        </label>
+        <label id="plaka-kendi-tel-alan">Cep telefonunuz
+          <input name="kendi_tel" type="tel" maxlength="20" autocomplete="tel" placeholder="0532 123 45 67">
+        </label>
+        <small class="ipucu">Bir kez yazmanız yeterli; sonraki bildirimlerde hatırlanır.</small>
+      </div>
+      <p id="plaka-kimlik-ozet" class="ipucu" hidden></p>
       <label><b class="plaka-soru">2. Plaka numarası</b>
         <input name="plaka" class="plaka-kutu" required maxlength="14" autocomplete="off" autocapitalize="characters" spellcheck="false">
       </label>

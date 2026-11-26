@@ -263,6 +263,30 @@ async function yenilikBul(u: any, rol: Rol) {
   return y;
 }
 
+// Plaka-Kimlik Bildirimi: bildirenin ortaklık numarası ve cep telefonu.
+// Ortakta kayıttan, yöneticide ayarlardan; TG ve YK üyelerinin kaydında yoktur: ilk bildirimde yazdıkları hatırlanır.
+const PLAKA_BILDIREN = (u: any, rol: Rol) => rol === "baskan" || rol === "yonetim" || (rol === "uye" && (!!u.ortak_no || /^TG/.test(u.unvan ?? "")));
+async function plakaKimlik(u: any, rol: Rol): Promise<{ no: number | null; tel: string | null }> {
+  let no: number | null = u.ortak_no ?? null, tel: string | null = u.telefon ?? null;
+  if (rol === "baskan" && (!no || !tel)) {
+    const { data: yp } = await db.from("ayarlar").select("deger").eq("ad", "yonetici_plaka").maybeSingle();
+    try { const x = JSON.parse(String(yp?.deger ?? "{}")); no ??= Number(x.no) || null; tel ??= x.tel || null; } catch { /* bozuk kayıt: boş kalır */ }
+  }
+  if (!no || !tel) {
+    const { data: son } = await db.from("plaka_talepleri").select("ortak_no, telefon").or(`cihaz.eq.${u.cihaz},ad.eq."${String(u.ad).replace(/["\\]/g, "")}"`)
+      .not("ortak_no", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    no ??= son?.ortak_no ?? null; tel ??= son?.telefon ?? null;
+  }
+  return { no, tel };
+}
+const telDuzelt = (ham: string) => {
+  let d = ham.replace(/\D/g, "");
+  if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
+  if (/^[2-5]\d{9}$/.test(d)) return `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  if (/^(\+|00)/.test(ham) && d.replace(/^00/, "").length >= 9 && d.length <= 15) return "+" + d.replace(/^00/, "");
+  return "";
+};
+
 type Hedef = Rol[] | "hepsi" | { cihaz: string };
 
 async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId?: number; resim?: string | null; sayfa?: string; haric?: string } = {}) {
@@ -1030,11 +1054,17 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
+    case "plaka_bilgi": {
+      // Formda ortaklık numarası / telefon sorulacak mı (kayıtta ya da önceki bildirimde yoksa)
+      if (!PLAKA_BILDIREN(u, rol)) throw new Hata("Plaka-Kimlik Bildirimini ortaklar, TG ve YK üyeleri yapar.", 403);
+      const k = await plakaKimlik(u, rol), uu = u as any;
+      return { ...k, degisir: !uu.ortak_no && rol !== "baskan" };
+    }
+
     case "plaka_talebi": {
-      // Ortak (ya da ortağın yakını) kendi aracının ya da yakınının aracının plakasını kooperatife bildirir
+      // Ortak (ya da ortağın yakını), TG ve YK üyesi, yönetici kendi aracının ya da yakınının aracının plakasını kooperatife bildirir
       const uu = u as any;
-      if (rol !== "baskan" && (rol !== "uye" || !uu.ortak_no)) throw new Hata("Plaka-Kimlik Bildirimini ortaklar yapar.", 403);
-      const kimlik = uu.ortak_no ? `${uu.ortak_no} No'lu Ortak` : (uu.unvan || "Yönetici");
+      if (!PLAKA_BILDIREN(u, rol)) throw new Hata("Plaka-Kimlik Bildirimini ortaklar, TG ve YK üyeleri yapar.", 403);
       const arac = g.arac === "yakin" ? "yakin" : g.arac === "kendi" ? "kendi" : "";
       if (!arac) throw new Hata("Önce kendi aracınız mı, yakınınızın aracı mı olduğunu seçin.");
       // "34abc123" → "34 ABC 123": rakam ve harf grupları arasına boşluk
@@ -1046,24 +1076,30 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const sahibi = adGerek ? temiz(g.arac_sahibi, 80).replace(/\s+/g, " ") : "";
       if (adGerek && sahibi.split(" ").filter(Boolean).length < 2) throw new Hata(arac === "yakin" ? "Aracın sahibi olan yakınınızın adını ve soyadını yazın." : "Adınızı ve soyadınızı yazın.");
       // Telefon yalnızca yakının aracında sorulur (yakınınki); kendi aracında kayıttaki telefon kullanılır
-      const sahibiTelHam = arac === "yakin" ? temiz(g.arac_sahibi_tel, 30) : "";
       let sahibiTel = "";
       if (arac === "yakin") {
-        let d = sahibiTelHam.replace(/\D/g, "");
-        if (d.startsWith("90") && d.length === 12) d = d.slice(2); else if (d.startsWith("0") && d.length === 11) d = d.slice(1);
-        if (/^[2-5]\d{9}$/.test(d)) sahibiTel = `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
-        else if (/^(\+|00)/.test(sahibiTelHam) && d.replace(/^00/, "").length >= 9 && d.length <= 15) sahibiTel = "+" + d.replace(/^00/, "");
-        else throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
+        sahibiTel = telDuzelt(temiz(g.arac_sahibi_tel, 30));
+        if (!sahibiTel) throw new Hata("Yakınınızın cep telefonu numarasını doğru yazın (örn. 0532 123 45 67).");
       }
-      // Daire = bildirimi yapanın ortaklık numarası; sorulmaz, kayıttan alınır.
-      // Yönetici koduyla girenin kaydında ortaklık numarası ve telefon yoktur: ayarlardaki yonetici_plaka {"no":…,"tel":"…"} kullanılır
-      let kayitNo: number | null = uu.ortak_no ?? null, kayitTel: string | null = uu.telefon ?? null;
-      if (rol === "baskan" && (!kayitNo || !kayitTel)) {
-        const { data: yp } = await db.from("ayarlar").select("deger").eq("ad", "yonetici_plaka").maybeSingle();
-        try { const x = JSON.parse(String(yp?.deger ?? "{}")); kayitNo ??= Number(x.no) || null; kayitTel ??= x.tel || null; } catch { /* bozuk kayıt: boş kalır */ }
+      // Daire = bildirimi yapanın ortaklık numarası. Ortakta ve yöneticide kayıttan alınır;
+      // TG ve YK üyesi ilk bildirimde yazar (sonra hatırlanır, isterse değiştirir)
+      let { no: kayitNo, tel: kayitTel } = await plakaKimlik(u, rol);
+      if (!uu.ortak_no && rol !== "baskan") {
+        if (String(g.daire ?? "").trim()) {
+          const n = Number(String(g.daire).replace(/\D/g, ""));
+          if (!Number.isInteger(n) || n < 1 || n > 9999) throw new Hata("Ortaklık numaranızı doğru yazın (örn. 12).");
+          kayitNo = n;
+        }
+        if (String(g.kendi_tel ?? "").trim()) {
+          kayitTel = telDuzelt(temiz(g.kendi_tel, 30));
+          if (!kayitTel) throw new Hata("Cep telefonunuzu doğru yazın (örn. 0532 123 45 67).");
+        }
       }
+      if (!kayitNo) throw new Hata("Ortaklık numaranızı yazın.");
+      if (arac === "kendi" && !kayitTel) throw new Hata("Cep telefonunuzu yazın.");
+      const kimlik = uu.ortak_no ? `${uu.ortak_no} No'lu Ortak` : `${uu.unvan || ROL_ADI[rol]}, ${kayitNo} No'lu Ortak`;
       const { data: t, error } = await db.from("plaka_talepleri").insert({
-        cihaz: u.cihaz, ad: u.ad, ortak_no: uu.ortak_no ?? null, telefon: uu.telefon ?? null, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
+        cihaz: u.cihaz, ad: u.ad, ortak_no: kayitNo, telefon: kayitTel, arac, plaka, arac_sahibi: sahibi || null, arac_sahibi_tel: sahibiTel || null,
       }).select("id, created_at").single();
       if (error) throw error;
       const konu = `Plaka-Kimlik Bildirimi: ${plaka} (${kimlik})`;
@@ -1085,7 +1121,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const gitti = await epostaGonder(PLAKA_EPOSTA, konu, metin);
       if (gitti) await db.from("plaka_talepleri").update({ eposta_gitti: true }).eq("id", t.id);
       await duyur(["baskan", "muhasebe"], "🚗 Plaka-Kimlik Bildirimi", `${plaka} · ${u.ad} (${kimlik})${arac === "yakin" ? " · yakınının aracı" : ""}`);
-      return { tamam: true, eposta: gitti, kime: PLAKA_EPOSTA, konu, metin };
+      return { tamam: true, eposta: gitti, kime: PLAKA_EPOSTA, konu, metin, no: kayitNo, tel: kayitTel };
     }
 
     case "yakin_onayla":
