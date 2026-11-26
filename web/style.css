@@ -772,6 +772,12 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .secim-yakin { background: linear-gradient(145deg, #d77523, #ad4d1c); }
 /* Parsel temsilcisi: ortak yakını onayları */
 .ak-yakinlar { background: linear-gradient(145deg, #d77523, #ad4d1c); }
+.ak-kayitonay { background: linear-gradient(145deg, #6c8a3d, #4b6629); }
+#kayit-uyari { z-index: 8500; }
+.kayit-uyari-kutu h2 { margin-top: 0; font-size: 21px; color: #8a3b05; }
+.kayit-uyari-kutu p { font-size: 18px; line-height: 1.45; }
+.kayit-uyari-kutu .ana-dugme { width: 100%; }
+.kayit-uyari-temsilci a { font-weight: 800; white-space: nowrap; }
 .bant-yakin { background: #d16022; }
 /* Restoran */
 .ak-restoran { background: linear-gradient(145deg, #3d4893, #262c6a); }
