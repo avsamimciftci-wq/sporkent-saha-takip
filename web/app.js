@@ -1031,7 +1031,7 @@
     $("#tel-ipucu").textContent = yakin
       ? "Kendi cep telefonunuzu yazın. Yurt dışı numarası ise başına + koyun (örn. +49 …)."
       : "Kooperatifte kayıtlı cep telefonunuzu yazın. Başka bir numara yazarsanız kaydınız yönetimin onayına gider. Yurt dışı numarası ise başına + koyun (örn. +49 …).";
-    $("#mod-degistir").innerHTML = yakin ? "🏠 Kooperatif ortağıysanız <b>buraya dokunun</b>" : "👨‍👩‍👧 Ortağın yakınıysanız (eşi, çocuğu, misafiri…) <b>buraya dokunun</b>";
+    $("#mod-degistir").innerHTML = yakin ? "⚠️ <b>Ortağın kendisi misiniz?</b> Bu form ortağın yakını (eşi, çocuğu, misafiri…) içindir. Ortaksanız <b>buraya dokunup</b> “Ortak kaydı” yapın." : "👨‍👩‍👧 Ortağın yakınıysanız (eşi, çocuğu, misafiri…) <b>buraya dokunun</b>";
   }
   $("#kayit-uyari-tamam").addEventListener("click", () => { $("#kayit-uyari").hidden = true; });
   $("#mod-degistir").addEventListener("click", () => { const y = !sakla.al("sk_yakin"); sakla.koy("sk_yakin", y ? 1 : 0); kayitModu(y); window.scrollTo(0, 0); });
@@ -1129,6 +1129,12 @@
     e.preventDefault();
     const f = new FormData(e.target);
     const hata = $("#kayit-hata"); hata.hidden = true;
+    // Ortağın kendisi yanlışlıkla "yakını" seçmesin: gönderirken bir kez sorulur
+    if (sakla.al("sk_yakin") && !confirm(`Bu kayıt ortağın YAKINI içindir (eşi, çocuğu, misafiri…).
+
+${String(f.get("ortak_no") || "").trim()} numaralı ortağın kendisi sizseniz “İptal”e dokunun, sonra en üstteki uyarıya dokunup “Ortak kaydı” yapın.
+
+Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     const d = e.target.querySelector("button[type=submit]"); d.disabled = true;
     try {
       const r = await api("ortak_kayit", { ad_soyad: String(f.get("ad_soyad")), ortak_no: String(f.get("ortak_no")), telefon: String(f.get("telefon")),
