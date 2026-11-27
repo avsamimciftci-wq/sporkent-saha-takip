@@ -79,19 +79,32 @@ async function temsilciGorunumu(liste: any[]) {
   const harita = new Map((data ?? []).map((d: any) => [d.path, d.signedUrl]));
   return liste.map((t) => ({ id: t.id, baslik: t.baslik, ad: t.ad, telefon: t.telefon, no_bas: t.no_bas, no_bit: t.no_bit, resim_url: t.resim ? harita.get(t.resim) ?? null : null }));
 }
-// Temsilcinin parsellerindeki ortakların onay bekleyen yakınları (yazdığı ortak adı kooperatif kaydıyla aynı mı)
+// Katılım başvurusu: ortağın kendisi ("12 No'lu Ortak") ya da yakını ("12 No'lu Ortağın Yakını").
+// Parselinde temsilci varsa onay / ret YALNIZCA o temsilcinindir; temsilci yoksa yöneticinin.
+const katilimBasvurusu = (x: any) => x?.rol === "uye" && !!x?.ortak_no && /No'lu (Ortak$|Ortağın Yakını)/.test(x?.unvan ?? "");
+async function temsilciAraliklari() {
+  const { data } = await db.from("parsel_temsilcileri").select("no_bas, no_bit");
+  return (data ?? []) as { no_bas: number; no_bit: number }[];
+}
+const aralikta = (ar: { no_bas: number; no_bit: number }[], no: number) => ar.some((t) => no >= t.no_bas && no <= t.no_bit);
+// Yöneticinin onayına düşmeyen (parsel temsilcisinin onaylayacağı) bekleyen başvuru mu
+const temsilciOnaylar = (x: any, ar: { no_bas: number; no_bit: number }[]) => x?.durum === "bekliyor" && katilimBasvurusu(x) && aralikta(ar, x.ortak_no);
+
+// Temsilcinin parsellerindeki onay bekleyen katılım başvuruları (ortaklar ve yakınları)
 async function yakinBasvurulari(temsil: any[]) {
-  const { data } = await db.from("uyeler").select("cihaz, ad, ortak_no, telefon, created_at")
-    .eq("durum", "bekliyor").ilike("unvan", "%Yakını%").order("created_at");
+  const { data } = await db.from("uyeler").select("cihaz, ad, rol, unvan, ortak_no, telefon, durum, created_at")
+    .eq("durum", "bekliyor").eq("rol", "uye").not("ortak_no", "is", null).order("created_at");
   const kapsar = (no: number) => temsil.some((t) => no >= t.no_bas && no <= t.no_bit);
-  const liste = (data ?? []).filter((x: any) => kapsar(x.ortak_no));
+  const liste = (data ?? []).filter((x: any) => katilimBasvurusu(x) && kapsar(x.ortak_no));
   const nolar = [...new Set(liste.map((x: any) => x.ortak_no))];
-  const { data: rh } = nolar.length ? await db.from("ortak_rehberi").select("no, ad_ozet").in("no", nolar) : { data: [] };
-  const adOzet = new Map((rh ?? []).map((r: any) => [r.no, r.ad_ozet]));
+  const { data: rh } = nolar.length ? await db.from("ortak_rehberi").select("no, ad_ozet, tel_ozetleri").in("no", nolar) : { data: [] };
+  const rehber = new Map((rh ?? []).map((r: any) => [r.no, r]));
   const sonuc = [];
   for (const x of liste) {
     const ortakAdi = String(x.ad).replace(/\s*\(yakını\)$/i, "");
-    sonuc.push({ ...x, ad_uyuyor: adOzet.get(x.ortak_no) === await rehberOzeti(adNorm(ortakAdi)) });
+    const e = await listeyleKarsilastir(rehber.get(x.ortak_no), ortakAdi, x.telefon);
+    sonuc.push({ cihaz: x.cihaz, ad: x.ad, ortak_no: x.ortak_no, telefon: x.telefon, created_at: x.created_at,
+      yakin: /Yakını/.test(x.unvan ?? ""), ad_uyuyor: e.ad_uyuyor, tel_uyuyor: e.uyuyor });
   }
   return sonuc;
 }
@@ -303,9 +316,10 @@ async function yenilikBul(u: any, rol: Rol) {
     const [yil, ay, gun] = String(x.tarih).split("-");
     y.push({ a: "p" + x.id, tip: "program", at: x.created_at, metin: kisa(`${gun}.${ay}.${yil}${x.saat ? " " + String(x.saat).slice(0, 5) : ""}: ${x.baslik} · ${x.ekleyen}`) });
   }
+  const uyeAr = (uye.data ?? []).length ? await temsilciAraliklari() : [];
   for (const x of (uye.data ?? []).filter(baska)) {
     const kim = `${x.ad} (${x.unvan || ROL_ADI[x.rol as Rol] || x.rol})`;
-    if (x.durum === "bekliyor") y.push({ a: "ub" + x.cihaz.slice(0, 12), tip: "uyebekler", at: x.created_at, metin: kisa(`${kim} katılmak istiyor.`) });
+    if (x.durum === "bekliyor" && !temsilciOnaylar(x, uyeAr)) y.push({ a: "ub" + x.cihaz.slice(0, 12), tip: "uyebekler", at: x.created_at, metin: kisa(`${kim} katılmak istiyor.`) });
     else if (x.durum === "onayli" && x.rol !== "baskan") y.push({ a: "uk" + x.cihaz.slice(0, 12), tip: "uye", at: x.onay_at ?? x.created_at, metin: kisa(`${kim} programa katıldı.`) });
   }
   for (const x of (plaka.data ?? []).filter(baska)) y.push({ a: "pl" + x.id, tip: "plaka", at: x.created_at, metin: kisa(`${x.plaka} · ${x.ad}`) });
@@ -705,13 +719,14 @@ async function ortakKayit(g: any) {
     // Otomatik girenler yöneticiye "katıldı" diye bildirilir.
     if (yeniOnay) await katildiBildir(ad, yakinlik ? `${no} No'lu ortağın yakını` : `${no} No'lu Ortak`);
     // Onay bekleyen yakın parsel temsilcisine (temsilci yoksa yöneticiye), onay bekleyen ortak yöneticiye bildirilir.
-    if (durum === "bekliyor" && yakinlik) {
+    // Onay bekleyen başvuru (ortak ya da yakını) parselin temsilcisine; temsilci yoksa yöneticiye gider
+    if (durum === "bekliyor") {
       const t = await temsilciBul(no);
-      const govde = `${ad}, ${no} No'lu ortağın yakını olarak katılmak istiyor (${telefon}). Telefonu ortağın kooperatif kayıtlarında yok.`;
-      if (t) await temsilciyeBildir(t, "👨‍👩‍👧 Onayınızı bekleyen ortak yakını", govde, { sayfa: "yakinlar" });
-      else await bildir(["baskan"], "Onay bekleyen ortak yakını", govde, { sayfa: "uyeler" });
-    } else if (durum === "bekliyor") {
-      await bildir(["baskan"], "Onay bekleyen ortak", `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Telefonu kooperatif kayıtlarıyla örtüşmüyor!"}`, { sayfa: "uyeler" });
+      const govde = yakinlik
+        ? `${ad}, ${no} No'lu ortağın yakını olarak katılmak istiyor (${telefon}). Telefonu ortağın kooperatif kayıtlarında yok.`
+        : `${ad} (${no} No'lu Ortak, ${telefon}) katılmak istiyor. ${uyuyor ? "🔵 Bilgileri örtüşüyor." : "🔴 Telefonu kooperatif kayıtlarıyla örtüşmüyor!"}`;
+      if (t) await temsilciyeBildir(t, yakinlik ? "👨‍👩‍👧 Onayınızı bekleyen ortak yakını" : "🏠 Onayınızı bekleyen ortak", govde, { sayfa: "yakinlar" });
+      else await bildir(["baskan"], yakinlik ? "Onay bekleyen ortak yakını" : "Onay bekleyen ortak", govde, { sayfa: "uyeler" });
     }
   }
   return { rol: "uye", durum, anahtar, ad, unvan, vapid: VAPID_PUBLIC || null };
@@ -784,7 +799,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "durum": {
       // Onay bekleyen ortak yakınına: görüşmesi gereken parsel temsilcisinin adı, telefonu ve resmi
       let temsilci: any = null;
-      if (u.durum === "bekliyor" && /Yakını/.test((u as any).unvan ?? "")) {
+      if (u.durum === "bekliyor" && katilimBasvurusu(u)) {
         const t = await temsilciBul((u as any).ortak_no);
         if (t) temsilci = (await temsilciGorunumu([t]))[0];
       }
@@ -838,8 +853,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       });
       let bekleyen: number | undefined;
       if (rol === "baskan") {
-        const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "bekliyor");
-        bekleyen = count ?? 0;
+        const { data: bk } = await db.from("uyeler").select("rol, unvan, ortak_no, durum").eq("durum", "bekliyor");
+        const ar = await temsilciAraliklari();
+        bekleyen = (bk ?? []).filter((x: any) => !temsilciOnaylar(x, ar)).length;
       }
       let ykUyeler: string[] | undefined;
       if (rol === "baskan" || rol === "yonetim") {
@@ -1185,21 +1201,22 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "yakin_onayla":
     case "yakin_reddet": {
-      // Ortak yakınının başvurusunu o parselin temsilcisi (ya da yönetici) onaylar / reddeder
+      // Katılım başvurusunu (ortak ya da yakını) parselin temsilcisi onaylar / reddeder; temsilci yoksa yönetici
       const hedef = temiz(g.hedef, 80);
-      const { data: y } = await db.from("uyeler").select("cihaz, ad, ortak_no, unvan, durum").eq("cihaz", hedef).maybeSingle();
-      if (!y || !/Yakını/.test(y.unvan ?? "") || y.durum !== "bekliyor") throw new Hata("Başvuru bulunamadı ya da zaten sonuçlandı.");
-      if (rol !== "baskan") {
+      const { data: y } = await db.from("uyeler").select("cihaz, ad, rol, ortak_no, unvan, durum").eq("cihaz", hedef).maybeSingle();
+      if (!y || !katilimBasvurusu(y) || y.durum !== "bekliyor") throw new Hata("Başvuru bulunamadı ya da zaten sonuçlandı.");
+      const temsilciVar = aralikta(await temsilciAraliklari(), y.ortak_no);
+      if (temsilciVar) {
         const temsil = await temsilcilikleri(u);
         if (!temsil.some((t) => y.ortak_no >= t.no_bas && y.ortak_no <= t.no_bit)) throw new Hata("Bu başvuruyu yalnızca ortağın parsel temsilcisi onaylar.", 403);
-      }
+      } else if (rol !== "baskan") throw new Hata("Bu parselde temsilci olmadığından başvuruyu yönetici onaylar.", 403);
       if (eylem === "yakin_onayla") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi).`);
         await db.from("uyeler").update({ durum: "onayli", onay_at: new Date().toISOString() }).eq("cihaz", hedef);
         await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "SPORKENT ASİSTAN uygulamasını kullanmaya başlayabilirsiniz.");
         // Temsilci onayladıysa yönetici de haberdar olur (yöneticinin kendi onayında gerek yok)
-        if (rol !== "baskan" && !testCihaz(u.cihaz)) await katildiBildir(y.ad, `${y.ortak_no} No'lu ortağın yakını, temsilci ${u.ad} onayladı`);
+        if (rol !== "baskan" && !testCihaz(u.cihaz)) await katildiBildir(y.ad, `${/Yakını/.test(y.unvan ?? "") ? `${y.ortak_no} No'lu ortağın yakını` : `${y.ortak_no} No'lu Ortak`}, temsilci ${u.ad} onayladı`);
       } else {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
         await db.from("uyeler").delete().eq("cihaz", hedef);
@@ -1484,11 +1501,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     // ---------- Yönetici (YK başkanı) ----------
     case "uye_listesi": {
       yonetici();
-      const { data, error } = await db.from("uyeler")
+      let { data, error } = await db.from("uyeler")
         .select("cihaz, ad, rol, unvan, durum, ortak_no, telefon, davetli_at, created_at, onay_at, son_gorulme, bildirim_izni").order("created_at", { ascending: false });
       if (error) throw error;
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
+      // Parselinde temsilci olan bekleyen başvurular yöneticinin listesine gelmez (onay / ret temsilcinin)
+      const uyeAr = await temsilciAraliklari();
+      data = (data ?? []).filter((x: any) => !temsilciOnaylar(x, uyeAr));
       // Ortak başvurusunu resmi ortak listesiyle karşılaştır: aynı ortak no + listedeki telefonlardan biri
       const nolar = [...new Set((data ?? []).map((x: any) => x.ortak_no).filter(Boolean))];
       const { data: rehber } = nolar.length ? await db.from("ortak_rehberi").select("no, ad_ozet, tel_ozetleri").in("no", nolar) : { data: [] };
@@ -1629,6 +1649,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (hedef === u.cihaz) throw new Hata("Kendi telefonunuzu değiştiremezsiniz.");
       const durum = eylem === "uye_cikar" ? "cikarildi" : "onayli";
       if (durum === "cikarildi") await yoneticiyeDokunma(hedef);
+      if (eylem === "uye_onayla") {
+        const { data: on } = await db.from("uyeler").select("rol, unvan, ortak_no, durum").eq("cihaz", hedef).maybeSingle();
+        if (temsilciOnaylar(on, await temsilciAraliklari())) throw new Hata("Bu başvuruyu ortağın parsel temsilcisi onaylar.", 403);
+      }
       if (durum === "onayli") {
         const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli");
         if ((count ?? 0) >= MAKS_UYE) throw new Hata(`Grup dolu (${MAKS_UYE} kişi). Yeni üye için önce birini çıkarın.`);

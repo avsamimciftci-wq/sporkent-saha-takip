@@ -216,7 +216,7 @@
     };
     const selam = KIM === "yk" ? "Yönetim Kurulu Üyesi Sayın" : "Temsilciler Grubu Üyesi Sayın";
     const anaTg = (duyuru = "", saha = "") => `${bant}<div class="e-selam">${selam} <b>Ali Örnek</b></div><div class="e-kutular dort">${K.duyuru(duyuru)}${K.saha(saha)}${K.restoran()}${K.servis()}${K.aidat()}${K.iletisim()}${K.sokak().replace("<div ", '<div class="tam" ')}</div>`;
-    const anaTemsilci = (saha = "", yakin = "Bekleyen yok") => `${bant}<div class="e-selam">${selam} <b>Ali Örnek</b></div><div class="e-kutular"><div class="genis" style="background:linear-gradient(145deg,#ef6c00,#b23c00)"><span>👨‍👩‍👧</span><div><b>Ortak Yakını Onayları</b><small>${yakin}</small></div></div>${K.duyuru()}${K.saha(saha)}${K.restoran()}${K.servis()}${K.aidat()}${K.iletisim()}${K.sokak().replace("<div ", '<div class="tam" ')}</div>`;
+    const anaTemsilci = (saha = "", yakin = "Bekleyen yok") => `${bant}<div class="e-selam">${selam} <b>Ali Örnek</b></div><div class="e-kutular"><div class="genis" style="background:linear-gradient(145deg,#ef6c00,#b23c00)"><span>👨‍👩‍👧</span><div><b>Katılım Onayları</b><small>${yakin}</small></div></div>${K.duyuru()}${K.saha(saha)}${K.restoran()}${K.servis()}${K.aidat()}${K.iletisim()}${K.sokak().replace("<div ", '<div class="tam" ')}</div>`;
     const anaYk = (duyuru = "", saha = "") => `${bant}<div class="e-selam">${selam} <b>Ali Örnek</b></div><div class="e-kutular dort">${K.duyuru(duyuru)}${K.saha(saha)}${K.restoran()}${K.servis()}${K.yonetim()}${K.aidat()}${K.iletisim()}${K.sokak()}</div>`;
     const YER_TG = { duyuru: [26, 26], saha: [74, 26], restoran: [26, 45], servis: [74, 45], aidat: [26, 64], iletisim: [74, 64], sokak: [50, 83] };
     const YER_YK = { duyuru: [26, 26], saha: [74, 26], restoran: [26, 45], servis: [74, 45], yonetim: [26, 64], aidat: [74, 64], iletisim: [26, 83], sokak: [74, 83] };
@@ -398,11 +398,11 @@
             { ekran: `${onayBekleyen}<div class="e-satir"><div class="e-foto" style="background:#e8f0ec">📝</div><div><span class="rozet r-acik">⏳ Onay bekliyor</span><br><b>12 numara önü</b><br>Sokak lambası yanmıyor</div></div>`, parmak: [50, 44] },
             { ekran: onayKutu("Örnek Ortak", "✖ Onaylamıyorum", "Onaylarsanız genel Saha Takip'e düşer ve herkes görür."), parmak: [75, 33] },
           ] },
-        { baslik: "Parsel temsilcisiyseniz: yakın onayı", aciklama: "Parselinizdeki bir ortağın yakını katılmak isterse size bildirim gelir. Turuncu <b>“Ortak Yakını Onayları”</b>na dokunun. Gerekirse <b>📞 arayın</b>, sonra <b>“✔ Onayla”</b> ya da <b>“✖ Reddet”</b>.",
+        { baslik: "Parsel temsilcisiyseniz: katılım onayı", aciklama: "Parselinizdeki bir ortak ya da ortağın yakını telefonu kooperatif kaydıyla eşleşmeden katılmak isterse size bildirim gelir. Onay ya da ret sizin işinizdir. <b>“Katılım Onayları”</b>na dokunun. Gerekirse <b>📞 arayın</b>, sonra <b>“✔ Onayla”</b> ya da <b>“✖ Reddet”</b>.",
           not: "Bu adım yalnızca parsel temsilcisi olan TG üyeleri içindir. Onaylarsanız uygulama o kişinin telefonunda kendiliğinden açılır.",
           kareler: [
             { ekran: anaTemsilci("", "⏳ 1 onay bekliyor"), parmak: [50, 23] },
-            { ekran: sayfa("👨‍👩‍👧 Ortak Yakını Onayları", "#d84315", `<div class="e-kart"><b style="font-size:14px">Zeynep Örnek</b><br>12 No'lu ortağın yakını<br><span style="color:#217a47">✔ Yazdığı ortak adı kayıtla aynı</span><br><span style="color:#b42318">✖ Telefonu kayıtta yok</span><br><b>📞 0532 123 45 67 · Ara</b><div style="display:flex;gap:6px;margin-top:8px"><div class="e-dugme" style="flex:1;background:#fde8e6;color:#b42318">✖ Reddet</div><div class="e-dugme" style="flex:1">✔ Onayla</div></div></div>`), parmak: [74, 58] },
+            { ekran: sayfa("👨‍👩‍👧 Katılım Onayları", "#d84315", `<div class="e-kart"><b style="font-size:14px">Zeynep Örnek</b><br>12 No'lu ortağın yakını<br><span style="color:#217a47">✔ Yazdığı ortak adı kayıtla aynı</span><br><span style="color:#b42318">✖ Telefonu kayıtta yok</span><br><b>📞 0532 123 45 67 · Ara</b><div style="display:flex;gap:6px;margin-top:8px"><div class="e-dugme" style="flex:1;background:#fde8e6;color:#b42318">✖ Reddet</div><div class="e-dugme" style="flex:1">✔ Onayla</div></div></div>`), parmak: [74, 58] },
           ] },
         restoran, diger, bitis];
       return [...bas,
