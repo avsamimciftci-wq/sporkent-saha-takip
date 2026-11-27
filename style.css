@@ -1170,3 +1170,22 @@ body.kilitli { overflow: hidden; }
   .secim-dugme.secim-yakin { background: #b06c45; color: #fff; border-color: transparent; }
   .secim-dugme.secim-tg { background: #7a5795; color: #fff; border-color: transparent; }
 } }
+
+/* Üyeler ve Ayarlar: bölüm tuşları */
+.uye-sekmeler { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 18px; }
+.uye-sekme { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 104px; padding: 10px 6px;
+  border-radius: 16px; border: 2px solid transparent; font: inherit; font-size: 17px; line-height: 1.2; text-align: center; cursor: pointer;
+  background: #d5dee4; color: #22414f; box-shadow: 0 3px 8px rgba(0,0,0,.10); }
+.uye-sekme span { font-size: 32px; line-height: 1; }
+.uye-sekme small { font-size: 14px; font-weight: 700; background: rgba(0,0,0,.07); border-radius: 99px; padding: 1px 10px; }
+.uye-sekme small:empty { display: none; }
+.uye-sekme.sekme-onay { background: #e5c1a9; color: #753910; }
+.uye-sekme.sekme-grup { background: #b0cdc2; color: #1a4c3c; }
+.uye-sekme.sekme-cikan { background: #e2b9b5; color: #79251f; }
+.uye-sekme.sekme-kisisel { background: #cbb9d9; color: #4d2468; }
+.uye-sekme.sekme-giris { background: #b8c0db; color: #273668; }
+.uye-sekme.sekme-ayar { background: #bbc2c9; color: #2c3943; }
+.uye-sekme.dikkat small { background: #b42318; color: #fff; }
+.uye-sekme.secili { border-color: #2b6f93; box-shadow: 0 0 0 3px #2b6f9355, 0 3px 8px rgba(0,0,0,.12); transform: translateY(-1px); }
+.uye-sekme:active { transform: scale(.98); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .uye-sekme { filter: brightness(.82) saturate(1.1); } }
