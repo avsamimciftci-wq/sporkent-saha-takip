@@ -8,8 +8,8 @@
   "theme_color": "#2b6f93",
   "lang": "tr",
   "icons": [
-    { "src": "icons/asistan-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/asistan-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/asistan-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/sk-ikon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/sk-ikon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/sk-ikon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
