@@ -1194,3 +1194,5 @@ body.kilitli { overflow: hidden; }
 dd.yapildi-not { color: #1565c0; font-weight: 800; }
 dt.yapildi-not { color: #1565c0; font-weight: 700; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) dd.yapildi-not, :root:not([data-theme="light"]) dt.yapildi-not { color: #64b5f6; } }
+.yenilik-metin.yapildi-not { color: #1565c0; font-weight: 800; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .yenilik-metin.yapildi-not { color: #64b5f6; } }

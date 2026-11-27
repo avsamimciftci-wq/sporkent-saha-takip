@@ -351,7 +351,7 @@
       return `<button type="button" class="yenilik-kart yt-${renk}" data-yenilik="${kac(y.a)}">
         <span class="yenilik-ust"><b>${simge} ${ad}</b><small>${tarihSaat(y.at)}</small></span>
         <span class="yenilik-ic">${foto ? `<img src="${kac(foto)}" alt="" loading="lazy">` : ""}<span>
-          ${y.kayit ? `<b class="yenilik-yer">${kac(y.kayit.yer)}</b>` : ""}<span class="yenilik-metin">${kac(y.metin)}</span>${y.kim ? `<small>${kac(y.kim)}${y.kayit?.gizli && y.tip !== "emir" ? " · 🔒 YK" : ""}</small>` : ""}</span></span>
+          ${y.kayit ? `<b class="yenilik-yer">${kac(y.kayit.yer)}</b>` : ""}<span class="yenilik-metin${y.tip === "yapildi" && y.kayit?.sonuc ? " yapildi-not" : ""}">${kac(y.metin)}</span>${y.kim ? `<small>${kac(y.kim)}${y.kayit?.gizli && y.tip !== "emir" ? " · 🔒 YK" : ""}</small>` : ""}</span></span>
         <span class="yenilik-ac">${y.tip === "plaka" ? "Gördüm ✓" : "Açmak için dokunun ›"}</span></button>`;
     }).join("");
   }
