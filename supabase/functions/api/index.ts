@@ -123,6 +123,58 @@ const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restor
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
+// Cihaz kimliği: telefonun ürettiği rastgele değer (UUID). Filtre metinlerine girdiği için biçimi sıkı denetlenir.
+const CIHAZ_BICIM = /^[A-Za-z0-9.-]{8,80}$/;
+function cihazAl(v: unknown): string {
+  const c = temiz(v, 80);
+  if (!CIHAZ_BICIM.test(c)) throw new Hata("Cihaz bilgisi geçersiz. Uygulamayı kapatıp yeniden açın.", 400);
+  return c;
+}
+// Deneme telefonları: öneki sunucu sırrıdır (TEST_ONEK); istemci "test-" yazarak gizli moda geçemez
+const TEST_ONEK = Deno.env.get("TEST_ONEK") ?? "";
+const testCihaz = (c: unknown) => TEST_ONEK.length >= 12 && String(c ?? "").startsWith(TEST_ONEK);
+// Sırları sabit zamanlı karşılaştır
+function esitMi(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+// Tahmin edilemez kod: karışmayan 31 harf/rakamdan 12 karakter (~59 bit), okunsun diye 4'erli gruplar
+function gucluKod(onek: string) {
+  const A = "abcdefghjkmnpqrstuvwxyz23456789", r = crypto.getRandomValues(new Uint32Array(12));
+  const k = Array.from(r, (x) => A[x % A.length]).join("");
+  return `${onek}-${k.slice(0, 4)}-${k.slice(4, 8)}-${k.slice(8)}`;
+}
+
+// ---------- Kodla girişte deneme sınırı ----------
+// Telefon başına 5, internet adresi başına 10 hatalı deneme → 30 dk kilit; tüm sistemde 1 saatte 100 hata → 1 saat kilit.
+const DENEME = { c: { sinir: 5, dk: 30 }, ip: { sinir: 10, dk: 30 }, genel: { sinir: 100, dk: 60 } } as const;
+const denemeAnahtarlari = (cihaz: string, ip: string) => [["c", "c:" + cihaz], ["ip", "ip:" + ip], ["genel", "genel"]] as const;
+async function denemeKontrol(cihaz: string, ip: string) {
+  const { data } = await db.from("giris_denemeleri").select("anahtar, kilit_bitis").in("anahtar", denemeAnahtarlari(cihaz, ip).map((x) => x[1]));
+  const kilit = (data ?? []).map((x: any) => x.kilit_bitis ? Date.parse(x.kilit_bitis) : 0).reduce((a, b) => Math.max(a, b), 0);
+  if (kilit > Date.now()) {
+    const dk = Math.ceil((kilit - Date.now()) / 60000);
+    throw new Hata(`Çok fazla hatalı deneme yapıldı. ${dk} dakika sonra tekrar deneyin.`, 429);
+  }
+}
+async function denemeHata(cihaz: string, ip: string) {
+  const simdi = Date.now();
+  for (const [tur, anahtar] of denemeAnahtarlari(cihaz, ip)) {
+    const { data: x } = await db.from("giris_denemeleri").select("hata, guncel").eq("anahtar", anahtar).maybeSingle();
+    // Son hatadan 1 saat geçtiyse sayaç sıfırdan başlar
+    const onceki = x && simdi - Date.parse(x.guncel) < 3600_000 ? x.hata : 0;
+    const hata = onceki + 1, k = DENEME[tur];
+    const kilitle = hata >= k.sinir;
+    await db.from("giris_denemeleri").upsert({ anahtar, hata: kilitle ? 0 : hata, guncel: new Date(simdi).toISOString(),
+      kilit_bitis: kilitle ? new Date(simdi + k.dk * 60000).toISOString() : null });
+  }
+}
+async function denemeTemizle(cihaz: string) {
+  await db.from("giris_denemeleri").delete().eq("anahtar", "c:" + cihaz);
+}
+
 // Kodlar: yöneticinin değiştirdiği değer (ayarlar tablosu), yoksa sunucu sırrı
 async function kodlar(): Promise<Record<Rol, string>> {
   const { data } = await db.from("ayarlar").select("ad, deger").like("ad", "kod_%");
@@ -137,7 +189,7 @@ async function rolBul(kod: unknown): Promise<Rol | null> {
   if (!k) return null;
   const hepsi = await kodlar();
   // TG üyeleri ve yönetim kurulu yalnızca kişisel kodla girer; ortak kodları kapalı
-  for (const r of ROLLER) if (r !== "uye" && r !== "yonetim" && hepsi[r] && k === hepsi[r].toLowerCase()) return r;
+  for (const r of ROLLER) if (r !== "uye" && r !== "yonetim" && hepsi[r] && esitMi(k, hepsi[r].toLowerCase())) return r;
   return null;
 }
 
@@ -240,7 +292,7 @@ async function yenilikBul(u: any, rol: Rol) {
     rol === "baskan" ? son("devriye_turlari", "id, cihaz, ad, basla, bitis, mesafe_m", "bitis") : bos,
   ]);
   const y: any[] = [];
-  const baska = (x: any) => x.cihaz !== u.cihaz && !String(x.cihaz ?? "").startsWith("test-");
+  const baska = (x: any) => x.cihaz !== u.cihaz && !testCihaz(String(x.cihaz ?? ""));
   for (const x of (pay.data ?? []).filter(baska)) {
     const duyuru = x.bolum === "duyuru";
     y.push({ a: (duyuru ? "d" : "r") + x.id, tip: duyuru ? "duyuru" : "restoran", at: x.created_at,
@@ -318,8 +370,10 @@ async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId
 }
 
 // ---------- Gruba katılma ----------
-async function giris(g: any) {
+async function giris(g: any, ip: string) {
   let rol: Rol | null = null;
+  const cihaz = cihazAl(g.cihaz);
+  await denemeKontrol(cihaz, ip);
   let ad = temiz(g.ad, 80);
   // "Ortak 12" + kendi şifresi: TG üyesi olarak katılır (onay kuralı aynı)
   const m = ad.match(/^ortak\s*-?\s*(\d{1,4})$/i);
@@ -333,9 +387,9 @@ async function giris(g: any) {
     if (t) { tg = t; rol = t.rol; ad = t.ad; }
   }
   if (!rol) rol = await rolBul(g.kod);
-  if (!rol) throw new Hata("Kullanıcı adı ya da şifre / kod hatalı.", 401);
-  const cihaz = temiz(g.cihaz, 80);
-  if (!cihaz || !ad) throw new Hata("Ad ve cihaz bilgisi gerekli.");
+  if (!rol) { await denemeHata(cihaz, ip); throw new Hata("Kullanıcı adı ya da şifre / kod hatalı.", 401); }
+  await denemeTemizle(cihaz);
+  if (!ad) throw new Hata("Ad ve cihaz bilgisi gerekli.");
 
   const { data: var_ } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
   if (var_?.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 403);
@@ -369,11 +423,11 @@ async function giris(g: any) {
   if (error) throw error;
   await db.from("abonelikler").update({ rol }).eq("cihaz", cihaz);
 
-  if (durum === "bekliyor" && !cihaz.startsWith("test-")) {
+  if (durum === "bekliyor" && !testCihaz(cihaz)) {
     await bildir(["baskan"], "Onay bekleyen üye", `${ad} (${ROL_ADI[rol]}) gruba katılmak istiyor.`, { sayfa: "uyeler" });
   }
   // Şahsi koduyla ilk kez giren (TG / YK üyesi, restoran yetkilisi…) yöneticiye bildirilir; yeniden girişler ve yönetici hariç
-  if (durum === "onayli" && rol !== "baskan" && var_?.durum !== "onayli" && !eskiOnayli && !cihaz.startsWith("test-")) {
+  if (durum === "onayli" && rol !== "baskan" && var_?.durum !== "onayli" && !eskiOnayli && !testCihaz(cihaz)) {
     await katildiBildir(ad, tg?.unvan ?? ROL_ADI[rol]);
   }
   return { rol, durum, anahtar, ad, unvan: tg?.unvan ?? null, vapid: VAPID_PUBLIC || null };
@@ -494,7 +548,7 @@ async function turKapat(tur: any, neden: string, bitisIstenen?: number, kesinti?
   const { data, error } = await db.from("devriye_turlari").update(guncel).eq("id", tur.id).is("bitis", null).select().maybeSingle();
   if (error) throw error;
   if (!data) return (await db.from("devriye_turlari").select("*").eq("id", tur.id).maybeSingle()).data; // başkası kapatmış
-  if (!String(tur.cihaz).startsWith("test-")) {
+  if (!testCihaz(String(tur.cihaz))) {
     const dk = Math.max(1, Math.round((bitis - basla) / 60000));
     const ek = neden === "kullanici" ? "" : neden === "mesai" ? " (mesai bitince kendiliğinden durdu)" : " (uzun süre konum gelmediği için kendiliğinden kapandı)";
     await bildir(["baskan"], "🚶 Devriye tamamlandı",
@@ -586,7 +640,7 @@ async function ortakKayit(g: any) {
   const no = Number(temiz(g.ortak_no, 6));
   const ham = temiz(g.telefon, 30);
   let tel = ham.replace(/\D/g, "");
-  const cihaz = temiz(g.cihaz, 80);
+  const cihaz = cihazAl(g.cihaz);
   if (yazilanAd.split(" ").length < 2) throw new Hata(yakinlik ? "Ortağın adını ve soyadını birlikte yazın." : "Adınızı ve soyadınızı birlikte yazın.");
   if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata(yakinlik ? "Ortağın ortaklık numarasını doğru yazın." : "Ortaklık numaranızı doğru yazın.");
   if (!cihaz) throw new Hata("Cihaz bilgisi gerekli.");
@@ -640,7 +694,7 @@ async function ortakKayit(g: any) {
   if (error) throw error;
   if (davetId) await db.from("davet_kodlari").update({ kullanildi_at: new Date().toISOString(), kullanan_cihaz: cihaz }).eq("id", davetId);
   await db.from("abonelikler").update({ rol: "uye" }).eq("cihaz", cihaz);
-  if ((durum === "bekliyor" || yeniOnay) && !cihaz.startsWith("test-")) {
+  if ((durum === "bekliyor" || yeniOnay) && !testCihaz(cihaz)) {
     // Bu ortak numarasıyla zaten girmiş telefonlar uyarılır (başkası onun yerine katılmasın)
     const { data: mevcutlar } = await db.from("uyeler").select("cihaz").eq("ortak_no", no).eq("durum", "onayli").neq("cihaz", cihaz);
     for (const m of mevcutlar ?? []) {
@@ -668,8 +722,9 @@ async function kimlik(g: any) {
   const cihaz = temiz(g.cihaz, 80);
   const anahtar = temiz(g.anahtar, 200);
   if (!cihaz || !anahtar) throw new Hata("Oturum bulunamadı, tekrar giriş yapın.", 401, { cikis: true });
+  if (!CIHAZ_BICIM.test(cihaz)) throw new Hata("Oturum geçersiz, tekrar giriş yapın.", 401, { cikis: true });
   const { data: u } = await db.from("uyeler").select("*").eq("cihaz", cihaz).maybeSingle();
-  if (!u || u.anahtar !== anahtar) throw new Hata("Oturum geçersiz, tekrar giriş yapın.", 401, { cikis: true });
+  if (!u || !esitMi(String(u.anahtar), anahtar)) throw new Hata("Oturum geçersiz, tekrar giriş yapın.", 401, { cikis: true });
   if (u.durum === "cikarildi") throw new Hata("Bu telefonun gruba erişimi yönetici tarafından kaldırıldı.", 401, { cikis: true });
   // Son görülme dakikada bir güncellenir
   if (!u.son_gorulme || Date.now() - Date.parse(u.son_gorulme) > 60_000) {
@@ -701,8 +756,8 @@ async function yoneticiyeDokunma(cihaz: string) {
 
 async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; durum: string }, g: any) {
   const rol = u.rol;
-  // Deneme telefonları (cihaz "test-…") kimseye bildirim göndermez
-  const duyur: typeof bildir = (...a) => (u.cihaz.startsWith("test-") ? Promise.resolve({ hedef: 0, basarili: 0 }) : bildir(...a));
+  // Deneme telefonları (cihaz TEST_ONEK ile başlar) kimseye bildirim göndermez
+  const duyur: typeof bildir = (...a) => (testCihaz(u.cihaz) ? Promise.resolve({ hedef: 0, basarili: 0 }) : bildir(...a));
   const yonetici = () => { if (rol !== "baskan") throw new Hata("Bu işlemi yalnızca yönetici (YK başkanı) yapabilir.", 403); };
   // Cevap yazma ve yapılma süresi: yönetici ve yönetim kurulu
   const ykVeYonetici = () => { if (rol !== "baskan" && rol !== "yonetim") throw new Hata("Bu işlemi yalnızca yönetici ve yönetim kurulu yapabilir.", 403); };
@@ -811,7 +866,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           for (const k of cevapli) k.cevap_gorenler = (cg ?? []).filter((x: any) => x.kayit_id === k.id).map(({ kayit_id: _i, ...x }: any) => x);
           const { data: kl } = await db.from("uyeler").select("ad, rol, cihaz").in("rol", YONETIM_ISI_GOREN).eq("durum", "onayli");
           const goruldu = new Set<string>();
-          cevapKisiler = (kl ?? []).filter((x: any) => !String(x.cihaz).startsWith("test-") && !goruldu.has(x.ad) && goruldu.add(x.ad))
+          cevapKisiler = (kl ?? []).filter((x: any) => !testCihaz(String(x.cihaz)) && !goruldu.has(x.ad) && goruldu.add(x.ad))
             .map(({ ad, rol }: any) => ({ ad, rol }));
         }
       }
@@ -825,7 +880,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "yukleme_adresi": {
       // Duyuru ve restoran paylaşımında PDF de yüklenir; diğer her şey JPEG fotoğraf
       // Duyuru dosyasını yalnızca yönetici yükler
-      if (g.tur === "duyuru") yonetici();
+      if (g.tur === "duyuru" || g.tur === "temsilci") yonetici();
+      else if (g.tur === "aidat") { if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Bu dosyayı yalnızca yönetici yükleyebilir.", 403); }
+      else if (g.tur === "restoran") restoranYonetir();
+      else if (g.tur === "devriye") { if (!["baskan", "mudur", "sef"].includes(rol)) throw new Hata("Bu işlem size açık değil.", 403); }
+      else if (g.tur !== undefined && g.tur !== null && g.tur !== "") throw new Hata("Geçersiz yükleme türü.");
       const coklu = g.tur === "restoran" || g.tur === "duyuru";
       const uzanti = coklu && ["jpg", "pdf"].includes(g.uzanti) ? g.uzanti : "jpg";
       const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
@@ -856,7 +915,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data, error } = await db.from("kayitlar").insert(kayit).select().single();
       if (error) throw error;
       if (data.onay_durumu === "bekliyor" && temsilci) {
-        if (!u.cihaz.startsWith("test-")) {
+        if (!testCihaz(u.cihaz)) {
           await temsilciyeBildir(temsilci, `⏳ Onayınızı bekleyen kayıt ${data.no}`, `${u.ad} · ${kayit.yer}: ${kayit.sorun}`.slice(0, 180), { kayitId: data.id });
         }
         const { cihaz: _c, ...donen } = data;
@@ -946,7 +1005,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const cevaplar = [...(Array.isArray(k.cevaplar) ? k.cevaplar : []), { ad: u.ad, rol, metin, at: new Date().toISOString() }];
       const { error } = await db.from("kayitlar").update({ cevaplar }).eq("id", k.id);
       if (error) throw error;
-      if (!u.cihaz.startsWith("test-")) {
+      if (!testCihaz(u.cihaz)) {
         await bildir(YONETIM_ISI_GOREN, `💬 YK cevabı • ${k.yer}`.slice(0, 80), `${u.ad}: ${metin}`.slice(0, 200), { kayitId: k.id, haric: u.cihaz });
       }
       return { cevaplar };
@@ -1140,7 +1199,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         await db.from("uyeler").update({ durum: "onayli", onay_at: new Date().toISOString() }).eq("cihaz", hedef);
         await duyur({ cihaz: hedef }, "Gruba kabul edildiniz", "SPORKENT ASİSTAN uygulamasını kullanmaya başlayabilirsiniz.");
         // Temsilci onayladıysa yönetici de haberdar olur (yöneticinin kendi onayında gerek yok)
-        if (rol !== "baskan" && !u.cihaz.startsWith("test-")) await katildiBildir(y.ad, `${y.ortak_no} No'lu ortağın yakını, temsilci ${u.ad} onayladı`);
+        if (rol !== "baskan" && !testCihaz(u.cihaz)) await katildiBildir(y.ad, `${y.ortak_no} No'lu ortağın yakını, temsilci ${u.ad} onayladı`);
       } else {
         await db.from("abonelikler").delete().eq("cihaz", hedef);
         await db.from("uyeler").delete().eq("cihaz", hedef);
@@ -1249,7 +1308,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const bas = new Date(simdi + 3 * 3600e3 - (gun - 1) * 86400e3).toISOString().slice(0, 10); // Türkiye günü
       const { data: uy, error } = await db.from("uyeler").select("cihaz, ad, rol, unvan, durum, created_at, son_gorulme, kurulu").neq("durum", "cikarildi");
       if (error) throw error;
-      const kisiler = (uy ?? []).filter((x: any) => !x.cihaz.startsWith("test-"));
+      const kisiler = (uy ?? []).filter((x: any) => !testCihaz(x.cihaz));
       const { data: ab } = await db.from("abonelikler").select("cihaz");
       const aboneler = new Set((ab ?? []).map((x: any) => x.cihaz));
       // Kullanım satırları sayfa sayfa okunur
@@ -1260,7 +1319,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         ku = ku.concat(p ?? []);
         if ((p ?? []).length < 1000) break;
       }
-      ku = ku.filter((x) => !x.cihaz.startsWith("test-"));
+      ku = ku.filter((x) => !testCihaz(x.cihaz));
       const bolumler: Record<string, { acilis: number; kisi: Set<string> }> = {};
       const kisiAcilis = new Map<string, number>(), kisiBolum = new Map<string, Record<string, number>>();
       for (const x of ku) {
@@ -1617,7 +1676,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { error: e2 } = await db.from("uyeler").update({ rol: eskiRol }).in("cihaz", eskiCihazlar);
       if (e2) throw e2;
       await db.from("abonelikler").update({ rol: eskiRol }).in("cihaz", eskiCihazlar);
-      const yeniKod = "baskan-sk-" + String(crypto.getRandomValues(new Uint32Array(1))[0] % 9000 + 1000);
+      const yeniKod = gucluKod("baskan");
       await db.from("ayarlar").upsert({ ad: "kod_baskan", deger: yeniKod });
       await duyur({ cihaz: hedef }, "Yönetici oldunuz",
         `${u.ad} yöneticiliği size devretti. Üyeler ve ayarlar artık sizde.`, { sayfa: "uyeler" });
@@ -1709,14 +1768,14 @@ Deno.serve(async (req) => {
   try {
     const g = await req.json();
     if (g.eylem === "gunluk_gecikme") {
-      if (!CRON_ANAHTARI || g.cron !== CRON_ANAHTARI) throw new Hata("Yetkisiz.", 401);
+      if (!CRON_ANAHTARI || !esitMi(String(g.cron ?? ""), CRON_ANAHTARI)) throw new Hata("Yetkisiz.", 401);
       return yanit(await gunlukGecikme());
     }
     if (g.eylem === "gorev_hatirlat") {
-      if (!CRON_ANAHTARI || g.cron !== CRON_ANAHTARI) throw new Hata("Yetkisiz.", 401);
+      if (!CRON_ANAHTARI || !esitMi(String(g.cron ?? ""), CRON_ANAHTARI)) throw new Hata("Yetkisiz.", 401);
       return yanit(await gorevHatirlat());
     }
-    if (g.eylem === "giris") return yanit(await giris(g));
+    if (g.eylem === "giris") return yanit(await giris(g, (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "?").trim().slice(0, 64)));
     if (g.eylem === "ortak_kayit") return yanit(await ortakKayit(g));
     const u = await kimlik(g);
     return yanit(await islem(String(g.eylem), u, g));
