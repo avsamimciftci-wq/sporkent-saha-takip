@@ -1011,7 +1011,7 @@
     // iPhone'da hiçbir site kendini ana ekrana ekleyemez: tuş yerine adımlar hemen görünsün
     if (kurulmali && iosCihaz) { $("#kur-dugme").hidden = true; kurAdim(iosAdimlari()); }
     if (kurulmali && masaustu) {
-      $("#kurulum").innerHTML = `<div class="kurulum-simge"><img src="icons/sk-ikon-192.png" alt="" width="84" height="84"></div>
+      $("#kurulum").innerHTML = `<div class="kurulum-simge"><img src="icons/asistan-192.png" alt="" width="84" height="84"></div>
         <h1>Telefonunuzdan açın</h1>
         <p class="kurulum-metin">Bu otomasyon <b>yalnızca telefondan</b> kullanılabilir. Bilgisayardan kullanılamaz.</p>
         <p class="kur-adim">Aşağıdaki bağlantıyı telefonunuzda açın, sonra ana ekranınıza ekleyin:<br><b class="masaustu-link">tinyurl.com/sporkent-takip</b></p>`;
