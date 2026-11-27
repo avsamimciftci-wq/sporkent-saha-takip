@@ -1281,6 +1281,15 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     </div>`;
   }
 
+  // Üyeler ve Ayarlar: bölümler ayrı tuşlarda; seçili bölüm yeniden çizimde korunur
+  let uyeBolum = null;
+  const UYE_BOLUMLER = [["onay", "⏳", "Onay Bekleyenler"], ["grup", "👥", "Gruptakiler"], ["cikan", "🚫", "Çıkarılanlar"],
+    ["kisisel", "🏅", "Kişisel Kodlar"], ["giris", "🔑", "Giriş Kodları"], ["ayar", "⚙️", "Davet ve Ayarlar"]];
+  function uyeBolumGoster(b) {
+    uyeBolum = b;
+    for (const x of document.querySelectorAll("#yonetim [data-bolum]")) x.hidden = x.dataset.bolum !== b;
+    for (const x of document.querySelectorAll("#yonetim [data-uye-bolum]")) { const s = x.dataset.uyeBolum === b; x.classList.toggle("secili", s); x.setAttribute("aria-pressed", s); }
+  }
   function yonetimCiz(uyeler, kodlar, varsSure, tg = []) {
     const bekleyen = uyeler.filter((u) => u.durum === "bekliyor");
     const gruptakiler = uyeler.filter((u) => u.durum === "onayli")
@@ -1321,9 +1330,14 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
       return `<div class="eslesme eslesme-uymuyor">✖ Ortağın bilgileri örtüşmüyor<small>${neden}</small></div>`;
     }
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
+    const sayilar = { onay: bekleyen.length, grup: gruptakiler.length, cikan: cikan.length, kisisel: tg.length, giris: "", ayar: "" };
     $("#yonetim").innerHTML = `
       <h1>Üyeler ve ayarlar</h1>
+      <div class="uye-sekmeler" role="group" aria-label="Bölümler">
+        ${UYE_BOLUMLER.map(([k, e, ad]) => `<button type="button" class="uye-sekme sekme-${k}${k === "onay" && bekleyen.length ? " dikkat" : ""}" data-uye-bolum="${k}" aria-pressed="false"><span>${e}</span><b>${ad}</b><small>${sayilar[k] === "" ? "" : k === "grup" ? `${sayilar[k]} / ${MAKS_UYE}` : sayilar[k]}</small></button>`).join("")}
+      </div>
 
+      <div data-bolum="ayar" hidden>
       <section class="davet-bolum">
         <h2>📨 Bütün ortakları davet edin</h2>
         <div class="tg-link-kutu">
@@ -1343,14 +1357,21 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         <div id="davet-sonuc"></div>
         </div>
       </section>
+      </div>
 
+      <div data-bolum="onay" hidden>
       <h2>Onay bekleyenler (${bekleyen.length})</h2>
+      <p class="ipucu">Parsel temsilcisi olan parsellerin başvuruları buraya gelmez; onları temsilci onaylar, size “katıldı” bildirimi gelir.</p>
       ${bekleyen.length ? bekleyen.map((u) => uyeSatiri(u, d("uye_onayla", u.cihaz, "✔ Onayla") + d("uye_sil", u.cihaz, "Reddet", "tehlike"), ayniNo(u))).join("")
-        : `<p class="ipucu">Onay bekleyen kimse yok.</p>`}
+        : `<p class="ipucu">Onay bekleyen kimse yok. 👍</p>`}
+      </div>
 
+      <div data-bolum="grup" hidden>
       <h2>Gruptakiler (${gruptakiler.length} / ${MAKS_UYE})</h2>
       ${gruptakiler.map((u) => uyeSatiri(u, u.rol === "baskan" ? "" : d("uye_cikar", u.cihaz, "Çıkar", "tehlike"))).join("")}
+      </div>
 
+      <div data-bolum="ayar" hidden>
       <h2>Yönetici Değiştir</h2>
       <p class="ipucu">Yöneticilik (YK Başkanı) gruptaki başka bir kişiye devredilir. Sizin ve diğer yönetici telefonlarının yetkisi kalkar, yönetici giriş kodu da yenilenir.</p>
       <button class="ikincil" style="width:100%" id="devret-ac" type="button">👑 Yönetici Değiştir</button>
@@ -1369,11 +1390,15 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         </label>
         <button class="ana-dugme" type="button" data-eylem="yonetici_degistir">Yöneticiyi devret</button>
       </div>
+      </div>
 
-      ${cikan.length ? `<h2>Çıkarılanlar (${cikan.length})</h2>
-      <p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
-      ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : ""}
+      <div data-bolum="cikan" hidden>
+      <h2>Çıkarılanlar (${cikan.length})</h2>
+      ${cikan.length ? `<p class="ipucu">Bu telefonlar kodu bilse de gruba giremez.</p>
+      ${cikan.map((u) => uyeSatiri(u, d("uye_geri_al", u.cihaz, "Geri al") + d("uye_sil", u.cihaz, "Sil", "tehlike"))).join("")}` : `<p class="ipucu">Çıkarılan kimse yok.</p>`}
+      </div>
 
+      <div data-bolum="kisisel" hidden>
       <h2>Kişisel kodlar: YK ve TG (${tg.length})</h2>
       <p class="ipucu">Her biri kendi adını ve kişisel kodunu yazar; onay beklemeden girer. Yönetim kurulu ve TG üyesi için ortak kod kapalıdır.</p>
       <div class="tg-link-kutu">
@@ -1392,24 +1417,37 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         ${tg.map((t) => `<tr><td>${kac(t.ad)}<br><small>${kac(t.unvan)}</small></td><td><code>${kac(t.kod)}</code></td><td>${t.kullaniliyor ? "✔ Giriş yaptı" : "—"}</td></tr>`).join("")}
         </tbody></table>
       </details>
+      </div>
 
+      <div data-bolum="ayar" hidden>
       <h2>Yeni işlerin yapılma süresi</h2>
       <div class="uye">
         <div><b>${varsSure} gün</b><br><small>Her yeni kayda kendiliğinden verilir. Kayıt içinden tek tek değiştirebilirsiniz.</small></div>
         <div class="uye-dugmeler">${d("varsayilan_sure", "", "Değiştir")}</div>
       </div>
+      </div>
 
+      <div data-bolum="giris" hidden>
       <h2>Giriş kodları</h2>
       <p class="ipucu">Kodu değiştirmek gruptakileri çıkarmaz; yalnızca yeni katılacaklar yeni kodu kullanır.</p>
       ${ROL_SIRASI.filter((r) => r !== "uye" && r !== "yonetim").map((r) => `<div class="uye">
         <div><b>${kac(ROL_ADI[r])}</b><br><code>${kac(kodlar[r] || "—")}</code></div>
         <div class="uye-dugmeler">${d("kod_degistir", r, "Değiştir")}</div>
       </div>`).join("")}
+      </div>
 
+      <div data-bolum="ayar" hidden>
       <h2>Tüm kayıtları sil</h2>
       <p class="ipucu">Bütün sorunlar ve fotoğraflar kalıcı olarak silinir, numaralar 001'den başlar. Üyeler silinmez. Geri alınamaz.</p>
-      <button class="ikincil tehlike" style="width:100%" data-eylem="hepsini_sil">Tüm kayıtları sil</button>`;
+      <button class="ikincil tehlike" style="width:100%" data-eylem="hepsini_sil">Tüm kayıtları sil</button>
+      </div>`;
+    uyeBolumGoster(uyeBolum || (bekleyen.length ? "onay" : "grup"));
   }
+  $("#yonetim").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-uye-bolum]"); if (!b) return;
+    uyeBolumGoster(b.dataset.uyeBolum);
+    b.closest(".uye-sekmeler").nextElementSibling?.scrollIntoView?.({ block: "nearest" });
+  });
 
   // ---------- Ortağa davet (yönetici) ----------
   const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-ortak";
