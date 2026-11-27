@@ -1115,7 +1115,7 @@
       <li><b>“Ana ekrana ekle”</b> ya da <b>“Uygulamayı yükle”</b>yi seçin, sonra <b>Ekle / Yükle</b>'ye dokunun.</li>
     </ol>
     <p class="kur-not">Menüde bu seçenek yoksa sayfayı Chrome'da açın:</p>
-    <a class="ikincil chrome-ac" href="${chrome}">Chrome'da aç</a>
+    <a class="ikincil chrome-ac" href="${kac(chrome)}">Chrome'da aç</a>
     <p class="kur-not">Daha önce eklediyseniz ana ekrandaki <b>Sporkent</b> simgesinden açın.</p>`);
   });
 
