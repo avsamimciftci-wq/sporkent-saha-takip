@@ -223,7 +223,7 @@
       if (!$("#ekran-parsel").hidden) parselCiz();
       const oncekiYakin = bekleyenYakinlar.length;
       bekleyenYakinlar = r.bekleyenYakinlar || [];
-      if (bekleyenYakinlar.length > oncekiYakin && oncekiYakin >= 0 && r.bekleyenYakinlar) mesaj(`Onayınızı bekleyen ${bekleyenYakinlar.length} ortak yakını var.`);
+      if (bekleyenYakinlar.length > oncekiYakin && oncekiYakin >= 0 && r.bekleyenYakinlar) mesaj(`Onayınızı bekleyen ${bekleyenYakinlar.length} katılım başvurusu var.`);
       if (!$("#ekran-yakinlar").hidden) yakinCiz();
       // Yönetici başka bir telefondan rolü değiştirilmişse güncel rolü kullan
       if (r.rol && r.rol !== oturum.rol) { oturum.rol = r.rol; sakla.koy("sk_oturum", oturum); }
@@ -939,8 +939,8 @@
     goster("bekle");
     $("#bekle-ad").textContent = oturum.ad;
     $("#bekle-rol").textContent = oturum.unvan || ROL_ADI[oturum.rol] || "";
-    // Ortak yakınının başvurusu parsel temsilcisine, diğerleri yöneticiye gider
-    const yakin = /Yakını/.test(oturum.unvan || "");
+    // Ortağın ve yakınının başvurusu parsel temsilcisine (temsilci yoksa yöneticiye), diğerleri yöneticiye gider
+    const yakin = oturum.rol === "uye" && /No'lu (Ortak$|Ortağın Yakını)/.test(oturum.unvan || "");
     $("#bekle-not").hidden = !yakin;
     $("#bekle-metin").textContent = yakin
       ? "Parsel temsilciniz onay verdikten sonra uygulama bu telefonda kendiliğinden açılır."
@@ -969,7 +969,7 @@
     if (!oturum?.anahtar) return clearInterval(bekleZamani);
     try {
       const r = await api("durum");
-      if (r.durum === "bekliyor" && /Yakını/.test(r.unvan || "")) bekleTemsilciCiz(r.temsilci);
+      if (r.durum === "bekliyor" && /No'lu (Ortak$|Ortağın Yakını)/.test(r.unvan || "")) bekleTemsilciCiz(r.temsilci);
       if (r.durum === "onayli") {
         clearInterval(bekleZamani);
         Object.assign(oturum, { durum: "onayli", rol: r.rol });
@@ -2499,7 +2499,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // ---------- Kullanım raporu (yalnızca yönetici) ----------
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
     aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
-    yakinlar: "👨‍👩‍👧 Ortak Yakını Onayları", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
+    yakinlar: "👨‍👩‍👧 Katılım Onayları", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
     program: "📅 İş Programı", devriye: "🚶 Günlük Devriye", gorevler: "✅ Görevler" };
   const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
   let raporGun = 30, raporVeri = null, raporAra = "";
@@ -2633,18 +2633,20 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
   function yakinCiz() {
     const liste = bekleyenYakinlar;
-    $("#yakin-liste").innerHTML = liste.length ? liste.map((y) => `
+    $("#yakin-liste").innerHTML = liste.length ? liste.map((y) => {
+      const yk = y.yakin !== false;
+      return `
       <div class="yakin-kart">
         <b>${kac(y.ad)}</b>
-        <span>${kac(y.ortak_no)} No'lu ortağın yakını · ${tarihSaat(y.created_at)}</span>
-        <span class="${y.ad_uyuyor ? "eslesme-uyuyor" : "eslesme-uymuyor"} yakin-eslesme">${y.ad_uyuyor ? "✔ Yazdığı ortak adı kooperatif kaydıyla aynı" : "✖ Yazdığı ortak adı kooperatif kaydından farklı"}</span>
-        <span class="eslesme-uymuyor yakin-eslesme">✖ Telefonu ortağın kooperatif kaydında yok</span>
+        <span>${yk ? `${kac(y.ortak_no)} No'lu ortağın yakını` : `🏠 ${kac(y.ortak_no)} No'lu Ortak (kendisi)`} · ${tarihSaat(y.created_at)}</span>
+        <span class="${y.ad_uyuyor ? "eslesme-uyuyor" : "eslesme-uymuyor"} yakin-eslesme">${y.ad_uyuyor ? (yk ? "✔ Yazdığı ortak adı kooperatif kaydıyla aynı" : "✔ Adı kooperatif kaydıyla aynı") : (yk ? "✖ Yazdığı ortak adı kooperatif kaydından farklı" : "✖ Adı kooperatif kaydından farklı")}</span>
+        <span class="${y.tel_uyuyor ? "eslesme-uyuyor" : "eslesme-uymuyor"} yakin-eslesme">${y.tel_uyuyor ? "✔ Telefonu kooperatif kaydında var" : yk ? "✖ Telefonu ortağın kooperatif kaydında yok" : "✖ Telefonu kooperatif kaydında yok"}</span>
         <a class="yakin-tel" href="tel:${kac(String(y.telefon).replace(/\s/g, ""))}">📞 ${kac(y.telefon)} · Ara</a>
         <div class="dugmeler">
           <button type="button" class="ikincil tehlike" data-yakin-reddet="${kac(y.cihaz)}">✖ Reddet</button>
           <button type="button" class="ana-dugme" data-yakin-onayla="${kac(y.cihaz)}">✔ Onayla</button>
         </div>
-      </div>`).join("") : `<p class="bos">Onay bekleyen yakın yok. 👍</p>`;
+      </div>`; }).join("") : `<p class="bos">Onay bekleyen başvuru yok. 👍</p>`;
   }
   $("#yakin-liste").addEventListener("click", async (e) => {
     const b = e.target.closest("[data-yakin-onayla],[data-yakin-reddet]"); if (!b) return;
