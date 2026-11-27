@@ -862,13 +862,18 @@
     if (!acik) kilitCiz();
     return !acik;
   }
+  // Düğmeye dokunulduğu hâlde telefon izin penceresini göstermediyse (Android'de daha önce kapatılan ya da
+  // "sessiz bildirim" ayarı açık telefonda soru hiç çıkmaz, izin "sorulmadı" görünür) ayardan açma adımları gösterilir.
+  let izinSorulmadi = false;
   function kilitCiz() {
     const d = $("#kilit-dugme"), m = $("#kilit-metin");
-    if (Notification.permission === "denied") {
+    if (Notification.permission === "denied" || izinSorulmadi) {
       d.textContent = "🔄 Açtım, kontrol et";
-      m.innerHTML = `<p>Bildirim izni kapatılmış. Telefonun ayarlarından açın:</p>` + (iosCihaz
+      const neden = Notification.permission === "denied" ? "Bildirim izni kapatılmış." : "Telefonunuz izin sorusunu göstermedi.";
+      m.innerHTML = `<p>${neden} Telefonun ayarlarından açın:</p>` + (iosCihaz
         ? `<ol><li>Telefonun <b>Ayarlar</b>'ını açın.</li><li><b>Bildirimler</b>'e dokunun.</li><li>Listeden <b>SPORKENT ASİSTAN</b>'ı (ya da Sporkent'i) bulun.</li><li><b>Bildirimlere İzin Ver</b>'i açın.</li><li>Uygulamayı kapatıp yeniden açın.</li></ol>`
-        : `<ol><li>Ana ekrandaki <b>Sporkent</b> simgesine uzun basın.</li><li><b>Uygulama bilgisi</b> (ⓘ) yazısına dokunun.</li><li><b>Bildirimler</b>'e dokunup açın.</li><li>Uygulamayı kapatıp yeniden açın.</li></ol>`);
+        : `<ol><li>Ana ekrandaki <b>Sporkent</b> simgesine <b>uzun basın</b>.</li><li><b>Uygulama bilgisi</b> (ⓘ) yazısına dokunun.</li><li><b>Bildirimler</b>'e dokunup <b>açın</b>.</li><li>Buraya dönüp aşağıdaki düğmeye dokunun.</li></ol>
+          <details class="kilit-diger"><summary>Bu yol olmadıysa</summary><ol><li><b>Chrome</b>'u açın, sağ üstteki <b>⋮</b> → <b>Ayarlar</b> → <b>Site ayarları</b> → <b>Bildirimler</b>'e girin.</li><li><b>“Daha sessiz mesajlaşma kullan”</b> açıksa kapatın.</li><li>Listede <b>avsamimciftci-wq.github.io</b> varsa dokunup <b>İzin ver</b>'i seçin.</li><li>Sporkent'i kapatıp yeniden açın, <b>Bildirimleri Aç</b>'a dokunun.</li></ol></details>`);
     } else {
       d.textContent = "🔔 Bildirimleri Aç";
       m.innerHTML = `<p>Duyurular ve haberler size bildirimle ulaşır. Aşağıdaki düğmeye dokunun, çıkan soruya <b>“İzin Ver”</b> deyin.</p>`;
@@ -879,8 +884,9 @@
     // İzin sorusu yalnızca dokunma anında çıkar: öncesinde bekleme olmamalı
     let izin; try { izin = await Notification.requestPermission(); } catch { izin = Notification.permission; }
     if (izin === "granted") izinOnay = true;
+    else izinSorulmadi = true; // soru çıkmadı ya da reddedildi: bundan sonra ayardan açma adımları görünür
     if (await bildirimKilidi()) {
-      h.textContent = "Bildirimler hâlâ kapalı. Açmadan programı kullanamazsınız."; h.hidden = false;
+      h.textContent = "Bildirimler hâlâ kapalı. Yukarıdaki adımlarla telefonun ayarından açın."; h.hidden = false;
       if (oturum?.anahtar) izinBildir(Notification.permission);
     } else { if (oturum?.anahtar) bildirimAc(true); yenilikKontrol(true); }
   });

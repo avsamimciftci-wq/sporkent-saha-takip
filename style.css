@@ -1043,6 +1043,8 @@ body.kilitli { overflow: hidden; }
 #kilit-metin p { margin: 0 0 12px; }
 #kilit-metin ol { text-align: left; margin: 0 0 14px; padding-left: 26px; }
 #kilit-metin li { margin-bottom: 8px; }
+.kilit-diger { text-align: left; margin: 0 0 14px; font-size: 17px; }
+.kilit-diger summary { font-weight: 700; color: var(--vurgu, #2b6f93); cursor: pointer; margin-bottom: 8px; }
 .kilit-dugme { width: 100%; font-size: 21px; min-height: 62px; }
 .kilit-hata { margin: 12px 0 0; color: #c62828; font-weight: 800; font-size: 17px; }
 /* Servis saatleri düzenleme (yönetici) */
