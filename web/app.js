@@ -605,7 +605,7 @@
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
         <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
-        ${k.sonuc ? `<dt>Not</dt><dd>${kac(k.sonuc)}</dd>` : ""}` : ""}
+        ${k.sonuc ? `<dt class="yapildi-not">Not</dt><dd class="yapildi-not">${kac(k.sonuc)}</dd>` : ""}` : ""}
       </dl>
       ${k.gizli ? `
       <div class="islem yk-cevaplar">
