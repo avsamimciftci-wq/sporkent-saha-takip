@@ -1189,3 +1189,8 @@ body.kilitli { overflow: hidden; }
 .uye-sekme.secili { border-color: #2b6f93; box-shadow: 0 0 0 3px #2b6f9355, 0 3px 8px rgba(0,0,0,.12); transform: translateY(-1px); }
 .uye-sekme:active { transform: scale(.98); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .uye-sekme { filter: brightness(.82) saturate(1.1); } }
+
+/* "Yapıldı" kaydındaki not hemen göze çarpsın */
+dd.yapildi-not { color: #1565c0; font-weight: 800; }
+dt.yapildi-not { color: #1565c0; font-weight: 700; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) dd.yapildi-not, :root:not([data-theme="light"]) dt.yapildi-not { color: #64b5f6; } }
