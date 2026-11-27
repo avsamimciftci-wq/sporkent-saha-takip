@@ -1,7 +1,7 @@
 ﻿// Bildirimleri gÃ¶sterir ve uygulama kabuÄŸunu Ã¶nbellekte tutar.
-const SURUM = "sk-v191";
+const SURUM = "sk-v192";
 const DURUM = "sk-durum"; // sÃ¼rÃ¼mden baÄŸÄ±msÄ±z kÃ¼Ã§Ã¼k kayÄ±t: temizlenmemiÅŸ bildirim var mÄ±
-const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "logo-yatay.png", "icons/sk-dikey-192.png"];
+const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "logo-yatay.png", "icons/sk-mavi-192.png"];
 
 self.addEventListener("install", (e) => {
   // GitHub Pages dosyalarÄ± 10 dk tarayÄ±cÄ± Ã¶nbelleÄŸinde tutar; "reload" ile her zaman sunucudan alÄ±nÄ±r.
@@ -40,8 +40,8 @@ self.addEventListener("push", (e) => {
     // Sesli, titreÅŸimli ve dokunulana kadar ekranda kalan bildirim
     await self.registration.showNotification(v.baslik || "Sporkent", {
       body: v.govde || "",
-      icon: "icons/sk-dikey-192.png",
-      badge: "icons/sk-dikey-192.png",
+      icon: "icons/sk-mavi-192.png",
+      badge: "icons/sk-mavi-192.png",
       image: v.resim || undefined,
       tag: v.kayitId ? "kayit-" + v.kayitId : "genel-" + Date.now(),
       renotify: true,

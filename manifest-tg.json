@@ -9,17 +9,17 @@
   "lang": "tr",
   "icons": [
     {
-      "src": "icons/sk-dikey-192.png",
+      "src": "icons/sk-mavi-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icons/sk-dikey-512.png",
+      "src": "icons/sk-mavi-512.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "icons/sk-dikey-maskable-512.png",
+      "src": "icons/sk-mavi-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
