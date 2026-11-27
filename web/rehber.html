@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SPORKENT ASİSTAN – Rehber</title>
   <meta name="theme-color" content="#1f4e45">
-  <link rel="icon" href="icons/asistan-192.png">
+  <link rel="icon" href="icons/sk-dikey-192.png">
   <style>
     :root {
       --yesil: #1f4e45; --yesil-acik: #e8f0ec; --zemin: #f4f6f4; --kart: #fff;
@@ -99,7 +99,7 @@
     .e-sayfa div { padding: 9px 14px; border-bottom: 1px solid #eee; }
     .e-ana { background: linear-gradient(160deg, #3a4a6b, #22283a); height: 100%; padding: 30px 14px; display: grid; grid-template-columns: repeat(4, 1fr); align-content: start; gap: 16px 8px; color: #fff; font-size: 9px; text-align: center; }
     .e-ana .ikon { width: 42px; height: 42px; border-radius: 12px; margin: 0 auto 4px; display: grid; place-items: center; font-size: 20px; }
-    .e-ana .sk { background: #fff url(icons/asistan-192.png) center/cover; }
+    .e-ana .sk { background: #fff url(icons/sk-dikey-192.png) center/cover; }
     .e-bildirim { position: absolute; left: 8px; right: 8px; top: 26px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.3); display: flex; gap: 8px; animation: in .6s ease; }
     @keyframes in { from { transform: translateY(-80px); opacity: 0; } }
     .e-safari { position: absolute; left: 0; right: 0; bottom: 0; background: #f7f7f7; border-top: 1px solid #ddd; display: flex; justify-content: space-around; padding: 8px 0 12px; font-size: 18px; color: #1a73e8; }
@@ -201,7 +201,7 @@
     const tarayiciAndroid = `<div class="durum-cubugu"></div><div class="e-tarayici"><span>🏠</span><div class="e-adres">${BAGLANTI}</div><b style="font-size:16px">⋮</b></div>`;
     const kurulum = `${bant}<div class="e-kart" style="text-align:center"><b style="font-size:15px">Ana ekrana ekleyin</b><div style="background:#fff4d6;border:1px solid #e0a800;border-radius:8px;padding:6px;margin:8px 0">Bu otomasyonu kullanmak için telefonunuzun <b>ana ekranına eklemek zorundasınız.</b></div><div class="e-dugme">📲 Ana Ekrana Ekle</div></div>`;
     const bantDon = `<div class="durum-cubugu"></div><div class="e-bant"><img src="logo.png" alt=""><span style="flex:1">SPORKENT ASİSTAN</span><span class="e-don">🏠<br>Ana Sayfaya Dön</span></div>`;
-    const kilit = `<div class="durum-cubugu"></div><div class="e-kart" style="text-align:center;margin-top:60px"><img src="icons/asistan-192.png" alt="" width="56" height="56" style="border-radius:12px"><br><b style="font-size:16px">🔔 Bildirimleri açın</b><div style="background:#ffebee;border:2px solid #c62828;color:#b71c1c;border-radius:10px;padding:7px;margin:8px 0;font-weight:700">Bildirimleri açmadan bu programı kullanamazsınız.</div>Aşağıdaki düğmeye dokunun, çıkan soruya <b>“İzin Ver”</b> deyin.<div class="e-dugme" style="margin-top:10px">🔔 Bildirimleri Aç</div></div>`;
+    const kilit = `<div class="durum-cubugu"></div><div class="e-kart" style="text-align:center;margin-top:60px"><img src="icons/sk-dikey-192.png" alt="" width="56" height="56" style="border-radius:12px"><br><b style="font-size:16px">🔔 Bildirimleri açın</b><div style="background:#ffebee;border:2px solid #c62828;color:#b71c1c;border-radius:10px;padding:7px;margin:8px 0;font-weight:700">Bildirimleri açmadan bu programı kullanamazsınız.</div>Aşağıdaki düğmeye dokunun, çıkan soruya <b>“İzin Ver”</b> deyin.<div class="e-dugme" style="margin-top:10px">🔔 Bildirimleri Aç</div></div>`;
     const secim = `${bant}<div class="e-kart"><b style="font-size:15px;display:block;text-align:center;margin-bottom:8px">Nasıl giriş yapacaksınız?</b><div class="e-secim" style="background:linear-gradient(145deg,#2e7d6b,#1f4e45)"><span>🏠</span><div><b>Kooperatif Ortağıyım</b><br><small>Kendi ortaklık numaramla kayıt oluyorum</small></div></div><div class="e-secim" style="background:linear-gradient(145deg,#ef6c00,#b23c00)"><span>👨‍👩‍👧</span><div><b>Ortağın Yakınıyım</b><br><small>Ortağın eşi, çocuğu, damadı, gelini, misafiri…</small></div></div><div style="text-align:center;font-size:11px;text-decoration:underline;margin-top:8px">🔑 Temsilciler Grubu (TG) ya da Yönetim Kurulu üyesiyseniz <b>buraya dokunun</b></div></div>`;
     const kayit = (ad, no, tel, yaz, tik) => `${bant}<div class="e-kart"><b style="font-size:15px">Ortak kaydı</b><br><br>Adınız ve soyadınız<div class="e-alan ${yaz === 1 ? "yaziyor" : ""}">${ad}</div>Ortaklık numaranız<div class="e-alan ${yaz === 2 ? "yaziyor" : ""}">${no}</div>Cep telefonunuz<div class="e-alan ${yaz === 3 ? "yaziyor" : ""}">${tel}</div><div style="display:flex;gap:6px;align-items:center;margin:4px 0 8px;font-weight:700"><span style="border:2px solid #1f4e45;border-radius:4px;width:18px;height:18px;line-height:14px;text-align:center;flex:none">${tik ? "✓" : ""}</span>Aydınlatma metnini okudum.</div><div class="e-dugme">Kayıt ol</div></div>`;
     const kutu = (ikon, ad, renk, alt = "") => `<div style="background:linear-gradient(145deg,${renk})"><span>${ikon}</span><b>${ad}</b>${alt ? `<small>${alt}</small>` : ""}</div>`;
@@ -241,7 +241,7 @@
       const sayfa18 = adimlar("• En altta, <b>tam ortadaki</b> ⬆︎ <b>Paylaş</b>'a dokunun.");
       const sayfa26 = adimlar("• En altta, sağdaki <b>⋯</b>'ya dokunun.<br>• <b>“Paylaş”</b>a dokunun.");
       const liste = `<div class="e-sayfa"><div>Kopyala</div><div>Okuma listesine ekle</div><div class="vurgu">➕ Ana Ekrana Ekle</div><div>Yer işareti ekle</div></div>`;
-      const ekle = { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/asistan-192.png) center/cover;border:1px solid #ddd"></span><div>SPORKENT ASİSTAN</div></div>`, parmak: [88, 9] };
+      const ekle = { ekran: `<div class="durum-cubugu"></div><div style="display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd"><span style="color:#1a73e8">Vazgeç</span><b>Ana Ekrana Ekle</b><b style="color:#1a73e8">Ekle</b></div><div style="display:flex;gap:10px;align-items:center;padding:14px;background:#fff"><span style="width:44px;height:44px;border-radius:10px;background:#fff url(icons/sk-dikey-192.png) center/cover;border:1px solid #ddd"></span><div>SPORKENT ASİSTAN</div></div>`, parmak: [88, 9] };
       const cubuk26 = `<div class="e-safari" style="align-items:center;gap:8px;padding:8px 10px 12px"><span>‹</span><span class="e-adres" style="text-align:center;padding:7px 8px">🔒 Sporkent</span><b style="background:#1b2421;color:#fff;border-radius:50%;width:28px;height:28px;line-height:26px;text-align:center">⋯</b></div>`;
       const son = "Listeyi yukarı kaydırıp <b>“Ana Ekrana Ekle”</b>ye, sonra sağ üstteki <b>“Ekle”</b>ye dokunun.";
       const not = "Listede yoksa en alttaki “Eylemleri Düzenle”den ekleyin. iPhone'da bildirimler yalnızca ana ekrandan açarsanız gelir; bu adımı atlamayın.";
@@ -273,7 +273,7 @@
           not: "Bu işi yalnızca bir kez yaparsınız. Pencere açılmazsa sağ üstteki üç noktaya (⋮) dokunup “Ana ekrana ekle”yi seçin.",
           kareler: [
             { ekran: `${tarayiciAndroid}${kurulum}`, parmak: [50, 52] },
-            { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/asistan-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>SPORKENT ASİSTAN</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 58] },
+            { ekran: `${tarayiciAndroid}${kurulum}<div class="e-perde"><div class="e-pencere"><b>Uygulama yüklensin mi?</b><br><br><div style="display:flex;gap:8px;align-items:center"><span class="ikon" style="width:30px;height:30px;border-radius:8px;background:#fff url(icons/sk-dikey-192.png) center/cover;display:inline-block;border:1px solid #ddd"></span>SPORKENT ASİSTAN</div><div class="dugmeler"><span style="color:#888">İptal</span><span>Yükle</span></div></div></div>`, parmak: [80, 58] },
           ] },
       ],
       iphone_yukle: iphoneYukle(),
