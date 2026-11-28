@@ -1396,3 +1396,41 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .ana-kutu.ak-masraf { background: #8a5a26; color: #fff; border-color: transparent; }
 }
+
+/* ---------- Muavin ---------- */
+.ak-muavin { background: linear-gradient(145deg, #3e7f5c, #245a3e); }
+.ana-kutu.ak-muavin { background: #c6e0cf; color: #1f4d33; border: 1.5px solid #1f4d3333; }
+.masraf-tus.muavin-tus { background: #d6ead9; color: #1f4d33; }
+.muavin-kart { display: grid; gap: 6px; }
+.muavin-kart > small { color: var(--soluk); font-weight: 700; }
+.muavin-ad { font-size: 22px; }
+.muavin-bakiye { border-radius: 14px; padding: 12px 14px; margin: 6px 0; display: grid; }
+.muavin-bakiye small { font-weight: 700; opacity: .85; }
+.muavin-bakiye b { font-size: 26px; }
+.muavin-bakiye.borc { background: #fdecea; color: #8e1c14; }
+.muavin-bakiye.alacak { background: #e8f5e9; color: #1b5e20; }
+.muavin-ozet { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 4px 0 8px; }
+.muavin-ozet dt { color: var(--soluk); }
+.muavin-ozet dd { margin: 0; font-weight: 700; text-align: right; }
+.muavin-ac { display: block; text-align: center; text-decoration: none; margin-top: 6px; }
+.muavin-uyari { font-weight: 600; line-height: 1.5; }
+.muavin-ust { display: grid; gap: 2px; margin: 0 0 12px; }
+.muavin-ust b { font-size: 18px; }
+.muavin-ust span { color: var(--soluk); font-size: 14px; }
+.muavin-liste { display: grid; gap: 6px; margin: 10px 0; }
+.muavin-satir { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; background: var(--kart); border: 1px solid var(--cizgi); border-radius: 12px; padding: 8px 10px; }
+.muavin-satir [data-muavin-link] { grid-column: 1 / -1; }
+.muavin-satir [data-muavin-link]:empty { display: none; }
+.muavin-no { font-weight: 800; font-size: 18px; text-align: center; color: var(--yesil); }
+.muavin-bilgi b { display: block; }
+.muavin-bilgi small { font-weight: 700; }
+.muavin-bilgi small.borc { color: #b3261e; } .muavin-bilgi small.alacak { color: #2e7d32; }
+.muavin-kod { margin: 10px 0; display: grid; gap: 4px; }
+.muavin-kod p { margin: 4px 0 0; }
+.muavin-adres { word-break: break-all; }
+.muavin-kod-yazi { font-size: 24px; letter-spacing: 1px; font-family: ui-monospace, Consolas, monospace; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ana-kutu.ak-muavin, :root:not([data-theme="light"]) .masraf-tus.muavin-tus { background: #2f6145; color: #fff; border-color: transparent; }
+  :root:not([data-theme="light"]) .muavin-bakiye.borc { background: #3d1a17; color: #ffb4ab; }
+  :root:not([data-theme="light"]) .muavin-bakiye.alacak { background: #1b3320; color: #a5d6a7; }
+}

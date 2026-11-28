@@ -7,6 +7,7 @@ import { GUNLUK, HAFTALIK, KONTROL, KALEM_IDLERI } from "./gorev_programi.ts";
 import { PDFDocument, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import { raporPdf } from "./faaliyet_raporu.js";
+import { muavinPdf } from "./muavin_pdf.js";
 import { ROBOTO_KALIN, ROBOTO_NORMAL } from "./fontlar.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -179,7 +180,7 @@ const ROL_ADI: Record<Rol, string> = {
 const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel", "duyuru_liste", "kullanim"];
 // Kullanım raporunda sayılan bölümler (uygulamadaki ekran adları)
 const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restoran", "yonetim", "aidat", "plaka", "iletisim", "sokaklar", "servis",
-  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet", "muhasebe", "masraf"];
+  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet", "muhasebe", "masraf", "muavin", "muavinler"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -430,12 +431,13 @@ const telDuzelt = (ham: string) => {
   return "";
 };
 
-type Hedef = Rol[] | "hepsi" | { cihaz: string };
+type Hedef = Rol[] | "hepsi" | { cihaz: string } | { cihazlar: string[] };
 
 async function bildir(hedef: Hedef, baslik: string, govde: string, ek: { kayitId?: number; resim?: string | null; sayfa?: string; haric?: string } = {}) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return { hedef: 0, basarili: 0 };
   let q = db.from("abonelikler").select("endpoint, abonelik, rol");
   if (Array.isArray(hedef)) q = q.in("rol", hedef);
+  else if (hedef !== "hepsi" && "cihazlar" in hedef) { if (!hedef.cihazlar.length) return { hedef: 0, basarili: 0 }; q = q.in("cihaz", hedef.cihazlar); }
   else if (hedef !== "hepsi") q = q.eq("cihaz", hedef.cihaz);
   if (ek.haric) q = q.neq("cihaz", ek.haric);
   const { data } = await q;
@@ -552,6 +554,127 @@ async function listeyleKarsilastir(r: any, ad: string, telefon: string) {
     uyuyor: tel.length >= 7 && r.tel_ozetleri.includes(await rehberOzeti(tel)),
     ad_uyuyor: r.ad_ozet === await rehberOzeti(adNorm(ad)),
   };
+}
+
+// ---------- Ortak muavinleri ----------
+// Muhasebe İletişim Programı'nın her ortak için çıkardığı faiz dökümü. Yükleme: muhasebe ve yönetici (bilgisayardan, kodla).
+// Görme: yönetici, YK ve muhasebe hepsini; ortak yalnızca kendisininkini (adı, numarası ve telefonu resmi listeyle eşleşirse).
+const MUAVIN_YUKLEYEN: Rol[] = ["baskan", "muhasebe"];
+const MUAVIN_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe"];
+const muavinYakinMi = (u: any) => /Yakını/.test(u?.unvan ?? "");
+// Ortağın kendisi mi, bilgileri resmi listeyle birebir örtüşüyor mu
+async function muavinHakki(u: any): Promise<{ hak: boolean; neden?: string }> {
+  if (u.rol !== "uye" || !u.ortak_no) return { hak: false, neden: "Muavini yalnızca ortağın kendisi görür." };
+  if (muavinYakinMi(u)) return { hak: false, neden: "Muavini yalnızca ortağın kendisi görür; ortak yakınları göremez." };
+  const { data: r } = await db.from("ortak_rehberi").select("ad_ozet, tel_ozetleri").eq("no", u.ortak_no).maybeSingle();
+  const e = await listeyleKarsilastir(r, u.ad, u.telefon ?? "");
+  if (!e.uyuyor || !e.ad_uyuyor) return { hak: false, neden: "Adınız, ortak numaranız ve telefonunuz kooperatif kayıtlarıyla birebir örtüşmediği için muavininizi buradan gösteremiyoruz. Lütfen muhasebeyle görüşün." };
+  return { hak: true };
+}
+// Bilgisayardan yükleme kodu: 30 dakika geçerli; hatalı denemeler kodla girişteki gibi sınırlanır
+async function muavinKodu(g: any, ip: string) {
+  const kod = temiz(g.kod, 40).toLowerCase().replace(/\s+/g, "");
+  await denemeKontrol("muavin-" + ip, ip);
+  const { data: k } = kod ? await db.from("muavin_kodlari").select("*").eq("kod", kod).maybeSingle() : { data: null };
+  if (!k || k.kullanildi || Date.parse(k.son) < Date.now()) {
+    if (!k) await denemeHata("muavin-" + ip, ip);
+    throw new Hata(k?.kullanildi ? "Bu kodla yükleme yapıldı. Yeni yükleme için telefondan yeni kod alın." : "Kod geçersiz ya da süresi doldu. Telefondan yeni kod alın.", 401);
+  }
+  return k;
+}
+const sayiMi = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+const metinMi = (v: unknown, n = 300) => temiz(v, n);
+// Bilgisayarda okunan dökümü denetler; yalnızca beklenen alanlar ve boyutlar saklanır
+function muavinTemizle(x: any) {
+  const hesap = metinMi(x?.hesap, 20);
+  const m = hesap.match(/^131\.\d{2}\.(\d{1,4})$/);
+  if (!m) throw new Hata(`Geçersiz hesap kodu: ${hesap || "(boş)"}`);
+  const no = Number(m[1]);
+  if (!Number.isInteger(no) || no < 1 || no > 9999) throw new Hata(`Geçersiz ortak numarası: ${hesap}`);
+  const satirlar = (Array.isArray(x.satirlar) ? x.satirlar : []).slice(0, 800).map((r: any) => ({
+    tarih: metinMi(r.tarih, 12), aciklama: metinMi(r.aciklama, 300), borc: sayiMi(r.borc), faiz: sayiMi(r.faiz),
+    odeme: sayiMi(r.odeme), bakiye: sayiMi(r.bakiye), not: metinMi(r.not, 300) }));
+  const kalemler = (Array.isArray(x.kalemler) ? x.kalemler : []).slice(0, 800).map((r: any) => ({
+    tarih: metinMi(r.tarih, 12), kalem: metinMi(r.kalem, 300), tutar: sayiMi(r.tutar), faizli: metinMi(r.faizli, 10),
+    faiz_baslangic: metinMi(r.faiz_baslangic, 12), faizli_gun: sayiMi(r.faizli_gun), isletilen_faiz: sayiMi(r.isletilen_faiz),
+    odenmemis_anapara: sayiMi(r.odenmemis_anapara) }));
+  const t = x.toplam ?? {};
+  return { ortak_no: no, veri: {
+    hesap, ad: metinMi(x.ad, 120),
+    bilgi: { hesap_tarihi: metinMi(x.bilgi?.hesap_tarihi, 12), faiz_orani: metinMi(x.bilgi?.faiz_orani, 10), mahsup: metinMi(x.bilgi?.mahsup, 80) },
+    satirlar, kalemler,
+    toplam: { borc: sayiMi(t.borc), faiz: sayiMi(t.faiz), odeme: sayiMi(t.odeme), bakiye: sayiMi(t.bakiye),
+      odenmemis_anapara: sayiMi(t.odenmemis_anapara), odenmemis_faiz: sayiMi(t.odenmemis_faiz) },
+  } };
+}
+async function muavinKlasoruSil() {
+  // muavin/<yükleme>/<dosya>.pdf: eski yüklemelerin PDF'leri
+  const { data: klasorler } = await db.storage.from(BUCKET).list("muavin", { limit: 1000 });
+  for (const k of klasorler ?? []) {
+    for (;;) {
+      const { data: d } = await db.storage.from(BUCKET).list(`muavin/${k.name}`, { limit: 1000 });
+      if (!d?.length) break;
+      await db.storage.from(BUCKET).remove(d.map((x: any) => `muavin/${k.name}/${x.name}`));
+      if (d.length < 1000) break;
+    }
+  }
+}
+const muavinOzet = (m: any) => ({ ortak_no: m.ortak_no, ad: m.ad, hesap_tarihi: m.bilgi?.hesap_tarihi ?? "", toplam: m.toplam ?? {} });
+// PDF bir kez üretilir, yükleme değişene kadar aynısı verilir; adres 10 dakika geçerlidir
+async function muavinPdfAdresi(m: any) {
+  if (m.pdf_yol) {
+    const { data } = await db.storage.from(BUCKET).createSignedUrl(m.pdf_yol, 600);
+    if (data?.signedUrl) return data.signedUrl;
+  }
+  const logo = await fetch("https://avsamimciftci-wq.github.io/sporkent-saha-takip/logo-yatay.png").then((r) => r.ok ? r.arrayBuffer() : null).catch(() => null);
+  const simdi = new Date(Date.now() + 3 * 3600e3), iki = (n: number) => String(n).padStart(2, "0");
+  const uretim = `${iki(simdi.getUTCDate())}.${iki(simdi.getUTCMonth() + 1)}.${simdi.getUTCFullYear()} ${iki(simdi.getUTCHours())}:${iki(simdi.getUTCMinutes())}`;
+  const bayt = await muavinPdf({ PDFDocument, rgb, fontkit, fontNormal: ROBOTO_NORMAL(), fontKalin: ROBOTO_KALIN(), logo: logo ? new Uint8Array(logo) : null }, m, uretim);
+  const yol = `muavin/${m.yukleme_id}/${m.ortak_no}-${crypto.randomUUID()}.pdf`;
+  const { error } = await db.storage.from(BUCKET).upload(yol, bayt, { contentType: "application/pdf", upsert: false });
+  if (error) throw error;
+  await db.from("muavinler").update({ pdf_yol: yol }).eq("ortak_no", m.ortak_no).eq("yukleme_id", m.yukleme_id);
+  const { data } = await db.storage.from(BUCKET).createSignedUrl(yol, 600);
+  if (!data?.signedUrl) throw new Hata("PDF hazırlanamadı, tekrar deneyin.", 500);
+  return data.signedUrl;
+}
+// Bilgisayardaki yükleme sayfası (oturum yok, telefondan alınan kodla)
+async function muavinYukleme(g: any, ip: string) {
+  const k = await muavinKodu(g, ip);
+  if (g.eylem === "muavin_kod_kontrol") {
+    const { data: m } = await db.from("muavinler").select("bilgi, yuklendi_at, yukleyen").limit(1).maybeSingle();
+    const { count } = await db.from("muavinler").select("ortak_no", { count: "exact", head: true });
+    return { ad: k.ad, son: k.son, mevcut: m ? { adet: count ?? 0, hesap_tarihi: m.bilgi?.hesap_tarihi ?? "", yuklendi_at: m.yuklendi_at, yukleyen: m.yukleyen } : null };
+  }
+  if (g.eylem === "muavin_parca") {
+    const liste = (Array.isArray(g.kayitlar) ? g.kayitlar : []).slice(0, 60).map(muavinTemizle);
+    if (!liste.length) throw new Hata("Gönderilecek döküm yok.");
+    const { error } = await db.from("muavin_yukleme").upsert(liste.map((x) => ({ yukleme_id: k.yukleme_id, ...x })));
+    if (error) throw error;
+    return { tamam: liste.length };
+  }
+  if (g.eylem === "muavin_tamamla") {
+    const { count } = await db.from("muavin_yukleme").select("ortak_no", { count: "exact", head: true }).eq("yukleme_id", k.yukleme_id);
+    if (!count || count !== Number(g.adet)) throw new Hata(`Yükleme eksik kaldı (${count ?? 0} / ${Number(g.adet) || 0}). Önceki muavin değiştirilmedi; tekrar deneyin.`);
+    // Kod tek kullanımlık: aynı anda iki tamamlama olmasın
+    const { data: kilit } = await db.from("muavin_kodlari").update({ kullanildi: true }).eq("kod", k.kod).eq("kullanildi", false).select("kod");
+    if (!kilit?.length) throw new Hata("Bu kodla yükleme zaten tamamlandı.");
+    const { data: n, error } = await db.rpc("muavin_degistir", { p_yukleme: k.yukleme_id, p_yukleyen: k.ad ?? null });
+    if (error) throw error;
+    await muavinKlasoruSil().catch(() => {});
+    await db.from("muavin_kodlari").delete().lt("son", new Date().toISOString());
+    let bildirilen = 0;
+    if (g.bildir) {
+      // Yalnızca muavinini görebilecek ortaklara (yakınlar ve bilgileri örtüşmeyenler hariç); tutar yazılmaz
+      const { data: ortaklar } = await db.from("uyeler").select("cihaz, ad, rol, unvan, ortak_no, telefon").eq("rol", "uye").eq("durum", "onayli").not("ortak_no", "is", null);
+      const cihazlar: string[] = [];
+      for (const o of ortaklar ?? []) if (!testCihaz(o.cihaz) && (await muavinHakki(o)).hak) cihazlar.push(o.cihaz);
+      const r = await bildir({ cihazlar }, "📒 Muavininiz güncellendi", "Hesap dökümünüze ana sayfadaki Muavinim tuşundan bakabilirsiniz.", { sayfa: "muavin" });
+      bildirilen = r.basarili ?? 0;
+    }
+    return { adet: n, bildirilen };
+  }
+  throw new Hata("Bilinmeyen işlem.");
 }
 
 // ---------- Devriye ----------
@@ -828,7 +951,7 @@ async function kimlik(g: any) {
 async function tumFotograflariSil() {
   const { data: klasorler } = await db.storage.from(BUCKET).list("", { limit: 1000 });
   for (const k of klasorler ?? []) {
-    if (k.name === "aidat" || k.name === "devriye" || k.name === "temsilci" || k.name === "restoran") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
+    if (k.name === "aidat" || k.name === "devriye" || k.name === "temsilci" || k.name === "restoran" || k.name === "muavin") continue; // aidat ve devriye fotoğrafları iş kayıtlarından ayrı, silinmez
     for (;;) {
       const { data: dosyalar } = await db.storage.from(BUCKET).list(k.name, { limit: 1000 });
       if (!dosyalar?.length) break;
@@ -1529,6 +1652,53 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       };
     }
 
+    case "muavin_kod_al": {
+      // Telefondaki yönetici / muhasebe, bilgisayardaki yükleme sayfası için 30 dakikalık kod alır
+      if (!MUAVIN_YUKLEYEN.includes(rol)) throw new Hata("Muavini yalnızca muhasebe ve yönetici yükler.", 403);
+      await db.from("muavin_kodlari").delete().or(`son.lt.${new Date().toISOString()},cihaz.eq.${u.cihaz}`);
+      const kod = gucluKod("m");
+      const son = new Date(Date.now() + 30 * 60000).toISOString();
+      const { error } = await db.from("muavin_kodlari").insert({ kod, cihaz: u.cihaz, ad: u.ad, rol, yukleme_id: crypto.randomUUID(), son });
+      if (error) throw error;
+      return { kod, son };
+    }
+
+    case "muavin_liste": {
+      // Yönetici, YK ve muhasebe: bütün ortakların muavin özeti
+      if (!MUAVIN_GOREN.includes(rol)) throw new Hata("Ortak muavinlerini yalnızca yönetici, YK ve muhasebe görür.", 403);
+      const { data, error } = await db.from("muavinler").select("ortak_no, ad, bilgi, toplam, yuklendi_at, yukleyen").order("ortak_no");
+      if (error) throw error;
+      const ilk = data?.[0];
+      return { yukleyebilir: MUAVIN_YUKLEYEN.includes(rol), muavinler: (data ?? []).map(muavinOzet),
+        bilgi: ilk ? { hesap_tarihi: ilk.bilgi?.hesap_tarihi ?? "", yuklendi_at: ilk.yuklendi_at, yukleyen: ilk.yukleyen, adet: data!.length } : null };
+    }
+
+    case "muavin_benim": {
+      // Ortak: yalnızca kendi muavininin özeti
+      const h = await muavinHakki(u);
+      if (!h.hak) return { hak: false, neden: h.neden };
+      const { data: m } = await db.from("muavinler").select("ortak_no, ad, bilgi, toplam, yuklendi_at").eq("ortak_no", (u as any).ortak_no).maybeSingle();
+      return { hak: true, muavin: m ? { ...muavinOzet(m), yuklendi_at: m.yuklendi_at } : null };
+    }
+
+    case "muavin_pdf": {
+      // Ortak kendi muavinini; yönetici, YK ve muhasebe istediği ortağınkini açar. Her açılış kaydedilir.
+      let no: number;
+      if (MUAVIN_GOREN.includes(rol)) {
+        no = Number(g.ortak_no);
+        if (!Number.isInteger(no) || no < 1) throw new Hata("Ortak numarası geçersiz.");
+      } else {
+        const h = await muavinHakki(u);
+        if (!h.hak) throw new Hata(h.neden ?? "Bu muavini göremezsiniz.", 403);
+        no = (u as any).ortak_no;
+      }
+      const { data: m } = await db.from("muavinler").select("*").eq("ortak_no", no).maybeSingle();
+      if (!m) throw new Hata("Bu ortak için yüklenmiş muavin yok.", 404);
+      const url = await muavinPdfAdresi(m);
+      await db.from("muavin_gorulme").insert({ ortak_no: no, cihaz: u.cihaz, ad: u.ad, rol });
+      return { url };
+    }
+
     case "masraf_liste": {
       // Yalnızca muhasebenin paylaştığı Aylık Masraflar Listeleri: TG ve Denetim Kurulu üyeleri ile yönetim görür
       if (!MUHASEBE_GOREN.includes(rol) && !tgGibi(u)) throw new Hata("Aylık Masraflar Listesini TG ve Denetim Kurulu üyeleri ile yönetim görür.", 403);
@@ -2148,6 +2318,9 @@ Deno.serve(async (req) => {
     }
     if (g.eylem === "giris") return yanit(await giris(g, (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "?").trim().slice(0, 64)));
     if (g.eylem === "ortak_kayit") return yanit(await ortakKayit(g));
+    if (["muavin_kod_kontrol", "muavin_parca", "muavin_tamamla"].includes(g.eylem)) {
+      return yanit(await muavinYukleme(g, (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "?").trim().slice(0, 64)));
+    }
     const u = await kimlik(g);
     return yanit(await islem(String(g.eylem), u, g));
   } catch (e: any) {
