@@ -2537,8 +2537,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const form = v.yonetir ? `
       <form class="kart restoran-yonet ${masraf ? "masraf-form" : ""}" data-paylasim-form>
         <b class="restoran-form-baslik">${masraf ? `📋 ${MASRAF_BASLIK} · ${kac(v.masraf?.liste_ayi || "")}` : `➕ ${b === "duyuru" ? "Yeni duyuru" : "Yeni paylaşım"}`}</b>
-        ${masraf ? `<small class="ipucu">Listeyi PDF ya da görsel olarak seçin (Excel'i PDF olarak kaydedebilirsiniz). Başlık kendiliğinden yazılır.</small>` : ""}
-        <div class="restoran-tur">${Object.entries(PAYLASIM_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}</div>
+        ${masraf ? `<small class="ipucu">Listeyi PDF olarak seçin (Excel'i PDF olarak kaydedebilirsiniz). Başlık kendiliğinden yazılır.</small>` : ""}
+        <div class="restoran-tur${b === "muhasebe" ? " dortlu" : ""}">${Object.entries(PAYLASIM_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur && !masraf ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}${b === "muhasebe" ? `<button type="button" data-masraf-ac class="masraf-tur ${masraf ? "secili" : ""}">📋<br>Aylık Masraflar Listesi</button>` : ""}</div>
         ${tur !== "metin" ? `<label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
           <p data-paylasim-secilen class="ipucu" hidden></p>` : ""}
         <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : "Açıklama (isteğe bağlı)"}
@@ -2558,7 +2558,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       siparis = `<div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
         <b>📋 ${MASRAF_BASLIK} · ${kac(m.liste_ayi)}</b>
         <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ay henüz paylaşılmadı. Her ayın ilk iş gününde paylaşılır (1'i cumartesi, pazar ya da resmî tatilse sonraki ilk iş günü). Bu ay: <b>${m.gun ? new Date(m.gun + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }) : "ayın 1'i"}</b>. O gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider.`}</span>
-        ${v.yonetir ? `<button type="button" class="ana-dugme masraf-dugme" data-masraf-ac>📋 ${MASRAF_BASLIK}${m.paylasildi_at ? "'ni yeniden paylaş" : "'ni paylaş"}</button>` : ""}
       </div>`;
     }
     // Restoran ve Muhasebe: paylaşımlar (en yenisi üstte) önce, yeni paylaşım penceresi en altta
@@ -2581,12 +2580,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     kutu.addEventListener("click", async (e) => {
       const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
       const tb = e.target.closest("[data-paylasim-tur]");
-      if (tb) { paylasimTur[b] = tb.dataset.paylasimTur; return paylasimAc(b); }
-      if (e.target.closest("[data-masraf-ac]")) {
-        masrafModu = true; paylasimTur[b] = "pdf"; await paylasimAc(b);
-        kutu.querySelector("[data-paylasim-form]")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
+      if (tb) { paylasimTur[b] = tb.dataset.paylasimTur; if (b === "muhasebe") masrafModu = false; return paylasimAc(b); }
+      if (e.target.closest("[data-masraf-ac]")) { masrafModu = true; paylasimTur[b] = "pdf"; return paylasimAc(b); }
       if (e.target.closest("[data-restoran-tel-kaydet]")) {
         try { const x = await api("restoran_tel", { tel: kutu.querySelector("[data-paylasim-form]").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await paylasimAc(b); }
         catch (err) { mesaj(err.message); }
