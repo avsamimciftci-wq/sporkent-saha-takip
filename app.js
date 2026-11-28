@@ -3248,15 +3248,15 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     catch (e) { $("#faaliyet").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
   const RAPOR_TUR = [["tum", "📑", "Tüm Aylık Faaliyet Raporu", "Saha Takip ve YK Saha Takip'teki bütün işler + İş Programı"],
-    ["yk", "🗂️", "YK Saha Takip", "Yalnızca YK Saha Takip işleri + İş Programı"],
-    ["saha", "🛠️", "Saha Takip", "Yalnızca Saha Takip'ten gelen işler"]];
+    ["yk", "🗂️", "YK Saha Takip Faaliyet Raporu", "Yalnızca YK Saha Takip işleri + İş Programı"],
+    ["saha", "🛠️", "Saha Takip Faaliyet Raporu", "Yalnızca Saha Takip'ten gelen işler"]];
   let faaliyetTur = "tum", faaliyetVeri = null;
   const raporPaylasMetni = (tur, ay, url) => `Sporkent İşletme Kooperatifi\n${RAPOR_TUR.find((x) => x[0] === tur)[2]} · ${ayAdi(ay)} (PDF):\n${url}`;
   function faaliyetCiz(v = faaliyetVeri) {
     faaliyetVeri = v;
     const [, ikon, ad, acik] = RAPOR_TUR.find((x) => x[0] === faaliyetTur);
     $("#faaliyet").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-faaliyet">📑 Aylık Faaliyet Raporu</h1></div>
+      <button class="geri" data-geri-yk style="width:100%;margin-bottom:12px">← Geri</button>
       <div class="faaliyet-turler">${RAPOR_TUR.map(([k, i, a]) => `<button type="button" class="faaliyet-tur tur-${k} ${k === faaliyetTur ? "secili" : ""}" data-faaliyet-tur="${k}"><span>${i}</span>${a}</button>`).join("")}</div>
       <p class="ipucu"><b>${ikon} ${ad}:</b> ${acik}. Raporlarda bildiren ve yapan kişilerin adları yazmaz; fotoğraflar ve notlar vardır. Her ayın son günü akşam 20.00'de üç rapor birden kendiliğinden hazırlanır ve size bildirim gelir.</p>
       ${v.raporlar.length ? v.raporlar.map((r) => {
