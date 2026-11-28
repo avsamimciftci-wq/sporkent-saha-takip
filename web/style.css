@@ -1280,3 +1280,7 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .sayfa-bant.bant-muhasebe { background: #c9d9b3; color: #34501a; border: 1.5px solid #34501a33; }
 .yt-muhasebe { --r: #4f7a28; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ana-kutu.ak-muhasebe { background: #5c7a3d; color: #fff; border-color: transparent; } }
+.kutu-muhasebe { background: linear-gradient(145deg, #5f8f2f, #3f6a1c); }
+.yonetim-kutu.kutu-muhasebe { background: #c9d9b3; color: #34501a; border: 1.5px solid #34501a33; }
+.yonetim-kutu.kutu-faaliyet { background: #f3dcc4; color: #6b3507; border: 1.5px solid #6b350733; }
+.yonetim-kutu.kutu-muhasebe { grid-column: 1 / -1; min-height: 110px; }

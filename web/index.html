@@ -74,7 +74,6 @@
       <button type="button" data-ac="restoran" class="ana-kutu ak-restoran" hidden><span>🍽️</span>Restoran</button>
       <button type="button" data-ac="servis" class="ana-kutu ak-servis"><span>🚐</span>Servis</button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
-      <button type="button" data-ac="muhasebe" class="ana-kutu ak-muhasebe" hidden><span>🧾</span>Muhasebe<small></small></button>
       <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
       <button type="button" data-ac="plaka" class="ana-kutu ak-plaka" hidden><span>🚗</span>Plaka-Kimlik Bildirimi</button>
       <button type="button" data-ac="iletisim" class="ana-kutu ak-iletisim"><span>☎️</span>İletişim</button>
@@ -170,6 +169,7 @@
       <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span class="isci-ikon" aria-hidden="true">👷<b>⛏️</b></span>İş Programı</button>
       <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>🚶</span>Müdür/Şef Günlük Devriye</button>
+      <button id="muhasebe-ac" class="yonetim-kutu kutu-muhasebe" hidden><span>🧾</span>Muhasebe</button>
       <button id="haftalik-ac" class="yonetim-kutu kutu-haftalik"><span>🗓️</span>Haftalık Kontrol</button>
       <button id="faaliyet-ac" class="yonetim-kutu kutu-faaliyet" hidden><span>📑</span>Aylık Faaliyet Raporu</button>
     </div>
@@ -252,7 +252,7 @@
 
   <!-- Restoran: menü resimleri ve sipariş telefonu (ara / WhatsApp) -->
   <main id="ekran-muhasebe" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-muhasebe">🧾 Muhasebe</h1></div>
+    <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-muhasebe">🧾 Muhasebe</h1></div>
     <div id="muhasebe"></div>
   </main>
 
