@@ -1296,3 +1296,6 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .paylasim.masraf { border: 2px solid #3f6a1c; }
 .paylasim.masraf .paylasim-metin { font-weight: 700; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .masraf-durum.tamam { background: #12301a; color: #c8e6c9; } :root:not([data-theme="light"]) .masraf-durum.bekliyor { background: #3a2410; color: #ffe0b2; } }
+.restoran-tur.dortlu { grid-template-columns: repeat(2, 1fr); }
+.restoran-tur .masraf-tur { color: #34501a; border-color: #3f6a1c; }
+.restoran-tur .masraf-tur.secili { background: #3f6a1c; border-color: #3f6a1c; color: #fff; }
