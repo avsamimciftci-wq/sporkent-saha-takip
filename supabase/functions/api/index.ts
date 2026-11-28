@@ -1499,6 +1499,47 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { tamam: true };
     }
 
+    // ---------- Duyuru ve Restoran paylaşımlarını kimler gördü ----------
+    case "paylasim_goruldu": {
+      // Ekranı açan herkesin ilk görüşü saklanır (yönetici sayılmaz)
+      if (rol === "baskan") return { tamam: true };
+      const ids = (Array.isArray(g.ids) ? g.ids : []).map(Number).filter((x: number) => Number.isInteger(x) && x > 0).slice(0, 100);
+      if (!ids.length) return { tamam: true };
+      const { data: pp } = await db.from("restoran_paylasim").select("id").in("id", ids).in("bolum", ["duyuru", "restoran"]);
+      if (pp?.length) await db.from("paylasim_gorulme").upsert(pp.map((p: any) => ({ paylasim_id: p.id, cihaz: u.cihaz, ad: u.ad, rol, unvan: u.unvan ?? null })),
+        { onConflict: "paylasim_id,cihaz", ignoreDuplicates: true });
+      return { tamam: true };
+    }
+
+    case "paylasim_gorulme": {
+      // Yalnızca yönetici: son paylaşımlar ve kaç kişinin gördüğü
+      yonetici();
+      const { data: pp } = await db.from("restoran_paylasim").select("id, bolum, tur, metin, created_at").in("bolum", ["duyuru", "restoran"])
+        .order("created_at", { ascending: false }).limit(40);
+      const ids = (pp ?? []).map((p: any) => p.id);
+      const { data: gr } = ids.length ? await db.from("paylasim_gorulme").select("paylasim_id").in("paylasim_id", ids) : { data: [] };
+      const say = new Map<number, number>();
+      for (const x of gr ?? []) say.set(x.paylasim_id, (say.get(x.paylasim_id) ?? 0) + 1);
+      const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli").neq("rol", "baskan");
+      return {
+        toplam: count ?? 0,
+        paylasimlar: (pp ?? []).map((p: any) => ({ id: p.id, bolum: p.bolum, tur: p.tur, metin: String(p.metin ?? "").slice(0, 140), created_at: p.created_at, goren: say.get(p.id) ?? 0 })),
+      };
+    }
+
+    case "paylasim_gorenler": {
+      yonetici();
+      const id = Number(g.id);
+      const { data: gr } = await db.from("paylasim_gorulme").select("cihaz, ad, unvan, rol, ilk_at").eq("paylasim_id", id).order("ilk_at");
+      const { data: uy } = await db.from("uyeler").select("cihaz, ad, unvan, rol").eq("durum", "onayli").neq("rol", "baskan");
+      const goren = new Set((gr ?? []).map((x: any) => x.cihaz));
+      return {
+        gorenler: (gr ?? []).map(({ cihaz: _c, ...x }: any) => x),
+        gormeyenler: (uy ?? []).filter((x: any) => !goren.has(x.cihaz)).map(({ cihaz: _c, ...x }: any) => x)
+          .sort((a: any, b: any) => String(a.ad).localeCompare(String(b.ad), "tr")),
+      };
+    }
+
     case "restoran_liste": {
       const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "restoran").order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
