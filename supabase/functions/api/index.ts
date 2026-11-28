@@ -621,16 +621,19 @@ async function muavinKlasoruSil() {
 }
 const muavinOzet = (m: any) => ({ ortak_no: m.ortak_no, ad: m.ad, hesap_tarihi: m.bilgi?.hesap_tarihi ?? "", toplam: m.toplam ?? {} });
 // PDF bir kez üretilir, yükleme değişene kadar aynısı verilir; adres 10 dakika geçerlidir
+// PDF düzeni değişince sürüm artar: eski düzendeki PDF silinip yenisi üretilir
+const MUAVIN_PDF_SURUM = "v2";
 async function muavinPdfAdresi(m: any) {
-  if (m.pdf_yol) {
+  if (m.pdf_yol && m.pdf_yol.includes(`/${MUAVIN_PDF_SURUM}-`)) {
     const { data } = await db.storage.from(BUCKET).createSignedUrl(m.pdf_yol, 600);
     if (data?.signedUrl) return data.signedUrl;
   }
+  if (m.pdf_yol) await db.storage.from(BUCKET).remove([m.pdf_yol]).catch(() => {});
   const logo = await fetch("https://avsamimciftci-wq.github.io/sporkent-saha-takip/logo-yatay.png").then((r) => r.ok ? r.arrayBuffer() : null).catch(() => null);
   const simdi = new Date(Date.now() + 3 * 3600e3), iki = (n: number) => String(n).padStart(2, "0");
   const uretim = `${iki(simdi.getUTCDate())}.${iki(simdi.getUTCMonth() + 1)}.${simdi.getUTCFullYear()} ${iki(simdi.getUTCHours())}:${iki(simdi.getUTCMinutes())}`;
   const bayt = await muavinPdf({ PDFDocument, rgb, fontkit, fontNormal: ROBOTO_NORMAL(), fontKalin: ROBOTO_KALIN(), logo: logo ? new Uint8Array(logo) : null }, m, uretim);
-  const yol = `muavin/${m.yukleme_id}/${m.ortak_no}-${crypto.randomUUID()}.pdf`;
+  const yol = `muavin/${m.yukleme_id}/${MUAVIN_PDF_SURUM}-${m.ortak_no}-${crypto.randomUUID()}.pdf`;
   const { error } = await db.storage.from(BUCKET).upload(yol, bayt, { contentType: "application/pdf", upsert: false });
   if (error) throw error;
   await db.from("muavinler").update({ pdf_yol: yol }).eq("ortak_no", m.ortak_no).eq("yukleme_id", m.yukleme_id);

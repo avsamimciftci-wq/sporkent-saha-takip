@@ -1,16 +1,13 @@
-// Ortak muavini (Muhasebe İletişim Programı'nın faiz dökümü) → yatay A4 PDF.
-// 1. bölüm: Hesap Dökümü + toplamlar; 2. bölüm: Kalem Faizleri. Bağımlılıklar dışarıdan verilir (sunucu: npm:pdf-lib).
+// Ortak muavini (Muhasebe İletişim Programı'nın faiz dökümü) → dikey A4 PDF, yaşlı ortakların da rahat okuyacağı büyük yazıyla.
+// Sıra: özet (güncel bakiye en üstte, büyük) → hesap hareketleri → kalem faizleri. Bağımlılıklar dışarıdan verilir (sunucu: npm:pdf-lib).
 // d = { PDFDocument, rgb, fontkit, fontNormal, fontKalin, logo? }
 // m = { ortak_no, hesap, ad, bilgi: {hesap_tarihi, faiz_orani, mahsup}, satirlar: [...], toplam: {...}, kalemler: [...] }
 
-const SAYFA = [841.89, 595.28], KENAR = 32, GEN = SAYFA[0] - 2 * KENAR;
-const para = (n) => n === null || n === undefined || n === "" || !Number.isFinite(Number(n)) ? ""
-  : Number(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// Bakiye: artı borç (B), eksi alacak (A)
-const bakiye = (n) => n === null || n === undefined || n === "" || !Number.isFinite(Number(n)) ? ""
-  : Number(n) === 0 ? "0,00" : `${para(Math.abs(Number(n)))} ${Number(n) > 0 ? "B" : "A"}`;
+const SAYFA = [595.28, 841.89], KENAR = 36, GEN = SAYFA[0] - 2 * KENAR;
+const bosMu = (n) => n === null || n === undefined || n === "" || !Number.isFinite(Number(n));
+const para = (n) => bosMu(n) ? "" : Number(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // Yazı tipinde olmayan emoji ve işaretler boş kutu olur: çıkarılır
-const temiz = (s) => String(s ?? "").replace(/\r/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/gu, "");
+const temiz = (s) => String(s ?? "").replace(/\r/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/gu, "").replace(/→/g, ">");
 
 export async function muavinPdf(d, m, uretim) {
   const { PDFDocument, rgb } = d;
@@ -21,11 +18,15 @@ export async function muavinPdf(d, m, uretim) {
   const N = await pdf.embedFont(d.fontNormal, { subset: true });
   const K = await pdf.embedFont(d.fontKalin, { subset: true });
   const R = {
-    mavi: rgb(0.169, 0.435, 0.576), koyu: rgb(0.11, 0.17, 0.15), soluk: rgb(0.38, 0.44, 0.42), cizgi: rgb(0.83, 0.87, 0.86),
-    zebra: rgb(0.95, 0.97, 0.97), beyaz: rgb(1, 1, 1), basBg: rgb(0.86, 0.92, 0.95), kirmizi: rgb(0.7, 0.14, 0.09), yesil: rgb(0.18, 0.49, 0.2),
+    mavi: rgb(0.169, 0.435, 0.576), koyu: rgb(0.08, 0.12, 0.11), soluk: rgb(0.33, 0.38, 0.36), cizgi: rgb(0.78, 0.83, 0.82),
+    zebra: rgb(0.95, 0.97, 0.97), beyaz: rgb(1, 1, 1), basBg: rgb(0.86, 0.92, 0.95),
+    kirmizi: rgb(0.66, 0.1, 0.07), kirmiziBg: rgb(0.99, 0.92, 0.91), yesil: rgb(0.1, 0.42, 0.15), yesilBg: rgb(0.91, 0.96, 0.91),
   };
   let logo = null;
   if (d.logo) { try { logo = await pdf.embedPng(d.logo); } catch { logo = null; } }
+  const t = m.toplam || {};
+  const borcMu = (n) => !bosMu(n) && Number(n) > 0, alacakMi = (n) => !bosMu(n) && Number(n) < 0;
+  const bakiyeYazi = (n) => bosMu(n) ? "" : Number(n) === 0 ? "0,00" : `${para(Math.abs(Number(n)))} ${Number(n) > 0 ? "B" : "A"}`;
 
   const sar = (metin, f, b, w) => {
     const satirlar = [];
@@ -42,125 +43,160 @@ export async function muavinPdf(d, m, uretim) {
         }
         s = k;
       }
-      satirlar.push(s);
+      if (s) satirlar.push(s);
     }
-    return satirlar.length ? satirlar : [""];
+    return satirlar;
   };
+  const sagaYaz = (p, metin, xSag, yy, f, b, renk) => p.drawText(metin, { x: xSag - f.widthOfTextAtSize(metin, b), y: yy, size: b, font: f, color: renk });
 
   let sayfa, y;
   const sayfalar = [];
-  // Her sayfanın üstünde kooperatif ve ortak bilgisi
-  const yeniSayfa = (baslik) => {
+  // İlk sayfada büyük başlık; sonraki sayfalarda ince şerit (kimin dökümü olduğu her sayfada yazar)
+  const yeniSayfa = () => {
     sayfa = pdf.addPage(SAYFA); sayfalar.push(sayfa);
-    const h = 62;
-    sayfa.drawRectangle({ x: 0, y: SAYFA[1] - h, width: SAYFA[0], height: h, color: R.mavi });
-    let x = KENAR;
-    if (logo) { const lh = 38, lw = (logo.width / logo.height) * lh; sayfa.drawImage(logo, { x, y: SAYFA[1] - 12 - lh, width: lw, height: lh, opacity: 0.95 }); x += lw + 16; }
-    sayfa.drawText(baslik, { x, y: SAYFA[1] - 30, size: 16, font: K, color: R.beyaz });
-    sayfa.drawText(`${m.ortak_no} No'lu Ortak · ${temiz(m.ad)}`, { x, y: SAYFA[1] - 49, size: 11, font: N, color: R.beyaz });
-    const sag = "Sporkent İşletme Kooperatifi";
-    sayfa.drawText(sag, { x: SAYFA[0] - KENAR - K.widthOfTextAtSize(sag, 11), y: SAYFA[1] - 30, size: 11, font: K, color: R.beyaz });
-    const ht = `Hesap tarihi: ${temiz(m.bilgi?.hesap_tarihi || "—")}`;
-    sayfa.drawText(ht, { x: SAYFA[0] - KENAR - N.widthOfTextAtSize(ht, 10), y: SAYFA[1] - 49, size: 10, font: N, color: R.beyaz });
-    y = SAYFA[1] - h - 16;
+    if (sayfalar.length === 1) {
+      const h = 84;
+      sayfa.drawRectangle({ x: 0, y: SAYFA[1] - h, width: SAYFA[0], height: h, color: R.mavi });
+      let x = KENAR;
+      if (logo) { const lh = 46, lw = (logo.width / logo.height) * lh; sayfa.drawImage(logo, { x, y: SAYFA[1] - 19 - lh, width: lw, height: lh }); x += lw + 18; }
+      sayfa.drawText("HESAP DÖKÜMÜ", { x, y: SAYFA[1] - 42, size: 22, font: K, color: R.beyaz });
+      sayfa.drawText("Sporkent İşletme Kooperatifi", { x, y: SAYFA[1] - 64, size: 13, font: N, color: R.beyaz });
+      y = SAYFA[1] - h - 24;
+    } else {
+      const h = 34;
+      sayfa.drawRectangle({ x: 0, y: SAYFA[1] - h, width: SAYFA[0], height: h, color: R.mavi });
+      sayfa.drawText(`Hesap Dökümü · ${m.ortak_no} No'lu Ortak · ${temiz(m.ad)}`, { x: KENAR, y: SAYFA[1] - 22, size: 12, font: K, color: R.beyaz });
+      sagaYaz(sayfa, temiz(m.bilgi?.hesap_tarihi || ""), SAYFA[0] - KENAR, SAYFA[1] - 22, N, 11, R.beyaz);
+      y = SAYFA[1] - h - 18;
+    }
   };
+  const altSinir = KENAR + 26;
 
-  // Tablo: başlık satırı sayfa bölündükçe tekrarlanır
-  const tablo = (baslik, kolonlar, satirlar, bicim) => {
-    const B = 7.6, SAT = B * 1.28, PAD = 3.2;
+  // ---- Kimlik ve özet ----
+  yeniSayfa();
+  sayfa.drawText(`${m.ortak_no} No'lu Ortak`, { x: KENAR, y: y - 13, size: 13, font: N, color: R.soluk });
+  y -= 20;
+  for (const s of sar(m.ad, K, 20, GEN)) { sayfa.drawText(s, { x: KENAR, y: y - 20, size: 20, font: K, color: R.koyu }); y -= 26; }
+  sayfa.drawText(`Hesap tarihi: ${temiz(m.bilgi?.hesap_tarihi || "—")}`, { x: KENAR, y: y - 13, size: 13, font: N, color: R.koyu });
+  y -= 28;
+
+  // Güncel bakiye kutusu: büyük, renkli, "BORÇ / ALACAK" yazıyla
+  const borc = borcMu(t.bakiye), alacak = alacakMi(t.bakiye);
+  const kH = 74;
+  sayfa.drawRectangle({ x: KENAR, y: y - kH, width: GEN, height: kH, color: borc ? R.kirmiziBg : alacak ? R.yesilBg : R.zebra, borderColor: borc ? R.kirmizi : alacak ? R.yesil : R.cizgi, borderWidth: 1.5 });
+  sayfa.drawText("Güncel bakiye", { x: KENAR + 16, y: y - 26, size: 14, font: K, color: R.koyu });
+  const tutar = bosMu(t.bakiye) ? "—" : `${para(Math.abs(Number(t.bakiye)))} TL`;
+  sayfa.drawText(tutar, { x: KENAR + 16, y: y - 58, size: 26, font: K, color: borc ? R.kirmizi : alacak ? R.yesil : R.koyu });
+  const etiket = borc ? "BORÇ" : alacak ? "ALACAK" : "BORÇ YOK";
+  sagaYaz(sayfa, etiket, KENAR + GEN - 16, y - 58, K, 22, borc ? R.kirmizi : alacak ? R.yesil : R.koyu);
+  y -= kH + 14;
+
+  // Ayrıntı satırları
+  const ayrinti = [
+    ["Ödenmemiş anapara", `${para(t.odenmemis_anapara) || "0,00"} TL`],
+    ["Ödenmemiş faiz", `${para(t.odenmemis_faiz) || "0,00"} TL`],
+    ["Toplam borç", `${para(t.borc) || "0,00"} TL`],
+    ["Toplam faiz", `${para(t.faiz) || "0,00"} TL`],
+    ["Toplam ödeme", `${para(t.odeme) || "0,00"} TL`],
+  ];
+  ayrinti.forEach(([a, b], i) => {
+    const yy = y - 15;
+    if (i % 2 === 0) sayfa.drawRectangle({ x: KENAR, y: y - 22, width: GEN, height: 22, color: R.zebra });
+    sayfa.drawText(a, { x: KENAR + 10, y: yy, size: 13, font: i < 2 ? K : N, color: R.koyu });
+    sagaYaz(sayfa, b, KENAR + GEN - 10, yy, K, 13, R.koyu);
+    y -= 22;
+  });
+  y -= 10;
+  const bilgi = `Aylık faiz oranı: %${temiz(m.bilgi?.faiz_orani || "—")}  ·  Mahsup sırası: ${temiz(m.bilgi?.mahsup || "—")}`;
+  for (const s of sar(bilgi, N, 11, GEN)) { sayfa.drawText(s, { x: KENAR, y: y - 11, size: 11, font: N, color: R.soluk }); y -= 15; }
+  y -= 14;
+
+  // ---- Tablo yardımcısı (başlık satırı her sayfada tekrarlanır) ----
+  const tablo = (baslik, aciklama, kolonlar, satirlar, b = 11) => {
+    const SAT = b * 1.28, PAD = 4.5, NOT_B = b - 1.5;
     const basCiz = () => {
-      const hh = 16;
+      const hh = 22;
       sayfa.drawRectangle({ x: KENAR, y: y - hh, width: GEN, height: hh, color: R.basBg });
       let x = KENAR;
       for (const k of kolonlar) {
-        const tw = K.widthOfTextAtSize(k.ad, 7.8);
-        sayfa.drawText(k.ad, { x: k.sag ? x + k.w - PAD - tw : x + PAD, y: y - 11, size: 7.8, font: K, color: R.koyu });
+        if (k.sag) sagaYaz(sayfa, k.ad, x + k.w - PAD, y - 15, K, b, R.koyu);
+        else sayfa.drawText(k.ad, { x: x + PAD, y: y - 15, size: b, font: K, color: R.koyu });
         x += k.w;
       }
       y -= hh;
     };
-    yeniSayfa(baslik); basCiz();
+    const bolumBasligi = (devam) => {
+      sayfa.drawText(baslik + (devam ? " (devam)" : ""), { x: KENAR, y: y - 16, size: 16, font: K, color: R.mavi });
+      y -= 24;
+      if (!devam && aciklama) { for (const s of sar(aciklama, N, 10, GEN)) { sayfa.drawText(s, { x: KENAR, y: y - 10, size: 10, font: N, color: R.soluk }); y -= 14; } y -= 4; }
+      basCiz();
+    };
+    if (y - 120 < altSinir) yeniSayfa();
+    bolumBasligi(false);
     satirlar.forEach((s, i) => {
-      const hucre = kolonlar.map((k) => sar(k.deger(s), s.kalin ? K : N, B, k.w - 2 * PAD));
-      const h = Math.max(...hucre.map((x) => x.length)) * SAT + 2 * PAD;
-      if (y - h < KENAR + 18) { yeniSayfa(baslik); basCiz(); }
+      const f = s.kalin ? K : N;
+      // Tarih ve tutarlar bölünmez (tek satır); açıklamalar sarılır
+      const hucre = kolonlar.map((k) => k.tek ? [temiz(k.deger(s))].filter(Boolean) : sar(k.deger(s), f, b, k.w - 2 * PAD));
+      const notlar = s.not ? sar(s.not, N, NOT_B, kolonlar.find((k) => k.not).w - 2 * PAD) : [];
+      const icerik = Math.max(1, ...hucre.map((x, j) => x.length + (kolonlar[j].not ? notlar.length * (NOT_B * 1.3) / SAT : 0)));
+      const h = icerik * SAT + 2 * PAD + 2;
+      if (y - h < altSinir) { yeniSayfa(); bolumBasligi(true); }
       if (s.kalin) sayfa.drawRectangle({ x: KENAR, y: y - h, width: GEN, height: h, color: R.basBg });
       else if (i % 2) sayfa.drawRectangle({ x: KENAR, y: y - h, width: GEN, height: h, color: R.zebra });
       let x = KENAR;
       kolonlar.forEach((k, j) => {
-        hucre[j].forEach((metin, n) => {
-          const f = s.kalin ? K : N, tw = f.widthOfTextAtSize(metin, B);
-          const renk = bicim?.(k, s) || R.koyu;
-          sayfa.drawText(metin, { x: k.sag ? x + k.w - PAD - tw : x + PAD, y: y - PAD - B - n * SAT + 1, size: B, font: f, color: renk });
-        });
+        let yy = y - PAD - b;
+        const renk = k.renk?.(s) || R.koyu;
+        for (const metin of hucre[j]) {
+          // Sığmayan tek satırlık hücrede yazı biraz küçülür
+          let bb = b; while (k.tek && bb > 7 && f.widthOfTextAtSize(metin, bb) > k.w - 2 * PAD) bb -= 0.25;
+          if (k.sag) sagaYaz(sayfa, metin, x + k.w - PAD, yy, f, bb, renk);
+          else sayfa.drawText(metin, { x: x + PAD, y: yy, size: bb, font: f, color: renk });
+          yy -= SAT;
+        }
+        if (k.not) for (const metin of notlar) { sayfa.drawText(metin, { x: x + PAD, y: yy + 1, size: NOT_B, font: N, color: R.soluk }); yy -= NOT_B * 1.3; }
         x += k.w;
       });
       y -= h;
-      sayfa.drawLine({ start: { x: KENAR, y }, end: { x: KENAR + GEN, y }, thickness: 0.4, color: R.cizgi });
+      sayfa.drawLine({ start: { x: KENAR, y }, end: { x: KENAR + GEN, y }, thickness: 0.5, color: R.cizgi });
     });
+    y -= 18;
   };
 
-  // ---- 1. Hesap Dökümü ----
-  const s1 = [
-    { ad: "Tarih", w: 58, deger: (s) => s.tarih },
-    { ad: "Açıklama", w: 222, deger: (s) => s.aciklama },
-    { ad: "Borç", w: 72, sag: true, deger: (s) => para(s.borc) },
-    { ad: "Faiz", w: 62, sag: true, deger: (s) => para(s.faiz) },
-    { ad: "Ödeme", w: 72, sag: true, deger: (s) => para(s.odeme) },
-    { ad: "Bakiye", w: 82, sag: true, deger: (s) => bakiye(s.bakiye) },
+  // ---- Hesap hareketleri ----
+  const bakiyeRenk = (s) => borcMu(s.bakiye) ? R.kirmizi : alacakMi(s.bakiye) ? R.yesil : null;
+  const k1 = [
+    { ad: "Tarih", w: 72, tek: true, deger: (s) => s.tarih },
+    { ad: "Açıklama", w: 0, not: true, deger: (s) => s.aciklama },
+    { ad: "Borç", tek: true, w: 64, sag: true, deger: (s) => para(s.borc) },
+    { ad: "Faiz", tek: true, w: 56, sag: true, deger: (s) => para(s.faiz) },
+    { ad: "Ödeme", tek: true, w: 64, sag: true, deger: (s) => para(s.odeme) },
+    { ad: "Bakiye", tek: true, w: 82, sag: true, deger: (s) => bakiyeYazi(s.bakiye), renk: bakiyeRenk },
   ];
-  s1.push({ ad: "Not", w: GEN - s1.reduce((a, k) => a + k.w, 0), deger: (s) => s.not });
-  const t = m.toplam || {};
-  const satir1 = [...(m.satirlar || []),
-    { kalin: true, tarih: "", aciklama: "TOPLAM", borc: t.borc, faiz: t.faiz, odeme: t.odeme, bakiye: t.bakiye, not: "" }];
-  tablo("ORTAK HESAP DÖKÜMÜ", s1, satir1, (k, s) => k.ad === "Bakiye" && Number(s.bakiye) < 0 ? R.yesil : null);
+  k1[1].w = GEN - k1.reduce((a, k) => a + k.w, 0);
+  tablo("Hesap Hareketleri", "Tutarlar TL'dir. Bakiye sütununda B: borçlu, A: alacaklı (fazla ödeme) demektir. Açıklamaların altındaki gri yazılar muhasebe notudur.", k1,
+    [...(m.satirlar || []), { kalin: true, tarih: "", aciklama: "TOPLAM", borc: t.borc, faiz: t.faiz, odeme: t.odeme, bakiye: t.bakiye }]);
 
-  // Özet ve hesap bilgisi
-  const ozet = [
-    ["Güncel bakiye", bakiye(t.bakiye)],
-    ["Ödenmemiş anapara", para(t.odenmemis_anapara)],
-    ["Ödenmemiş faiz", para(t.odenmemis_faiz)],
-  ];
-  const bilgi = [
-    ["Aylık faiz oranı", m.bilgi?.faiz_orani !== undefined && m.bilgi?.faiz_orani !== "" ? `%${temiz(m.bilgi.faiz_orani)}` : "—"],
-    ["Mahsup sırası", temiz(m.bilgi?.mahsup || "—")],
-  ];
-  const kutuH = 18 + ozet.length * 15;
-  if (y - kutuH - 14 < KENAR + 18) yeniSayfa("ORTAK HESAP DÖKÜMÜ");
-  y -= 14;
-  sayfa.drawRectangle({ x: KENAR, y: y - kutuH, width: 300, height: kutuH, borderColor: R.mavi, borderWidth: 1, color: R.beyaz });
-  ozet.forEach(([a, b], i) => {
-    const yy = y - 18 - i * 15;
-    sayfa.drawText(a, { x: KENAR + 10, y: yy, size: 10, font: i ? N : K, color: R.koyu });
-    const tw = K.widthOfTextAtSize(b, 10);
-    sayfa.drawText(b, { x: KENAR + 290 - tw, y: yy, size: 10, font: K, color: i === 0 && Number(t.bakiye) > 0 ? R.kirmizi : R.koyu });
-  });
-  bilgi.forEach(([a, b], i) => {
-    sayfa.drawText(`${a}: ${b}`, { x: KENAR + 320, y: y - 18 - i * 15, size: 9, font: N, color: R.soluk });
-  });
-  y -= kutuH;
-
-  // ---- 2. Kalem Faizleri ----
+  // ---- Kalem faizleri ----
   if ((m.kalemler || []).length) {
-    const s2 = [
-      { ad: "Tarih", w: 58, deger: (s) => s.tarih },
-      { ad: "Kalem", w: 250, deger: (s) => s.kalem },
-      { ad: "Tutar", w: 74, sag: true, deger: (s) => para(s.tutar) },
-      { ad: "Faiz", w: 40, deger: (s) => s.faizli },
-      { ad: "Faiz başlangıcı", w: 82, deger: (s) => s.faiz_baslangic },
-      { ad: "Faizli gün", w: 58, sag: true, deger: (s) => s.faizli_gun === null || s.faizli_gun === undefined ? "" : String(s.faizli_gun) },
-      { ad: "İşletilen faiz", w: 80, sag: true, deger: (s) => para(s.isletilen_faiz) },
+    const k2 = [
+      { ad: "Tarih", w: 72, tek: true, deger: (s) => s.tarih },
+      { ad: "Borç kalemi", w: 0, deger: (s) => `${s.kalem}${/^hay/i.test(s.faizli || "") ? " (faizsiz)" : ""}` },
+      { ad: "Tutar", tek: true, w: 66, sag: true, deger: (s) => para(s.tutar) },
+      { ad: "Faiz başl.", tek: true, w: 70, deger: (s) => s.faiz_baslangic },
+      { ad: "Gün", tek: true, w: 34, sag: true, deger: (s) => bosMu(s.faizli_gun) ? "" : String(s.faizli_gun) },
+      { ad: "İşl. faiz", tek: true, w: 58, sag: true, deger: (s) => para(s.isletilen_faiz) },
+      { ad: "Kalan", tek: true, w: 62, sag: true, deger: (s) => para(s.odenmemis_anapara) },
     ];
-    s2.push({ ad: "Ödenmemiş anapara", w: GEN - s2.reduce((a, k) => a + k.w, 0), sag: true, deger: (s) => para(s.odenmemis_anapara) });
-    tablo("KALEM FAİZLERİ", s2, m.kalemler, null);
+    k2[1].w = GEN - k2.reduce((a, k) => a + k.w, 0);
+    tablo("Borç Kalemleri ve Faizleri", "Her borç kalemi için faizin başladığı tarih, faiz işletilen gün sayısı, işletilen faiz ve kalemden henüz ödenmemiş anapara (Kalan).", k2, m.kalemler, 10.5);
   }
 
   // Alt bilgi: sayfa numarası ve gizlilik notu
   sayfalar.forEach((p, i) => {
-    const not = `Bu belge yalnızca ${m.ortak_no} No'lu ortağın kendi hesabını gösterir; üçüncü kişilerle paylaşılmamalıdır. · Sporkent Asistan · ${uretim}`;
-    p.drawText(temiz(not), { x: KENAR, y: 16, size: 7, font: N, color: R.soluk });
-    const sn = `Sayfa ${i + 1} / ${sayfalar.length}`;
-    p.drawText(sn, { x: SAYFA[0] - KENAR - N.widthOfTextAtSize(sn, 7.5), y: 16, size: 7.5, font: N, color: R.soluk });
+    p.drawLine({ start: { x: KENAR, y: 34 }, end: { x: SAYFA[0] - KENAR, y: 34 }, thickness: 0.5, color: R.cizgi });
+    p.drawText(temiz(`Bu belge ${m.ortak_no} No'lu ortağın kendi hesabıdır; başkalarıyla paylaşılmamalıdır. · Sporkent Asistan · ${uretim}`), { x: KENAR, y: 20, size: 8.5, font: N, color: R.soluk });
+    sagaYaz(p, `Sayfa ${i + 1} / ${sayfalar.length}`, SAYFA[0] - KENAR, 20, K, 10, R.koyu);
   });
   return await pdf.save();
 }
