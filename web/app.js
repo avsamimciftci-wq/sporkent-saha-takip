@@ -2551,13 +2551,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
         </details>` : ""}
       </form>` : "";
-    const liste = v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`;
+    const liste = v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.silebilir ?? v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`;
     // Muhasebe: bu ayın masraf listesi durumu ve paylaşma tuşu en üstte
     if (b === "muhasebe" && v.masraf) {
       const m = v.masraf;
       siparis = `<div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
         <b>📋 ${MASRAF_BASLIK} · ${kac(m.liste_ayi)}</b>
-        <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : "⏳ Bu ay henüz paylaşılmadı. Her ayın 1'inde paylaşılır; o gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider."}</span>
+        <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ay henüz paylaşılmadı. Her ayın ilk iş gününde paylaşılır (1'i cumartesi, pazar ya da resmî tatilse sonraki ilk iş günü). Bu ay: <b>${m.gun ? new Date(m.gun + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }) : "ayın 1'i"}</b>. O gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider.`}</span>
         ${v.yonetir ? `<button type="button" class="ana-dugme masraf-dugme" data-masraf-ac>📋 ${MASRAF_BASLIK}${m.paylasildi_at ? "'ni yeniden paylaş" : "'ni paylaş"}</button>` : ""}
       </div>`;
     }
