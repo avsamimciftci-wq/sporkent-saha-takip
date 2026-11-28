@@ -1232,3 +1232,32 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .video-satir { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--cizgi); }
 .video-satir .tg-link { font-size: 14px; overflow-wrap: anywhere; }
 .yapildi-goren h3.goren-baslik { border: 0; background: none; box-shadow: none; padding: 0; font-weight: 800; font-size: 17px; }
+
+/* İş Programı: pazar tatil (kırmızı), yapıldı işareti */
+.prog-gun h3.gun-6 { background: #f8d7d5; border-left-color: #c62828; color: #b71c1c; }
+.tatil-etiket { flex: none; background: #c62828; color: #fff; font-size: 12px; font-weight: 900; letter-spacing: .06em; border-radius: 99px; padding: 3px 10px; }
+.prog-ay .gun-adi.pazar { color: #c62828; }
+.prog-ay button.pazar { color: #c62828; background: #fdecea; }
+.prog-is .prog-dugmeler { flex: none; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.prog-is .prog-yap { background: #2e7d32; color: #fff; border: 0; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 800; padding: 8px 10px; cursor: pointer; }
+.prog-is .prog-geri { background: var(--kart); color: var(--soluk); border: 1px solid var(--cizgi); border-radius: 10px; font: inherit; font-size: 13px; padding: 6px 8px; cursor: pointer; }
+.prog-is.yapildi { background: #eef7ee; border-color: #a5d6a7; border-left-color: #2e7d32; }
+.prog-is.yapildi b { text-decoration: line-through; text-decoration-color: #2e7d3299; }
+.prog-yapildi-etiket, .prog-kaldi-etiket { display: inline-block; font-size: 12px; font-weight: 900; border-radius: 99px; padding: 2px 9px; margin-bottom: 4px; }
+.prog-yapildi-etiket { background: #2e7d32; color: #fff; }
+.prog-kaldi-etiket { background: #fff3e0; color: #b45309; border: 1px solid #f59e0b; }
+.prog-is small.prog-yapan { color: #2e7d32; font-weight: 700; }
+.prog-ne-zaman { border: 2px solid var(--cizgi); border-radius: 12px; padding: 8px 12px; margin: 10px 0; }
+.prog-ne-zaman legend { font-weight: 800; padding: 0 4px; }
+.prog-ne-zaman label { display: block; padding: 6px 0; }
+.prog-ne-zaman small { color: var(--soluk); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .prog-is.yapildi { background: #12301a; } :root:not([data-theme="light"]) .prog-gun h3.gun-6 { background: #4a1714; color: #ffcdd2; } }
+
+/* Aylık Faaliyet Raporu */
+.kutu-faaliyet { grid-column: 1 / -1; min-height: 110px; background: linear-gradient(145deg, #b45309, #8a3c05); }
+.sayfa-bant.bant-faaliyet { background: #f3dcc4; color: #6b3507; border: 1.5px solid #6b350733; }
+.faaliyet-satir { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 12px; margin-bottom: 10px; border: 2px solid var(--cizgi); border-radius: 14px; background: var(--kart); }
+.faaliyet-satir b { display: block; font-size: 18px; }
+.faaliyet-satir small { color: var(--soluk); font-size: 14px; }
+.faaliyet-ac { background: #2b6f93; color: #fff; text-decoration: none; font-weight: 800; border-radius: 12px; padding: 10px 14px; white-space: nowrap; }
+.faaliyet-yenile { grid-column: 1 / -1; font-size: 14px; padding: 8px; }
