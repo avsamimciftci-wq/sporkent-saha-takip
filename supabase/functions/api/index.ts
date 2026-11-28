@@ -568,7 +568,7 @@ async function muavinHakki(u: any): Promise<{ hak: boolean; neden?: string }> {
   if (muavinYakinMi(u)) return { hak: false, neden: "Muavini yalnızca ortağın kendisi görür; ortak yakınları göremez." };
   const { data: r } = await db.from("ortak_rehberi").select("ad_ozet, tel_ozetleri").eq("no", u.ortak_no).maybeSingle();
   const e = await listeyleKarsilastir(r, u.ad, u.telefon ?? "");
-  if (!e.uyuyor || !e.ad_uyuyor) return { hak: false, neden: "Adınız, ortak numaranız ve telefonunuz kooperatif kayıtlarıyla birebir örtüşmediği için muavininizi buradan gösteremiyoruz. Lütfen muhasebeyle görüşün." };
+  if (!e.uyuyor || !e.ad_uyuyor) return { hak: false, neden: "Adınız, ortak numaranız ve telefonunuz kooperatif kayıtlarıyla birebir örtüşmediği için hesap özetinizi buradan gösteremiyoruz. Lütfen muhasebeyle görüşün." };
   return { hak: true };
 }
 // Bilgisayardan yükleme kodu: 30 dakika geçerli; hatalı denemeler kodla girişteki gibi sınırlanır
@@ -672,7 +672,7 @@ async function muavinYukleme(g: any, ip: string) {
       const { data: ortaklar } = await db.from("uyeler").select("cihaz, ad, rol, unvan, ortak_no, telefon").eq("rol", "uye").eq("durum", "onayli").not("ortak_no", "is", null);
       const cihazlar: string[] = [];
       for (const o of ortaklar ?? []) if (!testCihaz(o.cihaz) && (await muavinHakki(o)).hak) cihazlar.push(o.cihaz);
-      const r = await bildir({ cihazlar }, "📒 Muavininiz güncellendi", "Hesap dökümünüze ana sayfadaki Muavinim tuşundan bakabilirsiniz.", { sayfa: "muavin" });
+      const r = await bildir({ cihazlar }, "📒 Hesap özetiniz güncellendi", "Hesap dökümünüze ana sayfadaki Hesap Özeti tuşundan bakabilirsiniz.", { sayfa: "muavin" });
       bildirilen = r.basarili ?? 0;
     }
     return { adet: n, bildirilen };

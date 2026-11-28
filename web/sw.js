@@ -1,5 +1,5 @@
 ﻿// Bildirimleri gÃ¶sterir ve uygulama kabuÄŸunu Ã¶nbellekte tutar.
-const SURUM = "sk-v216";
+const SURUM = "sk-v217";
 const DURUM = "sk-durum"; // sÃ¼rÃ¼mden baÄŸÄ±msÄ±z kÃ¼Ã§Ã¼k kayÄ±t: temizlenmemiÅŸ bildirim var mÄ±
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "logo-yatay.png", "icons/sk-mavi-192.png"];
 
