@@ -2486,7 +2486,30 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // ---------- Paylaşım bölümleri: Duyurular ve Restoran (görsel, metin, PDF) ----------
   // Duyuruyu yalnızca yönetici, restoran paylaşımını restoran yetkilisi ve yönetici yapar ve siler;
   // herkes görür, her paylaşım uygulamayı kullanan herkese sesli bildirimle duyurulur.
-  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"] };
+  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], link: ["🔗", "Link", ""] };
+  // Link (YouTube, Instagram, web…) Duyurular ve Restoran'da; metin olarak saklanır, gösterirken karta dönüşür
+  const turlerOf = (b) => Object.entries(PAYLASIM_TURLERI).filter(([k]) => k !== "link" || b !== "muhasebe");
+  const URL_RE = /https?:\/\/[^\s<>"']+/g;
+  const urlTemiz = (u) => u.replace(/[).,;:!?]+$/, "");
+  const youtubeId = (u) => (u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/) || [])[1];
+  function linkKarti(u) {
+    let alan = ""; try { alan = new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; }
+    const yt = youtubeId(u);
+    if (yt) return `<a class="link-kart youtube" href="${kac(u)}" target="_blank" rel="noopener"><span class="link-resim"><img src="https://i.ytimg.com/vi/${yt}/hqdefault.jpg" alt="" loading="lazy"><b>▶</b></span><span class="link-yazi"><b>▶ YouTube'da izle</b><small>${kac(alan)}</small></span></a>`;
+    const ig = /instagram\.com$/.test(alan), fb = /facebook\.com$|fb\.watch$/.test(alan), tt = /tiktok\.com$/.test(alan);
+    const [ikon, ad] = ig ? ["📸", "Instagram'da aç"] : fb ? ["📘", "Facebook'ta aç"] : tt ? ["🎵", "TikTok'ta aç"] : ["🌐", "Bağlantıyı aç"];
+    return `<a class="link-kart ${ig ? "instagram" : ""}" href="${kac(u)}" target="_blank" rel="noopener"><span class="link-ikon">${ikon}</span><span class="link-yazi"><b>${ad}</b><small>${kac(alan)}</small></span></a>`;
+  }
+  // Metindeki adresler tıklanır olur; ilk adres ayrıca kart olarak gösterilir
+  function linkliMetin(m) {
+    let html = "", son = 0;
+    for (const x of String(m).matchAll(URL_RE)) {
+      const u = urlTemiz(x[0]);
+      html += kac(m.slice(son, x.index)) + `<a href="${kac(u)}" target="_blank" rel="noopener">${kac(u)}</a>`;
+      son = x.index + u.length;
+    }
+    return html + kac(m.slice(son));
+  }
   const PAYLASIM_BOLUMU = {
     restoran: { ornekMetin: "Örn. Bu akşam balık günü!", ornekAciklama: "Örn. Haftanın menüsü", bos: "Henüz paylaşım yok." },
     duyuru: { ornekMetin: "Örn. Cumartesi günü saat 10.00'da sitede ilaçlama yapılacaktır.", ornekAciklama: "Örn. Genel Kurul daveti", bos: "Henüz duyuru yok." },
@@ -2501,8 +2524,17 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     goster(b);
     const kutu = $("#" + b);
     if (!kutu.innerHTML) kutu.innerHTML = `<p class="bos">Yükleniyor…</p>`;
-    try { const v = await api(b + "_liste"); paylasimCiz(b, v); if (b === "duyuru") duyuruGorulduIsaretle(v); }
+    try { const v = await api(b + "_liste"); paylasimCiz(b, v); if (b === "duyuru") duyuruGorulduIsaretle(v); paylasimGorulduGonder(b, v); }
     catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  // Duyuru ve Restoran'da ekranda görülen paylaşımlar "gördü" sayılır (Kullanım Raporu'nda yalnızca yönetici görür)
+  const paylasimGorulenler = new Set();
+  function paylasimGorulduGonder(b, v) {
+    if (!["duyuru", "restoran"].includes(b) || yonetici()) return;
+    const yeni = v.paylasimlar.map((p) => p.id).filter((i) => !paylasimGorulenler.has(i));
+    if (!yeni.length) return;
+    yeni.forEach((i) => paylasimGorulenler.add(i));
+    api("paylasim_goruldu", { ids: yeni }).catch(() => yeni.forEach((i) => paylasimGorulenler.delete(i)));
   }
   function restoranAc() { return paylasimAc("restoran"); }
   function duyuruAc() { return paylasimAc("duyuru"); }
@@ -2515,7 +2547,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       <div class="paylasim-ust"><span>${PAYLASIM_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
         ${yonetir ? `<button type="button" class="kucuk-dugme tehlike" data-paylasim-sil="${p.id}">🗑 Sil</button>` : ""}</div>
       ${ic}
-      ${p.metin ? `<p class="paylasim-metin">${kac(p.metin)}</p>` : ""}
+      ${p.metin ? (() => { const ilk = String(p.metin).match(URL_RE)?.[0]; return `${ilk ? linkKarti(urlTemiz(ilk)) : ""}<p class="paylasim-metin">${linkliMetin(p.metin)}</p>`; })() : ""}
     </article>`;
   }
   function paylasimCiz(b, v) {
@@ -2538,10 +2570,14 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       <form class="kart restoran-yonet ${masraf ? "masraf-form" : ""}" data-paylasim-form>
         <b class="restoran-form-baslik">${masraf ? `📋 ${MASRAF_BASLIK} · ${kac(v.masraf?.liste_ayi || "")}` : `➕ ${b === "duyuru" ? "Yeni duyuru" : "Yeni paylaşım"}`}</b>
         ${masraf ? `<small class="ipucu">Listeyi PDF olarak seçin (Excel'i PDF olarak kaydedebilirsiniz). Başlık kendiliğinden yazılır.</small>` : ""}
-        <div class="restoran-tur${b === "muhasebe" ? " dortlu" : ""}">${Object.entries(PAYLASIM_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur && !masraf ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}${b === "muhasebe" ? `<button type="button" data-masraf-ac class="masraf-tur ${masraf ? "secili" : ""}">📋<br>Aylık Masraflar Listesi</button>` : ""}</div>
-        ${tur !== "metin" ? `<label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
-          <p data-paylasim-secilen class="ipucu" hidden></p>` : ""}
-        <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : "Açıklama (isteğe bağlı)"}
+        <div class="restoran-tur${b === "muhasebe" ? " dortlu" : ""}">${turlerOf(b).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur && !masraf ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}${b === "muhasebe" ? `<button type="button" data-masraf-ac class="masraf-tur ${masraf ? "secili" : ""}">📋<br>Aylık Masraflar Listesi</button>` : ""}</div>
+        ${tur === "link" ? `<label>Bağlantı (YouTube, Instagram, web sitesi…)
+          <input name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://…" data-paylasim-link></label>
+          <div data-paylasim-onizleme class="paylasim-onizleme" hidden></div>`
+        : tur !== "metin" ? `<label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
+          <p data-paylasim-secilen class="ipucu" hidden></p>
+          <div data-paylasim-onizleme class="paylasim-onizleme" hidden></div>` : ""}
+        <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : tur === "link" ? "Açıklama (isteğe bağlı)" : "Açıklama (isteğe bağlı)"}
           <textarea name="metin" rows="${tur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${tur === "metin" ? ayar.ornekMetin : ayar.ornekAciklama}"></textarea>
         </label>
         <button class="ana-dugme" type="submit">📣 ${b === "duyuru" ? "Duyur ve herkese bildir" : b === "muhasebe" ? "Paylaş ve yönetime bildir" : "Paylaş ve herkese bildir"}</button>
@@ -2593,23 +2629,42 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       try { await api(b + "_sil", { id: Number(s.dataset.paylasimSil) }); mesaj(b === "duyuru" ? "Duyuru silindi." : "Paylaşım silindi."); await paylasimAc(b); }
       catch (err) { mesaj(err.message); s.disabled = false; }
     });
+    // Seçilen görsel paylaşılmadan önce görünür; PDF'in adı ve boyutu yazılır
+    let onizlemeAdres = null;
     kutu.addEventListener("change", (e) => {
       if (!e.target.matches("[data-paylasim-dosya]")) return;
-      const f = e.target.files?.[0], y = kutu.querySelector("[data-paylasim-secilen]");
-      if (!f) { y.hidden = true; return; }
+      const f = e.target.files?.[0], y = kutu.querySelector("[data-paylasim-secilen]"), o = kutu.querySelector("[data-paylasim-onizleme]");
+      if (onizlemeAdres) { URL.revokeObjectURL(onizlemeAdres); onizlemeAdres = null; }
+      if (!f) { y.hidden = true; if (o) o.hidden = true; return; }
       y.textContent = `Seçilen: ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`; y.hidden = false;
+      if (o) {
+        if (f.type.startsWith("image/")) { onizlemeAdres = URL.createObjectURL(f); o.innerHTML = `<small>Paylaşılacak görsel:</small><img src="${onizlemeAdres}" alt="Seçilen görsel">`; }
+        else o.innerHTML = `<div class="paylasim-pdf">📄 ${kac(f.name)}</div>`;
+        o.hidden = false;
+      }
+    });
+    // Link yazılırken nasıl görüneceği hemen gösterilir
+    kutu.addEventListener("input", (e) => {
+      if (!e.target.matches("[data-paylasim-link]")) return;
+      const o = kutu.querySelector("[data-paylasim-onizleme]"), u = e.target.value.trim();
+      const kart = /^https?:\/\/\S+\.\S+/.test(u) ? linkKarti(u) : "";
+      o.innerHTML = kart ? `<small>Paylaşılacak bağlantı:</small>${kart}` : ""; o.hidden = !kart;
     });
     kutu.addEventListener("submit", async (e) => {
       if (!e.target.matches("[data-paylasim-form]")) return;
       e.preventDefault();
       const f = e.target, d = f.querySelector("button[type=submit]"), eski = d.textContent, tur = paylasimTur[b];
       const dosya = f.querySelector("[data-paylasim-dosya]")?.files?.[0];
-      if (tur !== "metin" && !dosya) return mesaj(`Önce ${PAYLASIM_TURLERI[tur][1].toLocaleLowerCase("tr")} seçin.`);
+      const link = tur === "link" ? f.link.value.trim() : "";
+      if (tur === "link" && !/^https?:\/\/\S+\.\S+/.test(link)) return mesaj("Bağlantıyı https:// ile başlayarak yazın ya da yapıştırın.");
+      if (!["metin", "link"].includes(tur) && !dosya) return mesaj(`Önce ${PAYLASIM_TURLERI[tur][1].toLocaleLowerCase("tr")} seçin.`);
       d.disabled = true; d.textContent = "Yükleniyor…";
       try {
-        const yol = tur === "metin" ? null : await paylasimDosyaYukle(b, dosya);
+        const yol = ["metin", "link"].includes(tur) ? null : await paylasimDosyaYukle(b, dosya);
         d.textContent = "Gönderiliyor…";
-        const r = await api(b + "_paylas", { tur, metin: f.metin.value, yol, masraf: b === "muhasebe" && masrafModu });
+        // Link metin olarak gider: açıklama + adres (gösterirken karta dönüşür)
+        const metin = tur === "link" ? [f.metin.value.trim(), link].filter(Boolean).join("\n") : f.metin.value;
+        const r = await api(b + "_paylas", { tur: tur === "link" ? "metin" : tur, metin, yol, masraf: b === "muhasebe" && masrafModu });
         if (b === "muhasebe") masrafModu = false;
         mesaj(b === "duyuru"
           ? (typeof r?.basarili === "number" ? `Duyuru yayımlandı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Duyuru yayımlandı. Herkese bildirim gönderildi.")
@@ -2654,6 +2709,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   };
   async function raporAc() {
     if (!yonetici()) return;
+    raporPaylasim = null; paylasimAcik.clear();
     if (location.hash !== "#rapor") history.replaceState(history.state, "", "#rapor");
     goster("rapor");
     $("#rapor").innerHTML = `<p class="bos">Rapor hazırlanıyor…</p>`;
@@ -2699,12 +2755,47 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
             <small>${k.kurulu ? "📲" : ""}${k.bildirim ? "🔔" : "🔕"} ${k.acilis ? `${k.acilis} açılış` : ""}${k.en_cok ? ` · ${BOLUM_ADI[k.en_cok] || k.en_cok}` : ""}</small></div>
         </div>`).join("") || `<p class="bos">Bulunamadı.</p>`}</div>
       <p class="ipucu">📲 telefonuna yüklemiş · 🔔 bildirimi açık · 🔕 bildirimi kapalı. "Açılış": seçilen dönemde uygulamayı kaç gün/kez açtığı.</p>
+      <h3 class="rapor-baslik">📢 Duyuru ve 🍽️ Restoran paylaşımlarını kimler gördü?</h3>
+      <div id="rapor-paylasim">${paylasimRaporHtml()}</div>
       <button type="button" class="ikincil rapor-yazdir" data-rapor-yazdir>🖨️ Yazdır / PDF olarak kaydet</button>`;
+    if (!raporPaylasim) api("paylasim_gorulme").then((r) => { raporPaylasim = r; const k = $("#rapor-paylasim"); if (k) k.innerHTML = paylasimRaporHtml(); })
+      .catch((e) => { const k = $("#rapor-paylasim"); if (k) k.innerHTML = `<p class="hata">${kac(e.message)}</p>`; });
+  }
+  let raporPaylasim = null; const paylasimAcik = new Map();
+  function paylasimRaporHtml() {
+    const v = raporPaylasim;
+    if (!v) return `<p class="bos">Yükleniyor…</p>`;
+    if (!v.paylasimlar.length) return `<p class="bos">Henüz paylaşım yok.</p>`;
+    return `<p class="ipucu">Paylaşımı Duyurular ya da Restoran ekranında açıp gören kişi “gördü” sayılır. Sayım bu güncellemeyle başladı. Bir satıra dokunun, isimler açılsın.</p>
+      ${v.paylasimlar.map((p) => {
+        const ad = p.bolum === "duyuru" ? "📢 Duyuru" : "🍽️ Restoran", yuzde = v.toplam ? Math.round(p.goren / v.toplam * 100) : 0, ac = paylasimAcik.get(p.id);
+        const kisa = p.metin ? kac(p.metin.replace(/\s+/g, " ")) : { gorsel: "Görsel", pdf: "PDF belge" }[p.tur] || "Paylaşım";
+        return `<div class="rapor-paylasim">
+          <button type="button" class="rapor-paylasim-ust" data-paylasim-gor="${p.id}">
+            <span><b>${ad}</b> · ${tarihSaat(p.created_at)}<small>${kisa}</small></span>
+            <span class="rapor-paylasim-sayi"><b>👁 ${p.goren}</b><small>/ ${v.toplam} kişi</small></span>
+          </button>
+          <div class="rapor-cubuk"><i style="width:${Math.max(2, yuzde)}%"></i></div>
+          ${ac === "yukleniyor" ? `<p class="ipucu">Yükleniyor…</p>` : ac ? `<div class="rapor-paylasim-kisiler">
+            <b class="gordu">✅ Gördü (${ac.gorenler.length})</b>
+            ${ac.gorenler.map((x) => `<div><span>${kac(x.ad || "—")}${x.unvan ? ` <small>${kac(x.unvan)}</small>` : ""}</span><small>${tarihSaat(x.ilk_at)}</small></div>`).join("") || `<p class="ipucu">Henüz kimse görmedi.</p>`}
+            <details><summary><b class="gormedi">⏳ Görmedi (${ac.gormeyenler.length})</b></summary>
+            ${ac.gormeyenler.map((x) => `<div><span>${kac(x.ad || "—")}${x.unvan ? ` <small>${kac(x.unvan)}</small>` : ""}</span></div>`).join("")}</details>
+          </div>` : ""}
+        </div>`;
+      }).join("")}`;
   }
   $("#rapor").addEventListener("click", (e) => {
     const g = e.target.closest("[data-rapor-gun]");
     if (g) { raporGun = Number(g.dataset.raporGun); return raporAc(); }
     if (e.target.closest("[data-rapor-yazdir]")) window.print();
+    const pg = e.target.closest("[data-paylasim-gor]");
+    if (pg) {
+      const id = Number(pg.dataset.paylasimGor), cizP = () => { const k = $("#rapor-paylasim"); if (k) k.innerHTML = paylasimRaporHtml(); };
+      if (paylasimAcik.has(id)) { paylasimAcik.delete(id); return cizP(); }
+      paylasimAcik.set(id, "yukleniyor"); cizP();
+      api("paylasim_gorenler", { id }).then((r) => { paylasimAcik.set(id, r); cizP(); }).catch((err) => { paylasimAcik.delete(id); cizP(); mesaj(err.message); });
+    }
   });
   $("#rapor").addEventListener("input", (e) => {
     if (!e.target.matches(".rapor-ara")) return;
