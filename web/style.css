@@ -1285,3 +1285,14 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .yonetim-kutu.kutu-faaliyet { background: #f3dcc4; color: #6b3507; border: 1.5px solid #6b350733; }
 .yonetim-kutu.kutu-muhasebe { grid-column: 1 / -1; min-height: 110px; }
 #restoran .restoran-yonet, #muhasebe .restoran-yonet { margin: 16px 0 0; }
+
+/* Muhasebe: Aylık Masraflar Listesi */
+.masraf-durum { display: grid; gap: 8px; padding: 14px; margin-bottom: 14px; border-radius: 16px; border: 2px solid; }
+.masraf-durum b { font-size: 18px; }
+.masraf-durum.tamam { background: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
+.masraf-durum.bekliyor { background: #fff3e0; border-color: #ef6c00; color: #7a3d00; }
+.masraf-dugme { margin: 4px 0 0; background: #3f6a1c; }
+.masraf-form { border-color: #3f6a1c !important; }
+.paylasim.masraf { border: 2px solid #3f6a1c; }
+.paylasim.masraf .paylasim-metin { font-weight: 700; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .masraf-durum.tamam { background: #12301a; color: #c8e6c9; } :root:not([data-theme="light"]) .masraf-durum.bekliyor { background: #3a2410; color: #ffe0b2; } }

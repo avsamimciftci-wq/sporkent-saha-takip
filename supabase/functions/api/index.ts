@@ -45,6 +45,18 @@ const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef
 // Muhasebe bölümü: yalnızca yönetim görür; muhasebe ve yönetici paylaşır
 const MUHASEBE_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe"];
 const MUHASEBE_PAYLASAN: Rol[] = ["baskan", "muhasebe"];
+// "Aylık Masraflar Listesi": her ayın ilk günü muhasebe paylaşır (bir önceki ayın masrafları); başlığıyla tanınır
+const MASRAF_BASLIK = "Aylık Masraflar Listesi";
+const AY_AD = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const oncekiAyAdi = (gun: string) => { const [y, a] = gun.split("-").map(Number); const o = a === 1 ? 12 : a - 1; return `${AY_AD[o - 1]} ${a === 1 ? y - 1 : y}`; };
+// Bu ay (Türkiye saatiyle) masraf listesi paylaşıldı mı
+async function masrafDurumu() {
+  const bugun = sonGun(new Date(), 0), [y, a] = bugun.split("-").map(Number);
+  const bas = new Date(Date.UTC(y, a - 1, 1) - 3 * 3600e3).toISOString();
+  const { data } = await db.from("restoran_paylasim").select("id, created_at").eq("bolum", "muhasebe").like("metin", `${MASRAF_BASLIK} ·%`)
+    .gte("created_at", bas).order("created_at", { ascending: false }).limit(1);
+  return { ay: bugun.slice(0, 7), liste_ayi: oncekiAyAdi(bugun), paylasildi_at: data?.[0]?.created_at ?? null, bugun };
+}
 // Bu roller YK iş emrinin süresini görmez ve seçmez; süreyi yönetici ve yönetim kurulu belirler
 const SURE_GORMEYEN: Rol[] = ["mudur", "sef", "muhasebe"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
@@ -1435,6 +1447,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at,
           ekleyen: x.rol === "baskan" ? "Kooperatif Yönetimi" : "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })),
         yonetir: MUHASEBE_PAYLASAN.includes(rol),
+        masraf: await masrafDurumu(),
       };
     }
 
@@ -1442,7 +1455,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Muhasebe bölümünde yalnızca muhasebe ve yönetici paylaşım yapar.", 403);
       const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
-      const metin = temiz(g.metin, 3000);
+      const masraf = !!g.masraf;
+      const ek = temiz(g.metin, 2900);
+      // Masraf listesinin başlığı sunucuda yazılır: "Aylık Masraflar Listesi · Kasım 2026"
+      const metin = masraf ? `${MASRAF_BASLIK} · ${oncekiAyAdi(sonGun(new Date(), 0))}${ek ? "\n" + ek : ""}` : ek;
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
       if (tur === "metin" && !metin) throw new Hata("Paylaşılacak metni yazın.");
       if (tur !== "metin" && !yol?.startsWith("muhasebe/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
@@ -1451,7 +1467,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      const giden = await duyur(MUHASEBE_GOREN, `🧾 Muhasebe: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
+      const giden = await duyur(MUHASEBE_GOREN, masraf ? "📋 Aylık Masraflar Listesi paylaşıldı" : `🧾 Muhasebe: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
       return { id: p.id, ...giden };
     }
 
@@ -1942,13 +1958,24 @@ async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
   return { ay, ayAdi, yol, is_sayisi: isler?.length ?? 0, program_sayisi: program?.length ?? 0 };
 }
 // Her akşam çağrılır; yarın ayın 1'iyse bu ayın raporu hazırlanır
+async function masrafUyarisi() {
+  const m = await masrafDurumu();
+  if (!m.bugun.endsWith("-01") || m.paylasildi_at) return { masraf: m.paylasildi_at ? "paylaşıldı" : "bugün değil" };
+  const r = await bildir(MUHASEBE_GOREN, "⚠ Aylık Masraflar Listesi paylaşılmadı",
+    `${m.liste_ayi} ayının masraflar listesi bugün (ayın 1'i) Muhasebe bölümünde henüz paylaşılmadı.`, { sayfa: "muhasebe" });
+  return { masraf: "uyarı gönderildi", ...r };
+}
 async function aylikRaporZamani() {
+  const uyari = await masrafUyarisi().catch((e) => ({ masraf_hata: String(e) }));
   const bugun = sonGun(new Date(), 0), yarin = sonGun(new Date(), 1);
-  if (!yarin.endsWith("-01")) return { atlandi: true, bugun };
+  if (!yarin.endsWith("-01")) return { atlandi: true, bugun, ...uyari };
   return await aylikRaporHazirla(bugun.slice(0, 7), true);
 }
 
 async function gunlukGecikme() {
+  // Ayın 1'i sabahı: muhasebeye "bugün Aylık Masraflar Listesi'ni paylaşın" hatırlatması
+  await masrafDurumu().then((m) => m.bugun.endsWith("-01") && !m.paylasildi_at
+    ? bildir(["muhasebe"], "📋 Bugün Aylık Masraflar Listesi günü", `${m.liste_ayi} ayının masraflar listesini Muhasebe bölümünde paylaşmayı unutmayın.`, { sayfa: "muhasebe" }) : null).catch(() => {});
   await eskiUyeleriSil().catch(() => {});
   await eskiDevriyeSil().catch(() => {});
   const bugun = sonGun(new Date(), 0);
