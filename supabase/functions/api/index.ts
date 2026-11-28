@@ -314,7 +314,7 @@ async function gorevHatirlat() {
   const bugun = sonGun(new Date(), 0);
   const sonuc: Record<string, unknown> = {};
   sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📍 Günlük işler",
-    `Devriyeye çıkarken "Devriyeyi Başlat"a, bitince "Devriyeyi Bitir"e basın. Günlük Kontrol listesindeki ${kalemSayisi(KONTROL)} işi yapıldıkça işaretleyin.`, { sayfa: "gorevler-isler" });
+    `Devriyeye çıkarken "Devriyeyi Başlat"a, bitince "Devriyeyi Bitir"e basın. Günlük Kontrol listesindeki ${kalemSayisi(KONTROL)} işi yapıldıkça işaretleyin.`, { sayfa: "gorevler" });
   // Pazartesi: haftalık program da hatırlatılır
   if (haftaBasi(bugun) === bugun) {
     sonuc.haftalik = await bildir(GOREV_ISARETLEYEN, "📋 Haftalık görevler",
@@ -324,6 +324,25 @@ async function gorevHatirlat() {
 }
 
 const anahtarUret = () => crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
+
+// Duyurular ve Restoran: bu telefonun henüz açıp görmediği paylaşım sayısı (ana sayfadaki tuşlarda rakam).
+// Kendi paylaşımı sayılmaz. Görülme kaydı tutulmaya başlamadan önceki ve kişi katılmadan önceki paylaşımlar sayılmaz.
+let gorulmeBaslangic: string | null = null;
+async function okunmamisSay(u: any) {
+  if (!gorulmeBaslangic) {
+    const { data: ilk } = await db.from("paylasim_gorulme").select("ilk_at").order("ilk_at").limit(1).maybeSingle();
+    gorulmeBaslangic = ilk?.ilk_at ?? new Date().toISOString();
+  }
+  const bas = [gorulmeBaslangic, u.created_at].filter(Boolean).sort().pop() as string;
+  const { data: pp } = await db.from("restoran_paylasim").select("id, bolum, cihaz").in("bolum", ["duyuru", "restoran"])
+    .gte("created_at", bas).order("created_at", { ascending: false }).limit(200);
+  const ids = (pp ?? []).map((p: any) => p.id);
+  const { data: gr } = ids.length ? await db.from("paylasim_gorulme").select("paylasim_id").eq("cihaz", u.cihaz).in("paylasim_id", ids) : { data: [] };
+  const goren = new Set((gr ?? []).map((x: any) => x.paylasim_id));
+  const say: Record<string, number> = { duyuru: 0, restoran: 0 };
+  for (const p of pp ?? []) if (p.cihaz !== u.cihaz && !goren.has(p.id)) say[p.bolum]++;
+  return say;
+}
 
 async function fotoUrlleri(kayitlar: any[]) {
   const yollar = kayitlar.flatMap((k) => [k.foto_once, k.foto_sonra]).filter(Boolean);
@@ -865,7 +884,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "liste": {
       // Restoran yetkilisi saha kayıtlarını görmez
-      if (rol === "restoran") return { kayitlar: [], rol, unvan: (u as any).unvan ?? null, yenilikler: await yenilikBul(u, rol) };
+      if (rol === "restoran") return { kayitlar: [], rol, unvan: (u as any).unvan ?? null, yenilikler: await yenilikBul(u, rol), okunmamis: await okunmamisSay(u).catch(() => null) };
       let q = db.from("kayitlar").select("*").order("created_at", { ascending: false }).limit(300);
       if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
       // Onay bekleyen kaydı yazan kişi ve onaylayacak olan görür: ortağın kaydını parsel temsilcisi,
@@ -943,6 +962,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const varsayilan_sure = rol === "baskan" || rol === "yonetim" ? await varsayilanSure() : undefined;
       return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar,
         yenilikler: await yenilikBul(u, rol).catch(() => []),
+        okunmamis: await okunmamisSay(u).catch(() => null),
         // Yenilikler penceresi ilk kez kurulurken: bu kişinin daha önce açıp gördüğü kayıtlar yeniden gösterilmesin
         gordum: g.ilk ? ((await db.from("goruntulemeler").select("kayit_id, ilk_at").or(`cihaz.eq.${u.cihaz},and(ad.eq."${String(u.ad).replace(/["\\]/g, "")}",rol.eq.${rol})`)).data ?? []) : undefined };
     }
@@ -1536,8 +1556,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     // ---------- Duyuru ve Restoran paylaşımlarını kimler gördü ----------
     case "paylasim_goruldu": {
-      // Ekranı açan herkesin ilk görüşü saklanır (yönetici sayılmaz)
-      if (rol === "baskan") return { tamam: true };
+      // Ekranı açan herkesin ilk görüşü saklanır. Yöneticininki de saklanır (tuştaki rakam için) ama Kullanım Raporu'nda sayılmaz.
       const ids = (Array.isArray(g.ids) ? g.ids : []).map(Number).filter((x: number) => Number.isInteger(x) && x > 0).slice(0, 100);
       if (!ids.length) return { tamam: true };
       const { data: pp } = await db.from("restoran_paylasim").select("id").in("id", ids).in("bolum", ["duyuru", "restoran"]);
@@ -1552,7 +1571,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: pp } = await db.from("restoran_paylasim").select("id, bolum, tur, metin, created_at").in("bolum", ["duyuru", "restoran"])
         .order("created_at", { ascending: false }).limit(40);
       const ids = (pp ?? []).map((p: any) => p.id);
-      const { data: gr } = ids.length ? await db.from("paylasim_gorulme").select("paylasim_id").in("paylasim_id", ids) : { data: [] };
+      const { data: gr } = ids.length ? await db.from("paylasim_gorulme").select("paylasim_id").in("paylasim_id", ids).neq("rol", "baskan") : { data: [] };
       const say = new Map<number, number>();
       for (const x of gr ?? []) say.set(x.paylasim_id, (say.get(x.paylasim_id) ?? 0) + 1);
       const { count } = await db.from("uyeler").select("cihaz", { count: "exact", head: true }).eq("durum", "onayli").neq("rol", "baskan");
@@ -1565,7 +1584,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "paylasim_gorenler": {
       yonetici();
       const id = Number(g.id);
-      const { data: gr } = await db.from("paylasim_gorulme").select("cihaz, ad, unvan, rol, ilk_at").eq("paylasim_id", id).order("ilk_at");
+      const { data: gr } = await db.from("paylasim_gorulme").select("cihaz, ad, unvan, rol, ilk_at").eq("paylasim_id", id).neq("rol", "baskan").order("ilk_at");
       const { data: uy } = await db.from("uyeler").select("cihaz, ad, unvan, rol").eq("durum", "onayli").neq("rol", "baskan");
       const goren = new Set((gr ?? []).map((x: any) => x.cihaz));
       return {

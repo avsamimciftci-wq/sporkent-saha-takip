@@ -46,7 +46,7 @@
   <!-- Yenilikler: program açılınca görülmemiş bütün gelişmeler -->
   <div id="yenilik" class="perde yenilik-perde" role="dialog" aria-modal="true" aria-labelledby="yenilik-baslik" hidden>
     <div class="kart yenilik-kutu">
-      <h1>🔔 <span id="yenilik-baslik">Yenilikler</span></h1>
+      <h1>🔔 <span id="yenilik-baslik">Yeni bildirimler</span></h1>
       <div id="yenilik-liste" class="yenilik-liste"></div>
       <button id="yenilik-tamam" class="ana-dugme" type="button">✔ Tamam, hepsini gördüm</button>
     </div>
@@ -71,7 +71,7 @@
       <button type="button" data-ac="kayitonay" class="ana-kutu ak-kayitonay" hidden><span>📝</span>Saha Takip Onayları<small></small></button>
       <button type="button" data-ac="duyuru" class="ana-kutu ak-duyuru"><span>📢</span>Duyurular<small></small></button>
       <button type="button" data-ac="saha" class="ana-kutu ak-saha"><span>🛠️</span>Saha Takip<small></small></button>
-      <button type="button" data-ac="restoran" class="ana-kutu ak-restoran" hidden><span>🍽️</span>Restoran</button>
+      <button type="button" data-ac="restoran" class="ana-kutu ak-restoran" hidden><span>🍽️</span>Restoran<small></small></button>
       <button type="button" data-ac="servis" class="ana-kutu ak-servis"><span>🚐</span>Servis</button>
       <button type="button" data-ac="yonetim" class="ana-kutu ak-yk" hidden><span>🗂️</span>Yönetim Kurulu<small></small></button>
       <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
@@ -169,7 +169,8 @@
       <button id="yksaha-ac" class="yonetim-kutu kutu-yksaha"><span>🛠️</span>YK Saha Takip<small id="yksaha-sayi"></small></button>
       <button id="muhasebe-ac" class="yonetim-kutu kutu-muhasebe" hidden><span>🧾</span>Muhasebe</button>
       <button id="program-ac" class="yonetim-kutu kutu-program"><span class="isci-ikon" aria-hidden="true">👷<b>⛏️</b></span>İş Programı</button>
-      <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>📋</span>Günlük İşler</button>
+      <button id="gorevler-ac" class="yonetim-kutu kutu-gorev"><span>🚶</span>Devriye</button>
+      <button id="kontrol-ac" class="yonetim-kutu kutu-kontrol"><span>✅</span>Günlük Kontrol</button>
       <button id="haftalik-ac" class="yonetim-kutu kutu-haftalik"><span>🗓️</span>Haftalık Kontrol</button>
       <button id="faaliyet-ac" class="yonetim-kutu kutu-faaliyet" hidden><span>📑</span>Aylık Faaliyet Raporu</button>
     </div>
@@ -177,7 +178,7 @@
 
   <!-- YK Saha Takip: yönetici ve yönetim kurulunun verdiği iş emirleri -->
   <main id="ekran-yksaha" class="ekran" hidden>
-    <div class="baslik-cift"><button class="geri" type="button" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-yksaha">🛠️ YK Saha Takip</h1></div>
+    <button class="geri geri-tam" type="button" data-geri-yk>← Geri</button>
     <p class="modul-alt">Yönetici, yönetim kurulu, muhasebe, müdür ve şefin verdiği iş emirleri. Yalnızca bunlar görür.</p>
     <div id="yk-ozet" class="ozet"></div>
     <button id="yk-gecikme" class="gecikme-uyari" hidden></button>
@@ -202,7 +203,6 @@
 
   <!-- İletişim -->
   <main id="ekran-iletisim" class="ekran" hidden>
-    <h1 class="modul-baslik">☎ İletişim</h1>
     <p class="modul-alt">Dokunduğunuz satır telefonunuzda hemen açılır.</p>
     <div class="iletisim">
       <a class="iletisim-satir" href="tel:+905413253019">
@@ -234,36 +234,31 @@
 
   <!-- Parsel Temsilcisi: temsilcinin resmi, adı, telefonu ve iletişim düğmeleri -->
   <main id="ekran-parsel" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-parsel">👤 Parsel Temsilcisi</h1></div>
     <div id="parsel-icerik"></div>
   </main>
 
   <!-- Duyurular: yönetici metin, görsel ya da PDF paylaşır; herkes görür -->
   <main id="ekran-duyuru" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-duyuru">📢 Duyurular</h1></div>
     <div id="duyuru"></div>
   </main>
 
   <!-- Kullanım raporu (yalnızca yönetici) -->
   <main id="ekran-rapor" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-rapor">📊 Kullanım Raporu</h1></div>
     <div id="rapor"></div>
   </main>
 
   <!-- Restoran: menü resimleri ve sipariş telefonu (ara / WhatsApp) -->
   <main id="ekran-muhasebe" class="ekran" hidden>
-    <button class="geri" data-geri-yk style="width:100%;margin-bottom:12px">← Geri</button>
+    <button class="geri geri-tam" data-geri-yk>← Geri</button>
     <div id="muhasebe"></div>
   </main>
 
   <main id="ekran-restoran" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-restoran">🍽️ Restoran</h1></div>
     <div id="restoran"></div>
   </main>
 
   <!-- Ortak: araç plakası giriş talebi (kooperatif e-posta adresine gider) -->
   <main id="ekran-plaka" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-plaka">🚗 Plaka-Kimlik Bildirimi</h1></div>
     <form id="plaka-form" class="kart plaka-form">
       <p class="modul-alt" style="margin-top:0">Site girişinde tanınması için aracın plakasını kooperatife bildirin.</p>
       <b class="plaka-soru">1. Araç kimin?</b>
@@ -300,7 +295,6 @@
 
   <!-- Parsel temsilcisi: kendi parselindeki ortakların yakınlarının katılma başvuruları -->
   <main id="ekran-yakinlar" class="ekran" hidden>
-    <div class="baslik-cift"><h1 class="sayfa-bant bant-yakin">👨‍👩‍👧 Katılım Onayları</h1></div>
     <p class="modul-alt">Parselinizdeki ortaklar ve yakınları (eşi, çocuğu, damadı, misafiri…) uygulamaya katılmak istiyor. Telefonu kooperatif kaydıyla eşleşmeyenler sizin onayınızı bekler; onay ya da ret sizin işinizdir.</p>
     <div id="yakin-liste"></div>
   </main>
@@ -369,7 +363,7 @@
   <!-- Alt menü: üç modül -->
   <!-- Sokak Numaraları: kooperatifin sokak numaratörü (iki parmakla büyütülür) -->
   <main id="ekran-sokaklar" class="ekran" hidden>
-    <div class="numarator-ust"><b>🗺️ Sokak Numaraları</b><span>İki parmakla büyütün, kaydırın</span></div>
+    <div class="numarator-ust"><span>İki parmakla büyütün, kaydırın</span></div>
     <div id="numarator" class="numarator" aria-label="Sporkent sokak numaratörü"></div>
   </main>
 
