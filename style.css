@@ -1370,3 +1370,29 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 /* Açılan sayfada başlık yok (Ana Sayfaya Dön yeterli); Yönetim Kurulu alt sayfalarında yalnızca geri tuşu */
 .geri.geri-tam { display: block; width: 100%; margin: 0 0 12px; font-size: 18px; padding: 8px 12px; }
 .numarator-ust span:only-child { margin: 0 auto; font-size: 14px; }
+
+/* Muhasebe: 4 tür + Aylık Masraflar Listesi tam genişlik; Excel bağlantısı yeşil */
+.restoran-tur.dortlu .masraf-tur { grid-column: 1 / -1; }
+.paylasim-excel { background: #e8f5e9; color: #1b5e20; border-color: #a5d6a7; }
+.muhasebe-not { margin-top: 14px; font-size: 15px; text-align: center; }
+
+/* Muhasebe: Aylık Masraflar Listesi tuşu (alt tuşların altında, tam genişlik) */
+.masraf-tus { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin: 0 0 12px; padding: 12px 10px; border-radius: 16px; border: 2px solid transparent; font: inherit; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,.1); background: #f6e3c8; color: #6b3507; }
+.masraf-tus span { font-size: 30px; line-height: 1; }
+.masraf-tus b { font-size: 18px; font-weight: 800; }
+.masraf-tus small { font-size: 14px; font-weight: 700; opacity: .9; }
+.masraf-tus.bekliyor { background: #fdebd3; border-color: #e07a1f55; }
+.masraf-tus.tamam { background: #dcedc8; color: #33691e; }
+.masraf-tus.secili { border-color: #2b6f93; box-shadow: 0 0 0 3px #2b6f9355, 0 3px 8px rgba(0,0,0,.12); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .masraf-tus { background: #5a3a12; color: #fff; }
+  :root:not([data-theme="light"]) .masraf-tus.tamam { background: #33521a; color: #fff; }
+}
+
+/* Ana sayfa: Aylık Masraflar Listesi (TG ve Denetim Kurulu üyeleri) */
+.ak-masraf { background: linear-gradient(145deg, #c07a2c, #8a4f12); }
+.ana-kutu.ak-masraf { background: #f3dcc4; color: #6b3507; border: 1.5px solid #6b350733; }
+#ekran-ana .ak-masraf { line-height: 1.05; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ana-kutu.ak-masraf { background: #8a5a26; color: #fff; border-color: transparent; }
+}
