@@ -2531,8 +2531,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         </div>
       </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`;
     }
-    $("#" + b).innerHTML = `
-      ${v.yonetir ? `
+    const form = v.yonetir ? `
       <form class="kart restoran-yonet" data-paylasim-form>
         <b class="restoran-form-baslik">➕ ${b === "duyuru" ? "Yeni duyuru" : "Yeni paylaşım"}</b>
         <div class="restoran-tur">${Object.entries(PAYLASIM_TURLERI).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}</div>
@@ -2547,9 +2546,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
           <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
         </details>` : ""}
-      </form>` : ""}
-      ${siparis}
-      ${v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`}`;
+      </form>` : "";
+    const liste = v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`;
+    // Restoran ve Muhasebe: paylaşımlar (en yenisi üstte) önce, yeni paylaşım penceresi en altta
+    $("#" + b).innerHTML = b === "duyuru" ? form + siparis + liste : siparis + liste + form;
   }
   // Görsel küçültülüp JPEG olarak, PDF olduğu gibi yüklenir (en fazla 50 MB)
   async function paylasimDosyaYukle(b, f) {

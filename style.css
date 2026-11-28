@@ -1284,3 +1284,4 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .yonetim-kutu.kutu-muhasebe { background: #c9d9b3; color: #34501a; border: 1.5px solid #34501a33; }
 .yonetim-kutu.kutu-faaliyet { background: #f3dcc4; color: #6b3507; border: 1.5px solid #6b350733; }
 .yonetim-kutu.kutu-muhasebe { grid-column: 1 / -1; min-height: 110px; }
+#restoran .restoran-yonet, #muhasebe .restoran-yonet { margin: 16px 0 0; }
