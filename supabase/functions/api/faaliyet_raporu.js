@@ -15,7 +15,11 @@ export async function raporPdf(d, veri, foto) {
   const { PDFDocument, rgb } = d;
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(d.fontkit);
-  pdf.setTitle(`Sporkent Asistan - Aylık Faaliyet Raporu - ${veri.ayAdi}`);
+  // veri.tur: "tum" (hepsi + İş Programı), "yk" (YK Saha Takip + İş Programı), "saha" (Saha Takip); kişi adları yazılmaz
+  const tur = veri.tur || "tum";
+  const ad = { tum: "Aylık Faaliyet Raporu", yk: "YK Saha Takip Faaliyet Raporu", saha: "Saha Takip Faaliyet Raporu" }[tur];
+  const programVar = tur !== "saha";
+  pdf.setTitle(`Sporkent Asistan - ${ad} - ${veri.ayAdi}`);
   pdf.setAuthor("Sporkent İşletme Kooperatifi");
   const N = await pdf.embedFont(d.fontNormal, { subset: true });
   const K = await pdf.embedFont(d.fontKalin, { subset: true });
@@ -67,15 +71,17 @@ export async function raporPdf(d, veri, foto) {
       sayfa.drawImage(im, { x: KENAR, y: A4[1] - 30 - h, width: w, height: h, opacity: 0.95 });
     } catch { /* logo yoksa yalnızca yazı */ }
   }
-  sayfa.drawText("AYLIK FAALİYET RAPORU", { x: KENAR, y: A4[1] - 118, size: 24, font: K, color: R.beyaz });
+  sayfa.drawText(ad.toLocaleUpperCase("tr"), { x: KENAR, y: A4[1] - 118, size: 24, font: K, color: R.beyaz });
   sayfa.drawText(veri.ayAdi, { x: KENAR, y: A4[1] - 140, size: 15, font: N, color: R.beyaz });
   const sag = "Sporkent İşletme Kooperatifi";
   sayfa.drawText(sag, { x: A4[0] - KENAR - N.widthOfTextAtSize(sag, 11), y: A4[1] - 140, size: 11, font: N, color: R.beyaz });
   y = A4[1] - 175;
 
   const saha = veri.isler.filter((x) => !x.gizli), yk = veri.isler.filter((x) => x.gizli);
-  const kutular = [[veri.isler.length, "Yapılan iş (toplam)"], [saha.length, "Saha Takip"], [yk.length, "YK iş emri"], [veri.program.length, "İş Programı'nda yapılan"]];
-  const kw = (GEN - 3 * 10) / 4;
+  const kutular = tur === "tum" ? [[veri.isler.length, "Yapılan iş (toplam)"], [saha.length, "Saha Takip"], [yk.length, "YK Saha Takip"], [veri.program.length, "İş Programı'nda yapılan"]]
+    : tur === "yk" ? [[yk.length, "YK Saha Takip'te yapılan iş"], [veri.program.length, "İş Programı'nda yapılan"]]
+    : [[saha.length, "Saha Takip'te yapılan iş"]];
+  const kw = (GEN - (kutular.length - 1) * 10) / kutular.length;
   kutular.forEach(([n, ad], i) => {
     const x = KENAR + i * (kw + 10);
     sayfa.drawRectangle({ x, y: y - 62, width: kw, height: 62, color: R.acikMavi, borderColor: R.mavi, borderWidth: 1 });
@@ -85,11 +91,12 @@ export async function raporPdf(d, veri, foto) {
     sat.forEach((t, j) => sayfa.drawText(t, { x: x + kw / 2 - N.widthOfTextAtSize(t, 9) / 2, y: y - 46 - j * 10, size: 9, font: N, color: R.koyu }));
   });
   y -= 80;
-  yaz(`Bu rapor ${veri.ayAdi} ayında Sporkent Asistan programında “Yapıldı” olarak kapatılan bütün işleri içerir: önce kısa liste, ardından her işin fotoğrafları ve notlarıyla ayrıntısı. Hazırlanma: ${trTarih(veri.hazirlanma)}.`, KENAR, N, 10, R.soluk, GEN);
+  const kapsam = { tum: "Saha Takip ve YK Saha Takip bölümlerinde", yk: "YK Saha Takip bölümünde", saha: "Saha Takip bölümünde" }[tur];
+  yaz(`Bu rapor ${veri.ayAdi} ayında Sporkent Asistan programının ${kapsam} “Yapıldı” olarak kapatılan işleri içerir: önce kısa liste, ardından her işin fotoğrafları ve notlarıyla ayrıntısı. Hazırlanma: ${trTarih(veri.hazirlanma)}.`, KENAR, N, 10, R.soluk, GEN);
   y -= 10;
 
   // ---- Kısa liste ----
-  const sutun = [["#", 22], ["Kayıt no", 62], ["Yer", 120], ["Yapılan iş", GEN - 22 - 62 - 120 - 80 - 78], ["Yapan", 80], ["Yapıldı", 78]];
+  const sutun = [["#", 22], ["Kayıt no", 62], ["Yer", 130], ["Yapılan iş", GEN - 22 - 62 - 130 - 78], ["Yapıldı", 78]];
   const baslikSatiri = () => {
     yer(22);
     sayfa.drawRectangle({ x: KENAR, y: y - 20, width: GEN, height: 20, color: R.mavi });
@@ -107,7 +114,7 @@ export async function raporPdf(d, veri, foto) {
   else {
     baslikSatiri();
     veri.isler.forEach((x, i) => {
-      const hucre = [String(i + 1), x.no || "", `${x.yer || ""}${x.gizli ? " (YK)" : ""}`, x.sorun || "", x.kapatan || "", trTarih(x.kapanis_at)];
+      const hucre = [String(i + 1), x.no || "", `${x.yer || ""}${x.gizli && tur === "tum" ? " (YK)" : ""}`, x.sorun || "", trTarih(x.kapanis_at)];
       const satirlar = hucre.map((h, j) => sar(h, N, 8.5, sutun[j][1] - 6).slice(0, 4));
       const h = Math.max(...satirlar.map((s) => s.length)) * 11 + 6;
       if (yer(h)) baslikSatiri();
@@ -128,8 +135,8 @@ export async function raporPdf(d, veri, foto) {
     const alanlar = [
       ["Bölüm", x.gizli ? "Yönetim Kurulu iş emri (YK Saha Takip)" : "Saha Takip"],
       ["Bölge / yer", [x.bolge, x.yer].filter(Boolean).join(" · ")],
-      ["Bildiren", `${x.bildiren || "—"} · ${trTarih(x.created_at)}`],
-      ["Yapan", `${x.kapatan || "—"} · ${trTarih(x.kapanis_at)}`],
+      ["Bildirildi", trTarih(x.created_at)],
+      ["Yapıldı", trTarih(x.kapanis_at)],
       ["Süre", (() => { const g = Math.max(0, Math.round((Date.parse(x.kapanis_at) - Date.parse(x.created_at)) / 864e5)); return g ? `${g} günde yapıldı` : "Aynı gün yapıldı"; })()],
     ];
     const fotolar = [];
@@ -181,15 +188,17 @@ export async function raporPdf(d, veri, foto) {
   }
 
   // ---- İş Programı ----
+  if (programVar) {
   bolumBasligi(`${veri.isler.length ? 3 : 2}. İş Programı'nda yapılan işler`);
   if (!veri.program.length) yaz("Bu ay İş Programı'nda “Yapıldı” işaretlenen iş yok.", KENAR, N, 11, R.soluk, GEN);
-  for (const [i, p] of veri.program.entries()) {
+  }
+  for (const [i, p] of (programVar ? veri.program : []).entries()) {
     const metin = [p.baslik, p.aciklama].filter(Boolean).join("\n");
     yer(yukseklik(metin, N, 10, GEN - 150) + 18);
     sayfa.drawText(`${i + 1}.`, { x: KENAR, y: y - 10, size: 10, font: K, color: R.mavi });
     const ust = y;
     yaz(metin, KENAR + 20, N, 10, R.koyu, GEN - 150);
-    sayfa.drawText(`${p.yapan || "—"}`, { x: KENAR + GEN - 120, y: ust - 10, size: 9, font: K, color: R.yesil });
+    sayfa.drawText("Yapıldı", { x: KENAR + GEN - 120, y: ust - 10, size: 9, font: K, color: R.yesil });
     sayfa.drawText(trTarih(p.yapildi_at), { x: KENAR + GEN - 120, y: ust - 22, size: 9, font: N, color: R.soluk });
     y = Math.min(y, ust - 26) - 4;
     sayfa.drawLine({ start: { x: KENAR, y }, end: { x: KENAR + GEN, y }, thickness: 0.5, color: R.cizgi }); y -= 6;
@@ -198,7 +207,7 @@ export async function raporPdf(d, veri, foto) {
   // ---- Alt bilgi ----
   const sayfalar = pdf.getPages();
   sayfalar.forEach((s, i) => {
-    s.drawText(`Sporkent Asistan · Aylık Faaliyet Raporu · ${veri.ayAdi}`, { x: KENAR, y: 22, size: 8, font: N, color: R.soluk });
+    s.drawText(`Sporkent Asistan · ${ad} · ${veri.ayAdi}`, { x: KENAR, y: 22, size: 8, font: N, color: R.soluk });
     const t = `Sayfa ${i + 1} / ${sayfalar.length}`;
     s.drawText(t, { x: A4[0] - KENAR - N.widthOfTextAtSize(t, 8), y: 22, size: 8, font: N, color: R.soluk });
   });

@@ -42,6 +42,9 @@ const KAPATABILIR: Rol[] = ["baskan", "mudur", "sef"];
 // YK iş emrini verenler: yönetici, yönetim kurulu, muhasebe, müdür (şef veremez, yalnızca görür ve kapatır)
 const YONETIM_ISI_GIREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
 const YONETIM_ISI_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe", "mudur", "sef"];
+// Muhasebe bölümü: yalnızca yönetim görür; muhasebe ve yönetici paylaşır
+const MUHASEBE_GOREN: Rol[] = ["baskan", "yonetim", "muhasebe"];
+const MUHASEBE_PAYLASAN: Rol[] = ["baskan", "muhasebe"];
 // Bu roller YK iş emrinin süresini görmez ve seçmez; süreyi yönetici ve yönetim kurulu belirler
 const SURE_GORMEYEN: Rol[] = ["mudur", "sef", "muhasebe"];
 const kimeBildir = (k: { gizli?: boolean }): Hedef => (k.gizli ? YONETIM_ISI_GOREN : "hepsi");
@@ -136,7 +139,7 @@ const ROL_ADI: Record<Rol, string> = {
 const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel", "duyuru_liste", "kullanim"];
 // Kullanım raporunda sayılan bölümler (uygulamadaki ekran adları)
 const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restoran", "yonetim", "aidat", "plaka", "iletisim", "sokaklar", "servis",
-  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet"];
+  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet", "muhasebe"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -311,6 +314,11 @@ async function yenilikBul(u: any, rol: Rol) {
   const y: any[] = [];
   const baska = (x: any) => x.cihaz !== u.cihaz && !testCihaz(String(x.cihaz ?? ""));
   for (const x of (pay.data ?? []).filter(baska)) {
+    if (x.bolum === "muhasebe") {
+      if (MUHASEBE_GOREN.includes(rol)) y.push({ a: "m" + x.id, tip: "muhasebe", at: x.created_at,
+        metin: kisa(x.metin) || ({ gorsel: "Resim paylaşıldı.", pdf: "PDF belge paylaşıldı." } as any)[x.tur] || "Yeni paylaşım." });
+      continue;
+    }
     const duyuru = x.bolum === "duyuru";
     y.push({ a: (duyuru ? "d" : "r") + x.id, tip: duyuru ? "duyuru" : "restoran", at: x.created_at,
       metin: kisa(x.metin) || ({ gorsel: "Resim paylaşıldı.", pdf: "PDF belge paylaşıldı." } as any)[x.tur] || "Yeni paylaşım." });
@@ -903,9 +911,10 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (g.tur === "duyuru" || g.tur === "temsilci") yonetici();
       else if (g.tur === "aidat") { if (!AIDAT_EKLEYEN.includes(rol)) throw new Hata("Bu dosyayı yalnızca yönetici yükleyebilir.", 403); }
       else if (g.tur === "restoran") restoranYonetir();
+      else if (g.tur === "muhasebe") { if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Bu dosyayı yalnızca muhasebe ve yönetici yükleyebilir.", 403); }
       else if (g.tur === "devriye") { if (!["baskan", "mudur", "sef"].includes(rol)) throw new Hata("Bu işlem size açık değil.", 403); }
       else if (g.tur !== undefined && g.tur !== null && g.tur !== "") throw new Hata("Geçersiz yükleme türü.");
-      const coklu = g.tur === "restoran" || g.tur === "duyuru";
+      const coklu = g.tur === "restoran" || g.tur === "duyuru" || g.tur === "muhasebe";
       const uzanti = coklu && ["jpg", "pdf"].includes(g.uzanti) ? g.uzanti : "jpg";
       const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
@@ -1414,6 +1423,47 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       };
     }
 
+    // ---------- Muhasebe: yönetim görür; muhasebe ve yönetici paylaşır (görsel, metin, PDF) ----------
+    case "muhasebe_liste": {
+      if (!MUHASEBE_GOREN.includes(rol)) throw new Hata("Muhasebe bölümünü yalnızca yönetici, yönetim kurulu ve muhasebe görür.", 403);
+      const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "muhasebe").order("created_at", { ascending: false }).limit(100);
+      if (error) throw error;
+      const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
+      const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+      const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
+      return {
+        paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at,
+          ekleyen: x.rol === "baskan" ? "Kooperatif Yönetimi" : "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })),
+        yonetir: MUHASEBE_PAYLASAN.includes(rol),
+      };
+    }
+
+    case "muhasebe_paylas": {
+      if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Muhasebe bölümünde yalnızca muhasebe ve yönetici paylaşım yapar.", 403);
+      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
+      if (!tur) throw new Hata("Paylaşım türünü seçin.");
+      const metin = temiz(g.metin, 3000);
+      const yol = tur === "metin" ? null : temiz(g.yol, 200);
+      if (tur === "metin" && !metin) throw new Hata("Paylaşılacak metni yazın.");
+      if (tur !== "metin" && !yol?.startsWith("muhasebe/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
+      const { data: p, error } = await db.from("restoran_paylasim").insert({ bolum: "muhasebe", tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
+      if (error) throw error;
+      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
+      let resim: string | null = null;
+      if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
+      const giden = await duyur(MUHASEBE_GOREN, `🧾 Muhasebe: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
+      return { id: p.id, ...giden };
+    }
+
+    case "muhasebe_sil": {
+      if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Yalnızca muhasebe ve yönetici silebilir.", 403);
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).eq("bolum", "muhasebe").maybeSingle();
+      if (!x) throw new Hata("Paylaşım bulunamadı.");
+      if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
+      await db.from("restoran_paylasim").delete().eq("id", x.id);
+      return { tamam: true };
+    }
+
     case "restoran_liste": {
       const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "restoran").order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
@@ -1523,10 +1573,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "faaliyet_raporlari": {
       yonetici();
       const { data } = await db.from("faaliyet_raporlari").select("ay, yol, is_sayisi, program_sayisi, olusturma").order("ay", { ascending: false }).limit(60);
-      const liste = await Promise.all((data ?? []).map(async (r: any) => {
-        const { data: url } = await db.storage.from(BUCKET).createSignedUrl(r.yol, 60 * 60, { download: `Sporkent_Faaliyet_Raporu_${r.ay}.pdf` });
-        return { ay: r.ay, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, olusturma: r.olusturma, url: url?.signedUrl ?? null };
-      }));
+      const liste = await Promise.all((data ?? []).map(async (r: any) =>
+        ({ ay: r.ay, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, olusturma: r.olusturma, linkler: await raporLinkleri(r.ay) })));
       return { raporlar: liste, bu_ay: sonGun(new Date(), 0).slice(0, 7) };
     }
 
@@ -1536,8 +1584,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const ay = /^\d{4}-\d{2}$/.test(String(g.ay ?? "")) ? String(g.ay) : buAy;
       if (ay > buAy) throw new Hata("Gelecek ayın raporu hazırlanamaz.");
       const r = await aylikRaporHazirla(ay, false);
-      const { data: url } = await db.storage.from(BUCKET).createSignedUrl(r.yol, 60 * 60, { download: `Sporkent_Faaliyet_Raporu_${ay}.pdf` });
-      return { ay: r.ay, ayAdi: r.ayAdi, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, url: url?.signedUrl ?? null };
+      return { ay: r.ay, ayAdi: r.ayAdi, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, linkler: await raporLinkleri(ay) };
     }
 
     case "program_sil": {
@@ -1852,6 +1899,14 @@ async function eskiDevriyeSil() {
   await db.from("devriye_turlari").delete().lt("gun", sinir); // izleri de birlikte silinir
 }
 // ---------- Aylık Faaliyet Raporu ----------
+type RaporTur = "tum" | "yk" | "saha";
+const RAPOR_TURLERI: RaporTur[] = ["tum", "yk", "saha"];
+const raporYolu = (ay: string, tur: RaporTur) => `raporlar/faaliyet-${ay}-${tur}.pdf`;
+// Paylaşım linki: WhatsApp'tan gönderilebilsin diye 1 yıl geçerli
+const raporLinkleri = async (ay: string) => {
+  const { data } = await db.storage.from(BUCKET).createSignedUrls(RAPOR_TURLERI.map((t) => raporYolu(ay, t)), 60 * 60 * 24 * 365);
+  return Object.fromEntries(RAPOR_TURLERI.map((t, i) => [t, data?.[i]?.error ? null : data?.[i]?.signedUrl ?? null]));
+};
 const AY_ADLARI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
   const [yil, a] = ay.split("-").map(Number);
@@ -1865,16 +1920,25 @@ async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
     .gte("yapildi_at", bas).lt("yapildi_at", bit).order("yapildi_at");
   const ayAdi = `${AY_ADLARI[a - 1]} ${yil}`;
   const logo = await fetch("https://avsamimciftci-wq.github.io/sporkent-saha-takip/logo-yatay.png").then((r) => r.ok ? r.arrayBuffer() : null).catch(() => null);
-  const pdf = await raporPdf(
-    { PDFDocument, rgb, fontkit, fontNormal: ROBOTO_NORMAL(), fontKalin: ROBOTO_KALIN(), logo: logo ? new Uint8Array(logo) : null },
-    { ayAdi, hazirlanma: new Date().toISOString(), isler: isler ?? [], program: program ?? [] },
-    async (yol: string) => { const { data } = await db.storage.from(BUCKET).download(yol); return data ? new Uint8Array(await data.arrayBuffer()) : null; },
-  );
-  const yol = `raporlar/faaliyet-${ay}.pdf`;
-  const { error: ye } = await db.storage.from(BUCKET).upload(yol, pdf, { contentType: "application/pdf", upsert: true });
-  if (ye) throw ye;
-  await db.from("faaliyet_raporlari").upsert({ ay, yol, is_sayisi: isler?.length ?? 0, program_sayisi: program?.length ?? 0, olusturma: new Date().toISOString() });
-  if (bildirimle) await bildir(["baskan"], `📑 ${ayAdi} faaliyet raporu hazır`, `${isler?.length ?? 0} yapılan iş, fotoğrafları ve notlarıyla PDF olarak hazırlandı. Açmak için dokunun.`, { sayfa: "faaliyet" });
+  // Fotoğraflar bir kez indirilir, üç raporda da kullanılır
+  const onbellek = new Map<string, Promise<Uint8Array | null>>();
+  const foto = (yol: string) => {
+    if (!onbellek.has(yol)) onbellek.set(yol, db.storage.from(BUCKET).download(yol).then(async ({ data }) => data ? new Uint8Array(await data.arrayBuffer()) : null));
+    return onbellek.get(yol)!;
+  };
+  const hepsi = isler ?? [];
+  const parca: Record<RaporTur, any[]> = { tum: hepsi, yk: hepsi.filter((x: any) => x.gizli), saha: hepsi.filter((x: any) => !x.gizli) };
+  for (const tur of RAPOR_TURLERI) {
+    const pdf = await raporPdf(
+      { PDFDocument, rgb, fontkit, fontNormal: ROBOTO_NORMAL(), fontKalin: ROBOTO_KALIN(), logo: logo ? new Uint8Array(logo) : null },
+      { tur, ayAdi, hazirlanma: new Date().toISOString(), isler: parca[tur], program: tur === "saha" ? [] : program ?? [] }, foto,
+    );
+    const { error: ye } = await db.storage.from(BUCKET).upload(raporYolu(ay, tur), pdf, { contentType: "application/pdf", upsert: true });
+    if (ye) throw ye;
+  }
+  const yol = raporYolu(ay, "tum");
+  await db.from("faaliyet_raporlari").upsert({ ay, yol, is_sayisi: hepsi.length, program_sayisi: program?.length ?? 0, olusturma: new Date().toISOString() });
+  if (bildirimle) await bildir(["baskan"], `📑 ${ayAdi} faaliyet raporları hazır`, `${hepsi.length} yapılan iş: Tüm, YK Saha Takip ve Saha Takip raporları PDF olarak hazırlandı. Açmak için dokunun.`, { sayfa: "faaliyet" });
   return { ay, ayAdi, yol, is_sayisi: isler?.length ?? 0, program_sayisi: program?.length ?? 0 };
 }
 // Her akşam çağrılır; yarın ayın 1'iyse bu ayın raporu hazırlanır
