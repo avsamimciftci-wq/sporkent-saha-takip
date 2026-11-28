@@ -356,7 +356,8 @@
     }).join("");
   }
   $("#yenilik").addEventListener("click", (e) => {
-    if (e.target.closest("#yenilik-tamam")) { const l = new Set(gorulmemis().map((y) => y.a)); $("#yenilik").hidden = true; return yenilikIsaretle((y) => l.has(y.a)); }
+    if (e.target.closest("#yenilik-tamam")) { const gl = gorulmemis(), l = new Set(gl.map((y) => y.a)); $("#yenilik").hidden = true;
+      yapildiGorduGonder(gl.filter((y) => y.tip === "yapildi" && y.kayit).map((y) => y.kayit.id)); return yenilikIsaretle((y) => l.has(y.a)); }
     const b = e.target.closest("[data-yenilik]"); if (!b) return;
     const y = gorulmemis().find((x) => x.a === b.dataset.yenilik); if (!y) return yenilikCiz();
     if (y.tip === "plaka") return yenilikIsaretle((x) => x.a === y.a); // ayrıntısı e-postada, açılacak sayfası yok
@@ -446,6 +447,30 @@
     }).join("<br>")}</dd>`;
   };
   const gorulduGonderilen = new Set();
+  // Yapılan işi gören herkes (yönetici "Bu işi kimler gördü?" ile bakar); yöneticinin kendisi sayılmaz
+  const yapildiGonderilen = new Set();
+  function yapildiGorduGonder(ids) {
+    if (yonetici()) return;
+    const yeni = ids.filter((i) => !yapildiGonderilen.has(i)); if (!yeni.length) return;
+    yeni.forEach((i) => yapildiGonderilen.add(i));
+    api("yapildi_goruldu", { ids: yeni }).catch(() => yeni.forEach((i) => yapildiGonderilen.delete(i)));
+  }
+  async function yapildiGorenGoster(k) {
+    const kutu = $("#yapildi-goren"), dugme = $("#yapildi-goren-ac");
+    if (!kutu.hidden) { kutu.hidden = true; dugme.textContent = "👁 Bu işi kimler gördü?"; return; }
+    kutu.hidden = false; kutu.innerHTML = `<p class="ipucu">Yükleniyor…</p>`; dugme.textContent = "✖ Listeyi kapat";
+    try {
+      const r = await api("yapildi_gorenler", { id: k.id });
+      if ($("#yapildi-goren") !== kutu) return;
+      const kisi = (x) => `<b>${kac(x.ad || "—")}</b>${x.unvan ? ` <small>${kac(x.unvan)}</small>` : ""}`;
+      kutu.innerHTML = `
+        <h3 class="goren-baslik gordu">✅ Gördü (${r.gorenler.length})</h3>
+        ${r.gorenler.length ? `<ul class="goren-liste">${r.gorenler.map((x) => `<li>${kisi(x)}<span>👁 ${tarihSaat(x.ilk_at)}</span></li>`).join("")}</ul>` : `<p class="ipucu">Henüz kimse görmedi.</p>`}
+        <details class="goren-gormeyen"><summary><h3 class="goren-baslik gormedi">⏳ Henüz görmedi (${r.gormeyenler.length})</h3></summary>
+        <ul class="goren-liste">${r.gormeyenler.map((x) => `<li>${kisi(x)}</li>`).join("")}</ul></details>
+        <p class="ipucu">İşi açan ya da açılıştaki yenilik penceresinde notu gören kişi “gördü” sayılır. Yalnızca siz görürsünüz.</p>`;
+    } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message || "Liste alınamadı.")}</p>`; }
+  }
 
   // Yönetici / yönetim kurulu için onay bekleyenler iş listesinde değil, ayrı düğmede
   const listede = (k) => !benOnaylarim(k);
@@ -607,6 +632,9 @@
         <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
         ${k.sonuc ? `<dt class="yapildi-not">Not</dt><dd class="yapildi-not">${kac(k.sonuc)}</dd>` : ""}` : ""}
       </dl>
+      ${yonetici() && k.durum === "tamam" ? `
+      <button type="button" class="goren-dugme" id="yapildi-goren-ac">👁 Bu işi kimler gördü?</button>
+      <div id="yapildi-goren" class="yapildi-goren" hidden></div>` : ""}
       ${k.gizli ? `
       <div class="islem yk-cevaplar">
         <h2>💬 Cevaplar</h2>
@@ -681,6 +709,8 @@
     yenilikIsaretle((y) => y.kayit?.id === k.id);
     cevapOkundu(k); // açıldı: listede artık yanıp sönmez (bu ekranda okunmamışlar yanıp sönmeye devam eder)
     if (kapat) kapatBagla(k);
+    if (k.durum === "tamam") yapildiGorduGonder([k.id]);
+    $("#yapildi-goren-ac")?.addEventListener("click", () => yapildiGorenGoster(k));
     // Müdür ve şef kaydı açınca yönetici görsün (ilk açış saklanır)
     if (["mudur", "sef", "yonetim", "muhasebe"].includes(oturum.rol) && k.durum !== "tamam" && !gorulduGonderilen.has(k.id)) {
       gorulduGonderilen.add(k.id);
@@ -3018,7 +3048,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       etiket = `${ayinGunu(bas)} ${AYLAR[tGun(bas).getUTCMonth()]} – ${ayinGunu(tEkle(bas, 6))} ${AYLAR[tGun(tEkle(bas, 6)).getUTCMonth()]}`;
       icerik = Array.from({ length: 7 }, (_, i) => tEkle(bas, i)).map((g) => {
         const isler = gununIsleri(g);
-        return `<div class="prog-gun"><h3 class="${g === bugunT ? "bugun" : ""}">${GUNLER[haftaGunu(g)]}, ${ayinGunu(g)} ${AYLAR[tGun(g).getUTCMonth()]}</h3>
+        return `<div class="prog-gun"><h3 class="gun-${haftaGunu(g)} ${g === bugunT ? "bugun" : ""}">${GUNLER[haftaGunu(g)]}, ${ayinGunu(g)} ${AYLAR[tGun(g).getUTCMonth()]}${g === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : ""}</h3>
           ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">İş yok</p>`}</div>`;
       }).join("");
     } else {
@@ -3033,7 +3063,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       // Seçili günün işleri takvimin altında
       if (progTarih.slice(0, 7) === ay) {
         const isler = gununIsleri(progTarih);
-        icerik += `<div class="prog-gun"><h3 class="${progTarih === bugunT ? "bugun" : ""}">${uzunTarih(progTarih)}</h3>
+        icerik += `<div class="prog-gun"><h3 class="gun-${haftaGunu(progTarih)} ${progTarih === bugunT ? "bugun" : ""}">${uzunTarih(progTarih)}${progTarih === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : ""}</h3>
           ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">Bu gün için girilmiş iş yok</p>`}</div>`;
       }
     }
