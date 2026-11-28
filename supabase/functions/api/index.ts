@@ -989,6 +989,41 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { son_tarih };
     }
 
+    case "yapildi_goruldu": {
+      // Yapılan işi açan ya da yenilik penceresinde gören herkesin ilk görüşü (yönetici "Kimler gördü?" ile bakar)
+      const ids = (Array.isArray(g.ids) ? g.ids : [g.id]).map(Number).filter((x: number) => Number.isInteger(x) && x > 0).slice(0, 50);
+      if (!ids.length || rol === "baskan") return { tamam: true };
+      let q = db.from("kayitlar").select("id").in("id", ids).eq("durum", "tamam");
+      if (!YONETIM_ISI_GOREN.includes(rol)) q = q.eq("gizli", false);
+      const { data: kk } = await q;
+      if (kk?.length) {
+        await db.from("yapildi_gorulme").upsert(
+          kk.map((k: any) => ({ kayit_id: k.id, cihaz: u.cihaz, ad: u.ad, rol, unvan: u.unvan ?? null })),
+          { onConflict: "kayit_id,cihaz", ignoreDuplicates: true },
+        );
+      }
+      return { tamam: true };
+    }
+
+    case "yapildi_gorenler": {
+      // Yalnızca yönetici: yapılan işi kimler gördü, kimler henüz görmedi
+      yonetici();
+      const id = Number(g.id);
+      const { data: k } = await db.from("kayitlar").select("id, gizli, durum, kapanis_at").eq("id", id).maybeSingle();
+      if (!k) throw new Hata("Kayıt bulunamadı.", 404);
+      const { data: gr } = await db.from("yapildi_gorulme").select("cihaz, ad, rol, unvan, ilk_at").eq("kayit_id", id).order("ilk_at");
+      let uq = db.from("uyeler").select("cihaz, ad, rol, unvan").eq("durum", "onayli").neq("rol", "baskan");
+      if (k.gizli) uq = uq.in("rol", YONETIM_ISI_GOREN);
+      const { data: uy } = await uq;
+      const goren = new Set((gr ?? []).map((x: any) => x.cihaz));
+      return {
+        gorenler: (gr ?? []).map(({ cihaz: _c, ...x }: any) => x),
+        gormeyenler: (uy ?? []).filter((x: any) => !goren.has(x.cihaz)).map(({ cihaz: _c, ...x }: any) => x)
+          .sort((a: any, b: any) => String(a.ad).localeCompare(String(b.ad), "tr")),
+        kapanis_at: k.kapanis_at,
+      };
+    }
+
     case "goruldu": {
       // Müdür, şef, muhasebe ve yönetim kurulunun ilk açışı saklanır; sonraki açışlar ilk zamanı değiştirmez
       if (!["mudur", "sef", "yonetim", "muhasebe"].includes(rol)) return { tamam: true };
