@@ -2828,6 +2828,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (!programGorur()) return;
     for (const id of ["#program-ac", "#gorevler-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
     $("#faaliyet-ac").hidden = !yonetici();
+    $("#muhasebe-ac").hidden = !MUHASEBE_GOREN.includes(oturum?.rol);
     if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
     goster("yonetimisleri");
   }
@@ -2860,7 +2861,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
-    $("#ana-kutular [data-ac=muhasebe]").hidden = !MUHASEBE_GOREN.includes(oturum?.rol);
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
     // Ortaklar (ve yakınları), TG ve YK üyeleri, yönetici
     $("#ana-kutular [data-ac=plaka]").hidden = !(ortakMi() || ["baskan", "yonetim"].includes(oturum?.rol) || (oturum?.rol === "uye" && /^TG/.test(oturum?.unvan || "")));
@@ -2906,11 +2906,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       svKutu.after(ykKutu);
     }
     ykKutu.classList.toggle("sabit-tam", takas); ykKutu.classList.toggle("tam", takas);
-    // Muhasebe hep Yönetim Kurulu'nun hemen altında; Yönetim Kurulu en üstte tam genişlikse o da tam genişlik
-    const muKutu = $("#ana-kutular [data-ac=muhasebe]");
-    ykKutu.after(muKutu);
-    const muTam = takas && !muKutu.hidden;
-    muKutu.classList.toggle("sabit-tam", muTam); muKutu.classList.toggle("tam", muTam);
     pk.classList.toggle("sabit-tam", !takas); pk.classList.toggle("tam", !takas); pk.classList.toggle("yarim", takas);
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (en üstteki büyük kutu ve Ortak Yakını Onayları hep tam genişlik)
     const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.sabit-tam):not(.ak-yakinlar):not(.ak-kayitonay)")].filter((k) => !k.hidden);
@@ -3298,6 +3293,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       await faaliyetAc();
     } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = eski; }
   });
+  $("#muhasebe-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#muhasebe"); muhasebeAc(); });
   $("#faaliyet-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#faaliyet"); faaliyetAc(); });
 
   $("#program-ac").addEventListener("click", () => {
