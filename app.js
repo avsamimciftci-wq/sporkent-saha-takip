@@ -175,7 +175,7 @@
   // gezinmek (liste → kayıt → liste) tek açılış sayılır, ana sayfaya dönünce sıfırlanır.
   const EKRAN_BOLUM = { liste: "saha", detay: "saha", yeni: "saha", yonetim: "uyeler", yonetimisleri: "yonetim", yksaha: "yksaha", program: "program",
     gorevler: "gorevler", aidat: "aidat", iletisim: "iletisim", parsel: "parsel", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar",
-    sokaklar: "sokaklar", servis: "servis", duyuru: "duyuru", rapor: "rapor", masraf: "masraf" };
+    sokaklar: "sokaklar", servis: "servis", duyuru: "duyuru", rapor: "rapor", masraf: "masraf", muavin: "muavin", muavinler: "muavinler" };
   let sonSayilan = null;
   function kullanimSay(ad) {
     if (ad === "ana") { sonSayilan = null; return; }
@@ -1219,6 +1219,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         if (e.data.sayfa === "uyeler") yonetimAc();
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "masraf") { if (!$("#ekran-masraf").hidden) masrafListeAc(); }
+        else if (e.data.sayfa === "muavin") { if (!$("#ekran-muavin").hidden) muavinAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
         else if (e.data.sayfa === "faaliyet") { if (yonetici()) faaliyetAc(); }
         else if (["duyuru", "restoran", "muhasebe"].includes(e.data.sayfa)) { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); else yenile(); }
@@ -1270,6 +1271,8 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#masraf") return masrafListeAc();
+    if (location.hash === "#muavin") return muavinAc();
+    if (location.hash === "#muavinler") return muavinlerAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
@@ -2670,6 +2673,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       siparis = `<div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === muhasebeAlt ? "secili" : ""}" data-muhasebe-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
       <button type="button" class="masraf-tus ${m.paylasildi_at ? "tamam" : "bekliyor"} ${masraf ? "secili" : ""}" data-masraf-ac>
         <span>📋</span><b>${MASRAF_BASLIK}</b><small>${kac(m.liste_ayi)} · ${m.paylasildi_at ? "✅ Paylaşıldı" : "⏳ Henüz paylaşılmadı"}</small></button>
+      <button type="button" class="masraf-tus muavin-tus" data-muavinler-ac><span>📒</span><b>Ortak Muavinleri</b><small>Ortakların hesap dökümleri</small></button>
       ${masraf ? `<div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
         <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ay henüz paylaşılmadı. Her ayın ilk iş gününde paylaşılır (1'i cumartesi, pazar ya da resmî tatilse sonraki ilk iş günü). Bu ay: <b>${m.gun ? new Date(m.gun + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }) : "ayın 1'i"}</b>. O gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider.`}</span>
       </div>` : ""}`;
@@ -2697,6 +2701,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     kutu.addEventListener("click", async (e) => {
       const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
       if (e.target.closest("[data-masraf-ac]")) { muhasebeAlt = "masraf"; return paylasimAc(b); }
+      if (e.target.closest("[data-muavinler-ac]")) { history.pushState({ muh: 1 }, "", "#muavinler"); return muavinlerAc(); }
       const ma = e.target.closest("[data-muhasebe-alt]");
       if (ma) { muhasebeAlt = ma.dataset.muhasebeAlt; return paylasimAc(b); }
       if (e.target.closest("[data-restoran-tel-kaydet]")) {
@@ -2777,7 +2782,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
     aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
     yakinlar: "👨‍👩‍👧 Katılım Onayları", muhasebe: "🧾 Muhasebe", faaliyet: "📑 Aylık Faaliyet Raporu", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
-    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler", masraf: "📋 Aylık Masraflar Listesi" };
+    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler", masraf: "📋 Aylık Masraflar Listesi", muavin: "📒 Muavinim", muavinler: "📒 Ortak Muavinleri" };
   const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
   let raporGun = 30, raporVeri = null, raporAra = "";
   const sonGorulmeKisa = (t) => {
@@ -3035,7 +3040,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, muhasebe: muhasebeAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc(), masraf: () => masrafListeAc() };
+  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, muhasebe: muhasebeAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc(), masraf: () => masrafListeAc(), muavin: () => muavinAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -3072,6 +3077,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
     $("#ana-kutular [data-ac=masraf]").hidden = !tgGibi();
+    $("#ana-kutular [data-ac=muavin]").hidden = !muavinOrtagi();
     $("#ana-kutular [data-ac=rapor]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Restoran yetkilisi yalnızca Restoran bölümünü görür
@@ -3109,7 +3115,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     kutulariSigdir();
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { kayitonay: "saha", duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler", masraf: "masraf" };
+  const MODUL_ADRES = { kayitonay: "saha", duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler", masraf: "masraf", muavin: "muavin" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -3137,6 +3143,113 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
     numHarita = h;
   }
+
+  // ---------- Muavin: ortak yalnızca kendisininkini; yönetici, YK ve muhasebe hepsini görür ----------
+  // Ortağın kendisi (yakını değil). Bilgilerinin resmi listeyle örtüşüp örtüşmediğine sunucu karar verir.
+  const muavinOrtagi = () => ortakMi() && oturum?.rol === "uye" && !/Yakını/.test(oturum?.unvan || "");
+  const MUAVIN_GOREN = ["baskan", "yonetim", "muhasebe"];
+  const tlYaz = (n) => n === null || n === undefined || n === "" ? "—" : `${Number(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+  const bakiyeYaz = (n) => n === null || n === undefined || n === "" ? "—" : Number(n) === 0 ? "0,00 ₺" : `${tlYaz(Math.abs(Number(n)))} ${Number(n) > 0 ? "borç" : "alacak"}`;
+  // PDF adresi kısa süreli; gelince dokunulacak bağlantı olur (telefon açılır pencereyi engellemesin)
+  async function muavinPdfHazirla(kutu, no) {
+    const d = kutu.querySelector("[data-muavin-pdf]"), l = kutu.querySelector("[data-muavin-link]");
+    if (d) { d.disabled = true; d.textContent = "PDF hazırlanıyor…"; }
+    try {
+      const { url } = await api("muavin_pdf", no ? { ortak_no: no } : {});
+      if (d) d.hidden = true;
+      l.innerHTML = `<a class="ana-dugme muavin-ac" href="${kac(url)}" target="_blank" rel="noopener">📄 PDF hazır · açmak için dokunun</a><small class="ipucu">Bağlantı 10 dakika geçerlidir.</small>`;
+    } catch (e) { mesaj(e.message); if (d) { d.disabled = false; d.textContent = "📄 PDF olarak aç"; } }
+  }
+  async function muavinAc() {
+    if (location.hash !== "#muavin") history.replaceState(history.state, "", "#muavin");
+    goster("muavin");
+    const k = $("#muavin");
+    k.innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try {
+      const r = await api("muavin_benim");
+      if (!r.hak) {
+        k.innerHTML = `<div class="kart muavin-kart"><p class="muavin-uyari">⚠️ ${kac(r.neden)}</p>
+          <a class="iletisim-satir" href="tel:+905413253021"><span class="iletisim-ikon ara">📞</span><span><small>Muhasebe</small><b>0541 325 30 21</b><em>Aramak için dokunun</em></span></a></div>`;
+        return;
+      }
+      if (!r.muavin) { k.innerHTML = `<p class="bos">Henüz muavin yüklenmedi. Muhasebe yüklediğinde size bildirim gelir.</p>`; return; }
+      const m = r.muavin, t = m.toplam || {};
+      k.innerHTML = `
+        <div class="kart muavin-kart">
+          <small>${kac(m.ortak_no)} No'lu Ortak</small><b class="muavin-ad">${kac(m.ad)}</b>
+          <div class="muavin-bakiye ${Number(t.bakiye) > 0 ? "borc" : "alacak"}"><small>Güncel bakiye</small><b>${bakiyeYaz(t.bakiye)}</b></div>
+          <dl class="muavin-ozet">
+            <dt>Ödenmemiş anapara</dt><dd>${tlYaz(t.odenmemis_anapara)}</dd>
+            <dt>Ödenmemiş faiz</dt><dd>${tlYaz(t.odenmemis_faiz)}</dd>
+            <dt>Toplam borç</dt><dd>${tlYaz(t.borc)}</dd>
+            <dt>Toplam faiz</dt><dd>${tlYaz(t.faiz)}</dd>
+            <dt>Toplam ödeme</dt><dd>${tlYaz(t.odeme)}</dd>
+          </dl>
+          <small class="ipucu">Hesap tarihi: <b>${kac(m.hesap_tarihi)}</b></small>
+          <button type="button" class="ana-dugme" data-muavin-pdf>📄 Muavinimi PDF olarak aç</button>
+          <div data-muavin-link></div>
+        </div>
+        <p class="ipucu">🔒 Muavininizi ortaklardan yalnızca siz görürsünüz. Kooperatif yönetimi ve muhasebe de görebilir.</p>`;
+    } catch (e) { k.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  $("#muavin").addEventListener("click", (e) => { if (e.target.closest("[data-muavin-pdf]")) muavinPdfHazirla($("#muavin"), null); });
+
+  let muavinVeri = null, muavinAra = "";
+  async function muavinlerAc() {
+    if (!MUAVIN_GOREN.includes(oturum?.rol)) return;
+    if (location.hash !== "#muavinler") history.replaceState(history.state, "", "#muavinler");
+    goster("muavinler");
+    if (!muavinVeri) $("#muavinler").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { muavinVeri = await api("muavin_liste"); muavinlerCiz(); }
+    catch (e) { $("#muavinler").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  const aramaNorm = (s) => String(s || "").toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+  function muavinListeHtml() {
+    const a = aramaNorm(muavinAra);
+    const l = muavinVeri.muavinler.filter((m) => !a || String(m.ortak_no) === a || aramaNorm(m.ad).includes(a));
+    return l.length ? l.map((m) => `<div class="muavin-satir" data-muavin-satir="${m.ortak_no}">
+        <span class="muavin-no">${m.ortak_no}</span>
+        <span class="muavin-bilgi"><b>${kac(m.ad)}</b><small class="${Number(m.toplam?.bakiye) > 0 ? "borc" : "alacak"}">${bakiyeYaz(m.toplam?.bakiye)}</small></span>
+        <button type="button" class="kucuk-dugme" data-muavin-pdf>📄 PDF</button><span data-muavin-link></span></div>`).join("")
+      : `<p class="bos">Aranan ortak bulunamadı.</p>`;
+  }
+  function muavinlerCiz() {
+    const v = muavinVeri, b = v.bilgi;
+    $("#muavinler").innerHTML = `
+      <button class="geri geri-tam" type="button" data-muavin-geri>← Geri</button>
+      <div class="muavin-ust">${b ? `<b>📒 ${b.adet} ortağın muavini</b><span>Hesap tarihi: ${kac(b.hesap_tarihi)} · Yüklendi: ${tarihSaat(b.yuklendi_at)}${b.yukleyen ? " · " + kac(b.yukleyen) : ""}</span>` : `<b>📒 Henüz muavin yüklenmedi</b>`}</div>
+      ${v.yukleyebilir ? `<button type="button" class="ana-dugme" data-muavin-kod>💻 Bilgisayardan muavin yükle</button><div data-muavin-kod-kutu></div>` : ""}
+      ${v.muavinler.length ? `<input class="davet-ara" type="search" placeholder="Ortak no ya da isim" data-muavin-ara value="${kac(muavinAra)}" autocomplete="off">
+      <div class="muavin-liste" data-muavin-liste>${muavinListeHtml()}</div>` : ""}
+      <p class="ipucu">🔒 Her muavin açılışı kaydedilir. Ortaklar yalnızca kendi muavinlerini görür.</p>`;
+  }
+  $("#muavinler").addEventListener("input", (e) => {
+    if (!e.target.matches("[data-muavin-ara]")) return;
+    muavinAra = e.target.value; $("#muavinler [data-muavin-liste]").innerHTML = muavinListeHtml();
+  });
+  $("#muavinler").addEventListener("click", async (e) => {
+    if (e.target.closest("[data-muavin-geri]")) { if (history.state?.muh) history.back(); else muhasebeAc(); return; }
+    const satir = e.target.closest("[data-muavin-satir]");
+    if (satir && e.target.closest("[data-muavin-pdf]")) return muavinPdfHazirla(satir, Number(satir.dataset.muavinSatir));
+    const kb = e.target.closest("[data-muavin-kod]");
+    if (kb) {
+      kb.disabled = true;
+      try {
+        const r = await api("muavin_kod_al");
+        const adres = new URL("muavin-yukle.html", location.href).href.split("#")[0];
+        const link = `${adres}#kod=${r.kod}`;
+        $("#muavinler [data-muavin-kod-kutu]").innerHTML = `<div class="kart muavin-kod">
+          <p>Bilgisayarınızda şu adresi açın:</p><b class="muavin-adres">${kac(adres.replace(/^https:\/\//, ""))}</b>
+          <p>Sayfada istenen kod:</p><b class="muavin-kod-yazi">${kac(r.kod)}</b>
+          <small class="ipucu">Kod ${new Date(r.son).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar (30 dakika) geçerlidir ve tek yüklemede kullanılır.</small>
+          <div class="davet-tel"><button type="button" class="davet-dugme kopya" data-muavin-kopya="${kac(link)}">📋 Bağlantıyı kopyala</button>
+          <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent("Sporkent muavin yükleme: " + link)}" target="_blank" rel="noopener">WhatsApp ile kendime gönder</a></div></div>`;
+      } catch (err) { mesaj(err.message); kb.disabled = false; }
+      return;
+    }
+    const kp = e.target.closest("[data-muavin-kopya]");
+    if (kp) { try { await navigator.clipboard.writeText(kp.dataset.muavinKopya); mesaj("Bağlantı kopyalandı."); } catch { mesaj("Kopyalanamadı; adresi ve kodu elle yazın."); } }
+  });
 
   // ---------- Aylık Masraflar Listesi: TG ve Denetim Kurulu üyeleri muhasebenin paylaştığı listeleri görür ----------
   let masrafVeri = null;
@@ -3623,6 +3736,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash === "#uyeler") return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
     if (location.hash === "#masraf") return masrafListeAc();
+    if (location.hash === "#muavin") return muavinAc();
+    if (location.hash === "#muavinler") return muavinlerAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();

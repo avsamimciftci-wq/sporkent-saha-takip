@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Muavin Yükle – SPORKENT ASİSTAN</title>
+  <style>
+    :root { --mavi: #2b6f93; --koyu: #1b2b26; --soluk: #5b6b66; --cizgi: #d4dedb; --kart: #fff; --zemin: #f3f5f4; --yesil: #1f5246; --kirmizi: #b3261e; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --koyu: #e4ece9; --soluk: #a9b8b3; --cizgi: #34433f; --kart: #18211f; --zemin: #0f1513; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--zemin); color: var(--koyu); font: 16px/1.5 "Segoe UI", system-ui, sans-serif; }
+    header { background: var(--mavi); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
+    header img { height: 48px; }
+    header h1 { margin: 0; font-size: 22px; }
+    header small { display: block; opacity: .9; font-size: 14px; }
+    main { max-width: 860px; margin: 24px auto; padding: 0 16px; display: grid; gap: 16px; }
+    .kart { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 14px; padding: 20px 22px; }
+    .kart h2 { margin: 0 0 10px; font-size: 19px; }
+    .adim { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--mavi); color: #fff; font-weight: 700; margin-right: 8px; font-size: 15px; }
+    input[type=text] { font: inherit; font-size: 20px; letter-spacing: 1px; padding: 10px 12px; border: 2px solid var(--cizgi); border-radius: 10px; width: 100%; max-width: 340px; background: var(--kart); color: var(--koyu); }
+    button, .dugme { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 12px 18px; cursor: pointer; background: var(--yesil); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    .ikincil { background: #e4ece9; color: var(--koyu); }
+    .satir { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .ipucu { color: var(--soluk); font-size: 14px; margin: 8px 0 0; }
+    .hata { color: var(--kirmizi); font-weight: 600; }
+    .tamam { color: #1b6b2e; font-weight: 700; }
+    .ozet { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+    .ozet div { background: var(--zemin); border-radius: 10px; padding: 10px 12px; }
+    .ozet b { display: block; font-size: 22px; }
+    .cubuk { height: 14px; background: var(--cizgi); border-radius: 99px; overflow: hidden; margin: 12px 0 6px; }
+    .cubuk span { display: block; height: 100%; width: 0; background: var(--yesil); transition: width .2s; }
+    details { margin-top: 10px; } summary { cursor: pointer; color: var(--soluk); }
+    ul.hatalar { margin: 8px 0 0; padding-left: 20px; font-size: 14px; max-height: 220px; overflow: auto; }
+    label.secim { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="logo-yatay.png" alt="">
+    <div><h1>Ortak Muavinlerini Yükle</h1><small>Muhasebe ve yönetici · bilgisayardan</small></div>
+  </header>
+  <main>
+    <section class="kart" id="k-kod">
+      <h2><span class="adim">1</span>Telefondaki kodu yazın</h2>
+      <p class="ipucu" style="margin-top:0">Telefonda Sporkent Asistan › Yönetim Kurulu › Muhasebe › <b>Ortak Muavinleri</b> › <b>Bilgisayardan yükle</b>'ye dokunun. Çıkan kodu buraya yazın. Kod 30 dakika geçerlidir.</p>
+      <div class="satir"><input id="kod" type="text" placeholder="m-xxxx-xxxx-xxxx" autocomplete="off" spellcheck="false"><button id="kod-dugme" type="button">Devam</button></div>
+      <p id="kod-durum" class="ipucu"></p>
+    </section>
+
+    <section class="kart" id="k-klasor" hidden>
+      <h2><span class="adim">2</span>Faiz dökümleri klasörünü seçin</h2>
+      <p class="ipucu" style="margin-top:0">Muhasebe İletişim Programı'nın çıkardığı klasörü seçin (örn. <b>Faiz dökümleri 28.11.2026 (18.15)</b>). İçindeki her ortağın Excel dosyası bu bilgisayarda okunur; Excel dosyalarının kendisi hiçbir yere gönderilmez.</p>
+      <div class="satir">
+        <label class="dugme" for="klasor">📁 Klasörü seç</label><input id="klasor" type="file" webkitdirectory multiple hidden>
+        <label class="dugme ikincil" for="dosyalar">ya da dosyaları seç</label><input id="dosyalar" type="file" accept=".xlsx" multiple hidden>
+      </div>
+      <p id="okuma-durum" class="ipucu"></p>
+      <div id="sonuc" hidden>
+        <div class="ozet" id="ozet"></div>
+        <div id="hata-kutu"></div>
+      </div>
+    </section>
+
+    <section class="kart" id="k-yukle" hidden>
+      <h2><span class="adim">3</span>Yükle</h2>
+      <p id="mevcut" class="ipucu" style="margin-top:0"></p>
+      <label class="secim"><input type="checkbox" id="bildir" checked> Ortaklara "Muavininiz güncellendi" bildirimi gönder (bildirimde tutar yazmaz)</label>
+      <div class="satir" style="margin-top:14px"><button id="yukle" type="button">⬆ Muavini yükle</button></div>
+      <div class="cubuk" hidden id="cubuk"><span></span></div>
+      <p id="yukle-durum" class="ipucu"></p>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+  (() => {
+    "use strict";
+    const AYAR = window.SPORKENT || {};
+    const $ = (s) => document.querySelector(s);
+    const kac = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    let kod = "", okunan = [];
+
+    async function api(eylem, veri = {}) {
+      const r = await fetch(`${AYAR.supabaseUrl}/functions/v1/api`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: AYAR.anonKey, Authorization: `Bearer ${AYAR.anonKey}` },
+        body: JSON.stringify({ eylem, kod, ...veri }),
+      });
+      let j = {}; try { j = await r.json(); } catch {}
+      if (!r.ok) throw new Error(j.hata || "Bağlantı hatası, tekrar deneyin.");
+      return j;
+    }
+
+    // ---- 1. Kod ----
+    async function kodDene() {
+      kod = $("#kod").value.trim().toLowerCase().replace(/\s+/g, "");
+      const d = $("#kod-durum"); d.className = "ipucu"; d.textContent = "Kontrol ediliyor…";
+      try {
+        const r = await api("muavin_kod_kontrol");
+        d.className = "tamam"; d.textContent = `✔ Kod doğru · ${r.ad || ""} · ${new Date(r.son).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar geçerli`;
+        $("#k-klasor").hidden = false;
+        $("#mevcut").textContent = r.mevcut ? `Şu an uygulamadaki muavin: ${r.mevcut.adet} ortak · hesap tarihi ${r.mevcut.hesap_tarihi} · ${new Date(r.mevcut.yuklendi_at).toLocaleString("tr-TR")}${r.mevcut.yukleyen ? " · " + r.mevcut.yukleyen : ""}. Yüklediğinizde tamamen bunun yerine geçer.` : "Uygulamada henüz muavin yok.";
+      } catch (e) { d.className = "hata"; d.textContent = e.message; }
+    }
+    $("#kod-dugme").addEventListener("click", kodDene);
+    $("#kod").addEventListener("keydown", (e) => { if (e.key === "Enter") kodDene(); });
+    const h = new URLSearchParams(location.hash.slice(1)).get("kod");
+    if (h) { $("#kod").value = h; history.replaceState(null, "", location.pathname); kodDene(); }
+
+    // ---- 2. Excel okuma (bu bilgisayarda) ----
+    async function xlsxAc(file) {
+      const bytes = new Uint8Array(await file.arrayBuffer()), v = new DataView(bytes.buffer), td = new TextDecoder();
+      let son = bytes.length - 22; for (; son >= Math.max(0, bytes.length - 65557); son--) if (v.getUint32(son, true) === 0x06054b50) break;
+      if (son < 0) throw new Error("Excel dosyası açılamadı.");
+      const adet = v.getUint16(son + 10, true), girdiler = {}; let pos = v.getUint32(son + 16, true);
+      for (let i = 0; i < adet; i++) {
+        const yontem = v.getUint16(pos + 10, true), boy = v.getUint32(pos + 20, true), nl = v.getUint16(pos + 28, true), xl = v.getUint16(pos + 30, true), cl = v.getUint16(pos + 32, true), off = v.getUint32(pos + 42, true);
+        girdiler[td.decode(bytes.slice(pos + 46, pos + 46 + nl))] = { yontem, boy, off }; pos += 46 + nl + xl + cl;
+      }
+      return async (ad) => {
+        const e = girdiler[ad]; if (!e) return null;
+        const bas = e.off + 30 + v.getUint16(e.off + 26, true) + v.getUint16(e.off + 28, true);
+        let b = bytes.slice(bas, bas + e.boy);
+        if (e.yontem === 8) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+        return new DOMParser().parseFromString(td.decode(b), "application/xml");
+      };
+    }
+    // Sayfa adına göre satırlar: [{ satır no: { A: değer, … } }]
+    async function sayfalar(xml) {
+      const ss = await xml("xl/sharedStrings.xml");
+      const yazilar = ss ? Array.from(ss.getElementsByTagName("si"), (s) => Array.from(s.getElementsByTagName("t"), (t) => t.textContent).join("")) : [];
+      const wb = await xml("xl/workbook.xml"), rels = await xml("xl/_rels/workbook.xml.rels");
+      const hedef = {}; for (const r of Array.from(rels.getElementsByTagName("Relationship"))) hedef[r.getAttribute("Id")] = r.getAttribute("Target").replace(/^\/?(xl\/)?/, "xl/");
+      const sonuc = {};
+      for (const sh of Array.from(wb.getElementsByTagName("sheet"))) {
+        const rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+        const d = await xml(hedef[rid]); if (!d) continue;
+        const satirlar = [];
+        for (const row of Array.from(d.getElementsByTagName("row"))) {
+          const h = {};
+          for (const c of Array.from(row.getElementsByTagName("c"))) {
+            const kol = c.getAttribute("r").replace(/[0-9]/g, ""), t = c.getAttribute("t");
+            let val = c.getElementsByTagName("v")[0]?.textContent ?? "";
+            if (t === "s") val = yazilar[Number(val)] ?? "";
+            else if (t === "inlineStr") val = Array.from(c.getElementsByTagName("t"), (x) => x.textContent).join("");
+            h[kol] = val;
+          }
+          satirlar.push(h);
+        }
+        sonuc[sh.getAttribute("name")] = satirlar;
+      }
+      return sonuc;
+    }
+    const sayi = (v) => (v === "" || v === undefined || v === null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+    // Tarih: "28.11.2026" ya da Excel gün sayısı
+    const tarih = (v) => {
+      const s = String(v ?? "").trim();
+      if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s;
+      if (/^\d+(\.\d+)?$/.test(s) && Number(s) > 20000 && Number(s) < 100000) {
+        const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(s)) * 864e5);
+        return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`;
+      }
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10).split("-").reverse().join(".");
+      return s;
+    };
+    async function dokumOku(file) {
+      const s = await sayfalar(await xlsxAc(file));
+      const ad = Object.keys(s);
+      const hd = s["Hesap Dökümü"] || s[ad[0]], kf = s["Kalem Faizleri"] || s[ad[1]] || [];
+      if (!hd?.length) throw new Error("Hesap Dökümü sayfası yok");
+      const ust = String(hd[0].A || "").trim().match(/^(131\.\d{2}\.\d{1,4})\s+(.+)$/);
+      if (!ust) throw new Error("İlk satırda 131.xx.xxx hesap kodu yok");
+      const hesap = ust[1];
+      const dosyaKodu = (file.name.match(/^(131\.\d{2}\.\d{1,4})/) || [])[1];
+      if (dosyaKodu && dosyaKodu !== hesap) throw new Error(`Dosya adındaki kod (${dosyaKodu}) ile içerideki kod (${hesap}) farklı`);
+      const bilgi = {}, satirlar = [], toplam = {};
+      let tabloda = false;
+      for (const r of hd.slice(1)) {
+        const a = String(r.A ?? "").trim();
+        if (!tabloda) {
+          if (a === "Hesap") { tabloda = true; continue; }
+          if (/^Hesap tarihi/i.test(a)) bilgi.hesap_tarihi = tarih(r.B);
+          else if (/faiz oran/i.test(a)) bilgi.faiz_orani = String(r.B ?? "");
+          else if (/^Mahsup/i.test(a)) bilgi.mahsup = String(r.B ?? "");
+          continue;
+        }
+        if (a.startsWith("131.")) {
+          if (a !== hesap) throw new Error(`Satırda başka hesap kodu var (${a})`);
+          satirlar.push({ tarih: tarih(r.C), aciklama: r.D ?? "", borc: sayi(r.E), faiz: sayi(r.F), odeme: sayi(r.G), bakiye: sayi(r.H), not: r.I ?? "" });
+          continue;
+        }
+        const d = String(r.D ?? "").trim().toLocaleUpperCase("tr");
+        if (d === "TOPLAM") Object.assign(toplam, { borc: sayi(r.E), faiz: sayi(r.F), odeme: sayi(r.G), bakiye: sayi(r.H) });
+        else if (d.startsWith("ÖDENMEMİŞ ANAPARA")) toplam.odenmemis_anapara = sayi(r.E);
+        else if (d.startsWith("ÖDENMEMİŞ FAİZ")) toplam.odenmemis_faiz = sayi(r.E);
+      }
+      if (!tabloda) throw new Error("Hesap tablosu başlığı bulunamadı");
+      if (!satirlar.length) throw new Error("Hesap hareketi yok");
+      if (!bilgi.hesap_tarihi) throw new Error("Hesap tarihi yok");
+      if (toplam.bakiye === undefined) toplam.bakiye = satirlar[satirlar.length - 1].bakiye;
+      const kalemler = [];
+      for (const r of kf.slice(1)) {
+        if (!String(r.A ?? "").startsWith("131.")) continue;
+        kalemler.push({ tarih: tarih(r.C), kalem: r.D ?? "", tutar: sayi(r.E), faizli: r.F ?? "", faiz_baslangic: tarih(r.G), faizli_gun: sayi(r.H), isletilen_faiz: sayi(r.I), odenmemis_anapara: sayi(r.J) });
+      }
+      return { hesap, ad: ust[2].trim(), bilgi, satirlar, toplam, kalemler, no: Number(hesap.split(".")[2]) };
+    }
+
+    async function dosyalarSecildi(liste) {
+      const xlsx = Array.from(liste).filter((f) => /\.xlsx$/i.test(f.name) && !f.name.startsWith("~$"));
+      const d = $("#okuma-durum"); $("#sonuc").hidden = true; $("#k-yukle").hidden = true; okunan = [];
+      if (!xlsx.length) { d.className = "hata"; d.textContent = "Seçilen yerde Excel (.xlsx) dosyası yok."; return; }
+      const hatalar = [], gorulen = new Map();
+      for (let i = 0; i < xlsx.length; i++) {
+        if (i % 10 === 0) { d.className = "ipucu"; d.textContent = `Okunuyor… ${i} / ${xlsx.length}`; await new Promise((r) => setTimeout(r, 0)); }
+        try {
+          const m = await dokumOku(xlsx[i]);
+          if (gorulen.has(m.no)) throw new Error(`${m.hesap} iki kez var (${gorulen.get(m.no)})`);
+          gorulen.set(m.no, xlsx[i].name); okunan.push(m);
+        } catch (e) { hatalar.push(`${xlsx[i].name}: ${e.message}`); }
+      }
+      okunan.sort((a, b) => a.no - b.no);
+      const tarihler = [...new Set(okunan.map((m) => m.bilgi.hesap_tarihi))];
+      if (tarihler.length > 1) hatalar.push(`Dosyalarda farklı hesap tarihleri var: ${tarihler.join(", ")}. Aynı hesaplamanın dosyalarını seçin.`);
+      d.textContent = "";
+      $("#ozet").innerHTML = `
+        <div>Okunan ortak<b>${okunan.length}</b></div>
+        <div>Hesap tarihi<b>${kac(tarihler.join(", ") || "—")}</b></div>
+        <div>Ortak no<b>${okunan.length ? `${okunan[0].no} – ${okunan[okunan.length - 1].no}` : "—"}</b></div>
+        <div>Hatalı dosya<b style="color:${hatalar.length ? "var(--kirmizi)" : "inherit"}">${hatalar.length}</b></div>`;
+      $("#hata-kutu").innerHTML = hatalar.length
+        ? `<p class="hata">⚠ Bazı dosyalar okunamadı. Hata varken yükleme yapılamaz; dosyaları düzeltip klasörü yeniden seçin.</p><ul class="hatalar">${hatalar.map((x) => `<li>${kac(x)}</li>`).join("")}</ul>`
+        : `<p class="tamam">✔ ${okunan.length} dosyanın hepsi okundu.</p>`;
+      $("#sonuc").hidden = false;
+      $("#k-yukle").hidden = !!hatalar.length || !okunan.length;
+      $("#yukle-durum").textContent = ""; $("#yukle").disabled = false;
+    }
+    $("#klasor").addEventListener("change", (e) => dosyalarSecildi(e.target.files));
+    $("#dosyalar").addEventListener("change", (e) => dosyalarSecildi(e.target.files));
+
+    // ---- 3. Yükleme: 40'arlı parçalar, sonunda tek seferde eskisinin yerine geçer ----
+    $("#yukle").addEventListener("click", async () => {
+      if (!confirm(`${okunan.length} ortağın muavini yüklenecek ve uygulamadaki muavinin yerine geçecek. Devam edilsin mi?`)) return;
+      const b = $("#yukle"), d = $("#yukle-durum"), c = $("#cubuk"), cs = c.querySelector("span");
+      b.disabled = true; c.hidden = false; d.className = "ipucu";
+      try {
+        for (let i = 0; i < okunan.length; i += 40) {
+          d.textContent = `Gönderiliyor… ${i} / ${okunan.length}`; cs.style.width = `${Math.round((i / okunan.length) * 90)}%`;
+          await api("muavin_parca", { kayitlar: okunan.slice(i, i + 40).map(({ no, ...m }) => m) });
+        }
+        d.textContent = "Tamamlanıyor…"; cs.style.width = "95%";
+        const r = await api("muavin_tamamla", { adet: okunan.length, bildir: $("#bildir").checked });
+        cs.style.width = "100%";
+        d.className = "tamam";
+        d.textContent = `✔ ${r.adet} ortağın muavini yüklendi.${$("#bildir").checked ? ` ${r.bildirilen} telefona bildirim gönderildi.` : ""} Bu sayfayı kapatabilirsiniz.`;
+        $("#k-klasor").hidden = true;
+      } catch (e) { d.className = "hata"; d.textContent = e.message; b.disabled = false; }
+    });
+  })();
+  </script>
+</body>
+</html>

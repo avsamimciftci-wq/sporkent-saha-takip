@@ -77,6 +77,7 @@
       <button type="button" data-ac="aidat" class="ana-kutu ak-aidat"><span>💳</span>Aidat</button>
       <button type="button" data-ac="plaka" class="ana-kutu ak-plaka" hidden><span>🚗</span>Plaka-Kimlik Bildirimi</button>
       <button type="button" data-ac="masraf" class="ana-kutu ak-masraf" hidden><span>📋</span>Aylık Masraflar Listesi</button>
+      <button type="button" data-ac="muavin" class="ana-kutu ak-muavin" hidden><span>📒</span>Muavinim</button>
       <button type="button" data-ac="iletisim" class="ana-kutu ak-iletisim"><span>☎️</span>İletişim</button>
       <button type="button" data-ac="sokaklar" class="ana-kutu ak-sokak"><span>🗺️</span>Sokak Numaraları</button>
       <button type="button" data-ac="uyeler" class="ana-kutu ak-uyeler" hidden><span>👥</span>Üyeler ve Ayarlar<small></small></button>
@@ -257,6 +258,15 @@
   <!-- Aylık Masraflar Listesi: TG ve Denetim Kurulu üyeleri (yalnızca görüntüleme) -->
   <main id="ekran-masraf" class="ekran" hidden>
     <div id="masraf"></div>
+  </main>
+
+  <!-- Muavinim: ortak yalnızca kendi hesap dökümünü görür -->
+  <main id="ekran-muavin" class="ekran" hidden>
+    <div id="muavin"></div>
+  </main>
+  <!-- Ortak Muavinleri: yönetici, YK ve muhasebe -->
+  <main id="ekran-muavinler" class="ekran" hidden>
+    <div id="muavinler"></div>
   </main>
 
   <main id="ekran-restoran" class="ekran" hidden>
