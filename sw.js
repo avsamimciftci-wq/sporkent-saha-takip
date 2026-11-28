@@ -1,5 +1,5 @@
 ﻿// Bildirimleri gÃ¶sterir ve uygulama kabuÄŸunu Ã¶nbellekte tutar.
-const SURUM = "sk-v195";
+const SURUM = "sk-v196";
 const DURUM = "sk-durum"; // sÃ¼rÃ¼mden baÄŸÄ±msÄ±z kÃ¼Ã§Ã¼k kayÄ±t: temizlenmemiÅŸ bildirim var mÄ±
 const KABUK = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json", "logo.png", "logo-yatay.png", "icons/sk-mavi-192.png"];
 
@@ -22,6 +22,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  if (url.pathname.includes("/video/")) return; // videolar parça parça iner, önbelleğe alınmaz
   e.respondWith(
     fetch(e.request, { cache: "no-cache" })
       .then((r) => {

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sporkent Asistan · Video</title>
+  <meta name="theme-color" content="#2b6f93">
+  <link rel="icon" href="icons/sk-mavi-192.png">
+  <meta property="og:title" content="Sporkent Asistan · Video">
+  <meta property="og:description" content="Sporkent Asistan programının kurulum ve tanıtım videoları">
+  <meta property="og:image" content="https://avsamimciftci-wq.github.io/sporkent-saha-takip/video/tanitim.jpg">
+  <style>
+    :root { --zemin: #f3f5f4; --kart: #fff; --yazi: #1d2b26; --soluk: #5b6b66; --cizgi: #d8e0dd; --mavi: #2b6f93; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --zemin: #101a17; --kart: #1a2622; --yazi: #e9f0ed; --soluk: #a6b5b0; --cizgi: #2c3b36; }
+    }
+    :root[data-theme="dark"] { --zemin: #101a17; --kart: #1a2622; --yazi: #e9f0ed; --soluk: #a6b5b0; --cizgi: #2c3b36; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--zemin); color: var(--yazi); font: 18px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    header { background: var(--mavi); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; text-align: center; }
+    header img { height: 76px; max-width: 100%; object-fit: contain; }
+    main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); }
+    h1 { font-size: 24px; margin: 4px 0 6px; text-align: center; }
+    .alt { color: var(--soluk); text-align: center; margin: 0 0 14px; font-size: 16px; }
+    .sekmeler { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .sekmeler button { font: inherit; font-weight: 800; padding: 12px 8px; border-radius: 14px; border: 2px solid var(--cizgi); background: var(--kart); color: var(--yazi); cursor: pointer; }
+    .sekmeler button.secili { background: var(--mavi); border-color: var(--mavi); color: #fff; }
+    video { display: block; width: 100%; max-height: 78vh; background: #000; border-radius: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+    .ipucu { color: var(--soluk); font-size: 15px; text-align: center; margin: 10px 0 0; }
+    .dugme { display: block; margin: 18px 0 0; padding: 16px; border-radius: 16px; background: #1f5145; color: #fff; text-align: center; text-decoration: none; font-weight: 800; font-size: 19px; }
+    .diger { display: block; margin-top: 12px; text-align: center; color: var(--mavi); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header><img src="logo-yatay.png" alt="Sporkent Asistan"></header>
+  <main>
+    <h1 id="baslik">Sporkent Asistan</h1>
+    <p class="alt" id="alt"></p>
+    <div class="sekmeler" id="sekmeler" hidden>
+      <button type="button" data-cihaz="android">🤖 Android</button>
+      <button type="button" data-cihaz="iphone">🍏 iPhone</button>
+    </div>
+    <video id="video" controls playsinline preload="metadata"></video>
+    <p class="ipucu">▶ Oynatmak için videoya dokunun. Tam ekran için sağ alttaki ⛶ işaretine dokunun.</p>
+    <a class="dugme" id="kur" href="./">📲 Programı açmak / kurmak için dokunun</a>
+    <a class="diger" id="diger" href="#"></a>
+  </main>
+  <script>
+    const p = new URLSearchParams(location.search);
+    const tg = p.has("tg");
+    const tur = p.get("v") === "tanitim" ? "tanitim" : "kurulum";
+    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    let cihaz = p.get("cihaz") === "iphone" || (!p.get("cihaz") && ios) ? "iphone" : "android";
+    const v = document.getElementById("video");
+    const ek = tg ? "&tg=1" : "";
+    document.getElementById("kur").href = tg ? "./?giris=tg" : "./";
+    function goster() {
+      if (tur === "tanitim") {
+        document.getElementById("baslik").textContent = "Programın tanıtımı";
+        document.getElementById("alt").textContent = "Sporkent Asistan programında neler var? (3,5 dakika)";
+        v.poster = "video/tanitim.jpg"; v.src = "video/tanitim.mp4";
+        const d = document.getElementById("diger"); d.textContent = "📲 Kurulum videosunu izleyin ›"; d.href = "?v=kurulum" + ek;
+      } else {
+        document.getElementById("baslik").textContent = "Program nasıl kurulur?";
+        document.getElementById("alt").textContent = cihaz === "iphone" ? "iPhone için kurulum (1,5 dakika)" : "Android telefon için kurulum (1 dakika)";
+        document.getElementById("sekmeler").hidden = false;
+        for (const b of document.querySelectorAll("[data-cihaz]")) b.classList.toggle("secili", b.dataset.cihaz === cihaz);
+        v.poster = `video/kurulum-${cihaz}.jpg`; v.src = `video/kurulum-${cihaz}.mp4`;
+        const d = document.getElementById("diger"); d.textContent = "🎬 Programın tanıtım videosunu izleyin ›"; d.href = "?v=tanitim" + ek;
+      }
+    }
+    document.getElementById("sekmeler").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-cihaz]"); if (!b) return;
+      cihaz = b.dataset.cihaz; goster(); v.play().catch(() => {});
+    });
+    goster();
+  </script>
+</body>
+</html>
