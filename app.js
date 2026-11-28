@@ -190,7 +190,7 @@
     setTimeout(() => { if (typeof izCubuk === "function") izCubuk(); }, 0);
     for (const e of document.querySelectorAll(".ekran")) e.hidden = e.id !== "ekran-" + ad;
     kullanimSay(ad);
-    const bolumTip = { duyuru: ["duyuru"], restoran: ["restoran"], aidat: ["aidat"], program: ["program"], yonetim: ["uye", "uyebekler"], yakinlar: ["yakin"] }[ad];
+    const bolumTip = { duyuru: ["duyuru"], restoran: ["restoran"], muhasebe: ["muhasebe"], aidat: ["aidat"], program: ["program"], yonetim: ["uye", "uyebekler"], yakinlar: ["yakin"] }[ad];
     if (ad === "ana" && yenilikHazir) setTimeout(yenilikKontrol, 0); // ana sayfada görülmemiş yenilik varsa pencere hep önde
     if (bolumTip && onayli() && yenilikHazir) yenilikIsaretle((y) => bolumTip.includes(y.tip));
     document.documentElement.classList.toggle("ana-acik", ad === "ana");
@@ -284,10 +284,10 @@
   const YENILIK_TIP = {
     onay: ["⏳", "Onayınızı bekleyen kayıt", "onay"], sorun: ["🛠️", "Yeni sorun", "saha"], emir: ["🔒", "Yeni YK iş emri", "yk"], yapildi: ["✅", "İş yapıldı", "yapildi"],
     cevap: ["💬", "Yeni cevap", "cevap"], gecikti: ["⚠", "Süresinde yapılmadı", "gecikti"], yakin: ["👨‍👩‍👧", "Onayınızı bekleyen ortak yakını", "onay"],
-    duyuru: ["📢", "Yeni duyuru", "duyuru"], restoran: ["🍽️", "Restoran", "restoran"], aidat: ["💳", "Aidat bilgisi eklendi", "aidat"], program: ["📅", "İş programına eklendi", "program"],
+    duyuru: ["📢", "Yeni duyuru", "duyuru"], restoran: ["🍽️", "Restoran", "restoran"], muhasebe: ["🧾", "Muhasebe", "muhasebe"], aidat: ["💳", "Aidat bilgisi eklendi", "aidat"], program: ["📅", "İş programına eklendi", "program"],
     uyebekler: ["👤", "Onay bekleyen üye", "onay"], uye: ["🎉", "Programa yeni katılım", "uye"], plaka: ["🚗", "Plaka-Kimlik bildirimi", "plaka"], devriye: ["🚶", "Devriye tamamlandı", "devriye"],
   };
-  const YENILIK_AC = { duyuru: "duyuru", restoran: "restoran", aidat: "aidat", uyebekler: "uyeler", uye: "uyeler", yakin: "yakinlar" };
+  const YENILIK_AC = { duyuru: "duyuru", restoran: "restoran", muhasebe: "muhasebe", aidat: "aidat", uyebekler: "uyeler", uye: "uyeler", yakin: "yakinlar" };
   // Bir kaydın yenilikleri; kişinin kendi yaptığı iş kendisine yenilik sayılmaz
   function kayitYenilikleri(k) {
     const y = [], ben = oturum?.ad, ek = (son, tip, at, metin, kim) => at && y.push({ a: k.id + ":" + son, tip, at, metin, kim, kayit: k });
@@ -1215,7 +1215,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
         else if (e.data.sayfa === "faaliyet") { if (yonetici()) faaliyetAc(); }
-        else if (e.data.sayfa === "duyuru" || e.data.sayfa === "restoran") { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); }
+        else if (["duyuru", "restoran", "muhasebe"].includes(e.data.sayfa)) { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); }
         else yenile();
       });
     }
@@ -1258,6 +1258,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     if (location.hash === "#yakinlar") return yakinlarAc();
     if (location.hash === "#plaka") return plakaAc();
     if (location.hash === "#restoran") return restoranAc();
+    if (location.hash === "#muhasebe" && MUHASEBE_GOREN.includes(oturum?.rol)) return muhasebeAc();
     if (location.hash === "#duyuru") return duyuruAc();
     if (location.hash === "#rapor" && yonetici()) return raporAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
@@ -2489,8 +2490,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const PAYLASIM_BOLUMU = {
     restoran: { ornekMetin: "Örn. Bu akşam balık günü!", ornekAciklama: "Örn. Haftanın menüsü", bos: "Henüz paylaşım yok." },
     duyuru: { ornekMetin: "Örn. Cumartesi günü saat 10.00'da sitede ilaçlama yapılacaktır.", ornekAciklama: "Örn. Genel Kurul daveti", bos: "Henüz duyuru yok." },
+    muhasebe: { ornekMetin: "Örn. Kasım ayı gelir-gider tablosu hazırlandı.", ornekAciklama: "Örn. Kasım ayı mizanı", bos: "Henüz paylaşım yok." },
   };
-  const paylasimTur = { restoran: "gorsel", duyuru: "metin" };
+  const paylasimTur = { restoran: "gorsel", duyuru: "metin", muhasebe: "pdf" };
+  const MUHASEBE_GOREN = ["baskan", "yonetim", "muhasebe"];
   async function paylasimAc(b) {
     if (location.hash !== "#" + b) history.replaceState(null, "", "#" + b);
     goster(b);
@@ -2501,6 +2504,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
   function restoranAc() { return paylasimAc("restoran"); }
   function duyuruAc() { return paylasimAc("duyuru"); }
+  function muhasebeAc() { if (MUHASEBE_GOREN.includes(oturum?.rol)) return paylasimAc("muhasebe"); }
   function paylasimHtml(b, p, yonetir) {
     let ic = "";
     if (p.tur === "gorsel") ic = p.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(p.url)}" aria-label="Tam ekran aç"><img src="${kac(p.url)}" alt=""></button>` : `<div class="foto-bos">Görsel açılamadı</div>`;
@@ -2537,7 +2541,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : "Açıklama (isteğe bağlı)"}
           <textarea name="metin" rows="${tur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${tur === "metin" ? ayar.ornekMetin : ayar.ornekAciklama}"></textarea>
         </label>
-        <button class="ana-dugme" type="submit">📣 ${b === "duyuru" ? "Duyur ve herkese bildir" : "Paylaş ve herkese bildir"}</button>
+        <button class="ana-dugme" type="submit">📣 ${b === "duyuru" ? "Duyur ve herkese bildir" : b === "muhasebe" ? "Paylaş ve yönetime bildir" : "Paylaş ve herkese bildir"}</button>
+        ${b === "muhasebe" ? `<small class="ipucu">Muhasebe bölümünü yalnızca yönetici, yönetim kurulu üyeleri ve muhasebe görür; ortaklar görmez.</small>` : ""}
         ${b === "restoran" ? `<details class="restoran-tel-ayar"><summary>📞 Sipariş telefonunu değiştir</summary>
           <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
           <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
@@ -2558,7 +2563,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (!r.ok) throw new Error("Dosya yüklenemedi, tekrar deneyin.");
     return yol;
   }
-  for (const b of ["restoran", "duyuru"]) {
+  for (const b of ["restoran", "duyuru", "muhasebe"]) {
     const kutu = $("#" + b);
     kutu.addEventListener("click", async (e) => {
       const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
@@ -2594,7 +2599,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         const r = await api(b + "_paylas", { tur, metin: f.metin.value, yol });
         mesaj(b === "duyuru"
           ? (typeof r?.basarili === "number" ? `Duyuru yayımlandı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Duyuru yayımlandı. Herkese bildirim gönderildi.")
-          : (typeof r?.basarili === "number" ? `Paylaşıldı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Paylaşıldı. Herkese bildirim gönderildi."));
+          : (typeof r?.basarili === "number" ? `Paylaşıldı. ${r.basarili} telefona bildirim gönderildi${b === "muhasebe" ? "" : " (sizinki dahil)"}.` : b === "muhasebe" ? "Paylaşıldı. Yönetime bildirim gönderildi." : "Paylaşıldı. Herkese bildirim gönderildi."));
         await paylasimAc(b);
       } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = eski; }
     });
@@ -2620,7 +2625,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // ---------- Kullanım raporu (yalnızca yönetici) ----------
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
     aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
-    yakinlar: "👨‍👩‍👧 Katılım Onayları", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
+    yakinlar: "👨‍👩‍👧 Katılım Onayları", muhasebe: "🧾 Muhasebe", faaliyet: "📑 Aylık Faaliyet Raporu", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
     program: "📅 İş Programı", devriye: "🚶 Günlük Devriye", gorevler: "✅ Görevler" };
   const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
   let raporGun = 30, raporVeri = null, raporAra = "";
@@ -2842,7 +2847,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, muhasebe: muhasebeAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -2855,6 +2860,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-hitap").textContent = hitap();
     $("#ana-ad").textContent = oturum?.ad || "";
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
+    $("#ana-kutular [data-ac=muhasebe]").hidden = !MUHASEBE_GOREN.includes(oturum?.rol);
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
     // Ortaklar (ve yakınları), TG ve YK üyeleri, yönetici
     $("#ana-kutular [data-ac=plaka]").hidden = !(ortakMi() || ["baskan", "yonetim"].includes(oturum?.rol) || (oturum?.rol === "uye" && /^TG/.test(oturum?.unvan || "")));
@@ -2900,6 +2906,11 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       svKutu.after(ykKutu);
     }
     ykKutu.classList.toggle("sabit-tam", takas); ykKutu.classList.toggle("tam", takas);
+    // Muhasebe hep Yönetim Kurulu'nun hemen altında; Yönetim Kurulu en üstte tam genişlikse o da tam genişlik
+    const muKutu = $("#ana-kutular [data-ac=muhasebe]");
+    ykKutu.after(muKutu);
+    const muTam = takas && !muKutu.hidden;
+    muKutu.classList.toggle("sabit-tam", muTam); muKutu.classList.toggle("tam", muTam);
     pk.classList.toggle("sabit-tam", !takas); pk.classList.toggle("tam", !takas); pk.classList.toggle("yarim", takas);
     // Görünen kutu sayısı tekse son kutu tam genişlik olsun (en üstteki büyük kutu ve Ortak Yakını Onayları hep tam genişlik)
     const gorunen = [...document.querySelectorAll("#ana-kutular .ana-kutu:not(.sabit-tam):not(.ak-yakinlar):not(.ak-kayitonay)")].filter((k) => !k.hidden);
@@ -3241,26 +3252,49 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     try { faaliyetCiz(await api("faaliyet_raporlari")); }
     catch (e) { $("#faaliyet").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
-  function faaliyetCiz(v) {
-    const buAyVar = v.raporlar.some((r) => r.ay === v.bu_ay);
+  const RAPOR_TUR = [["tum", "📑", "Tüm Aylık Faaliyet Raporu", "Saha Takip ve YK Saha Takip'teki bütün işler + İş Programı"],
+    ["yk", "🗂️", "YK Saha Takip", "Yalnızca YK Saha Takip işleri + İş Programı"],
+    ["saha", "🛠️", "Saha Takip", "Yalnızca Saha Takip'ten gelen işler"]];
+  let faaliyetTur = "tum", faaliyetVeri = null;
+  const raporPaylasMetni = (tur, ay, url) => `Sporkent İşletme Kooperatifi\n${RAPOR_TUR.find((x) => x[0] === tur)[2]} · ${ayAdi(ay)} (PDF):\n${url}`;
+  function faaliyetCiz(v = faaliyetVeri) {
+    faaliyetVeri = v;
+    const [, ikon, ad, acik] = RAPOR_TUR.find((x) => x[0] === faaliyetTur);
     $("#faaliyet").innerHTML = `
       <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-faaliyet">📑 Aylık Faaliyet Raporu</h1></div>
-      <p class="ipucu">Saha Takip ve YK Saha Takip'te “Yapıldı” olarak kapatılan bütün işler ile İş Programı'nda yapılanlar her ay <b>fotoğrafları ve notlarıyla</b> PDF rapor olur. Rapor <b>her ayın son günü akşam 20.00'de</b> kendiliğinden hazırlanır ve size bildirim gelir. Raporlar haftalık yedeğe de girer.</p>
-      <button type="button" class="ana-dugme" data-faaliyet-hazirla="${v.bu_ay}">🔄 ${ayAdi(v.bu_ay)} raporunu şimdi hazırla</button>
-      <small class="ipucu">Ay bitmeden hazırlarsanız o güne kadar yapılanlar girer; ayın son günü rapor yeniden, eksiksiz hazırlanır.</small>
-      <h2>Hazır raporlar</h2>
-      ${v.raporlar.length ? v.raporlar.map((r) => `<div class="faaliyet-satir">
-          <div><b>${ayAdi(r.ay)}</b><small>${r.is_sayisi} yapılan iş · ${r.program_sayisi} İş Programı işi · Hazırlandı: ${tarihSaat(r.olusturma)}</small></div>
-          ${r.url ? `<a class="faaliyet-ac" href="${kac(r.url)}" target="_blank" rel="noopener">📄 PDF'i aç</a>` : ""}
-          ${r.ay !== v.bu_ay ? `<button type="button" class="ikincil faaliyet-yenile" data-faaliyet-hazirla="${r.ay}">🔄 Yeniden hazırla</button>` : ""}
-        </div>`).join("") : `<p class="bos">Henüz hazır rapor yok.${buAyVar ? "" : " Yukarıdaki düğmeyle bu ayın raporunu şimdi hazırlayabilirsiniz."}</p>`}`;
+      <div class="faaliyet-turler">${RAPOR_TUR.map(([k, i, a]) => `<button type="button" class="faaliyet-tur tur-${k} ${k === faaliyetTur ? "secili" : ""}" data-faaliyet-tur="${k}"><span>${i}</span>${a}</button>`).join("")}</div>
+      <p class="ipucu"><b>${ikon} ${ad}:</b> ${acik}. Raporlarda bildiren ve yapan kişilerin adları yazmaz; fotoğraflar ve notlar vardır. Her ayın son günü akşam 20.00'de üç rapor birden kendiliğinden hazırlanır ve size bildirim gelir.</p>
+      ${v.raporlar.length ? v.raporlar.map((r) => {
+        const url = r.linkler?.[faaliyetTur];
+        return `<div class="faaliyet-satir">
+          <div><b>${ayAdi(r.ay)}</b><small>${ad} · Hazırlandı: ${tarihSaat(r.olusturma)}</small></div>
+          ${url ? `<a class="faaliyet-ac" href="${kac(url)}" target="_blank" rel="noopener">📄 Aç</a>
+          <div class="faaliyet-paylas">
+            <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(raporPaylasMetni(faaliyetTur, r.ay, url))}" target="_blank" rel="noopener">WhatsApp ile paylaş</a>
+            <button type="button" class="davet-dugme kopya" data-faaliyet-kopya="${r.ay}">📋 Linki kopyala</button></div>`
+          : `<small class="faaliyet-yok">Bu rapor henüz hazırlanmadı; aşağıdaki düğmeyle hazırlayın.</small>`}
+          <button type="button" class="ikincil faaliyet-yenile" data-faaliyet-hazirla="${r.ay}">🔄 ${r.ay === v.bu_ay ? "Bugüne kadarki hâliyle yeniden hazırla" : "Yeniden hazırla"}</button>
+        </div>`;
+      }).join("") : `<p class="bos">Henüz hazır rapor yok.</p>`}
+      ${v.raporlar.some((r) => r.ay === v.bu_ay) ? "" : `<button type="button" class="ana-dugme" data-faaliyet-hazirla="${v.bu_ay}">🔄 ${ayAdi(v.bu_ay)} raporlarını şimdi hazırla</button>
+      <small class="ipucu">Ay bitmeden hazırlarsanız o güne kadar yapılanlar girer; ayın son günü raporlar yeniden, eksiksiz hazırlanır.</small>`}
+      <p class="ipucu">WhatsApp ile gönderdiğiniz link 1 yıl geçerlidir; linke dokunan kişi PDF'i telefonunda açar.</p>`;
   }
   $("#faaliyet").addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-faaliyet-tur]");
+    if (t) { faaliyetTur = t.dataset.faaliyetTur; return faaliyetCiz(); }
+    const kp = e.target.closest("[data-faaliyet-kopya]");
+    if (kp) {
+      const url = faaliyetVeri.raporlar.find((r) => r.ay === kp.dataset.faaliyetKopya)?.linkler?.[faaliyetTur];
+      try { await navigator.clipboard.writeText(raporPaylasMetni(faaliyetTur, kp.dataset.faaliyetKopya, url)); mesaj("Rapor linki kopyalandı."); }
+      catch { mesaj("Kopyalanamadı; WhatsApp düğmesini kullanın."); }
+      return;
+    }
     const b = e.target.closest("[data-faaliyet-hazirla]"); if (!b) return;
     const eski = b.textContent; b.disabled = true; b.textContent = "Hazırlanıyor… (fotoğraflarla birlikte biraz sürebilir)";
     try {
       const r = await api("faaliyet_raporu_hazirla", { ay: b.dataset.faaliyetHazirla });
-      mesaj(`${r.ayAdi} raporu hazırlandı: ${r.is_sayisi} yapılan iş.`);
+      mesaj(`${r.ayAdi} raporları hazırlandı: ${r.is_sayisi} yapılan iş.`);
       await faaliyetAc();
     } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = eski; }
   });
@@ -3386,6 +3420,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program" && $("#ekran-program").hidden) return programAc();
+    if (location.hash === "#faaliyet" && $("#ekran-faaliyet").hidden) return faaliyetAc();
+    if (location.hash === "#muhasebe" && $("#ekran-muhasebe").hidden) return muhasebeAc();
     if (location.hash.startsWith("#gorevler") && $("#ekran-gorevler").hidden) {
       return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
     }
