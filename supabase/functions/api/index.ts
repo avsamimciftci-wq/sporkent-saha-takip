@@ -571,6 +571,21 @@ async function muavinHakki(u: any): Promise<{ hak: boolean; neden?: string }> {
   if (!e.uyuyor || !e.ad_uyuyor) return { hak: false, neden: "Adınız, ortak numaranız ve telefonunuz kooperatif kayıtlarıyla birebir örtüşmediği için hesap özetinizi buradan gösteremiyoruz. Lütfen muhasebeyle görüşün." };
   return { hak: true };
 }
+// Hesap Özeti'ni görebileceği ortak numaraları.
+// - Ortak: kendi numarası (adı, numarası ve telefonu resmi listeyle örtüşmeli); yakınlar göremez.
+// - Yönetici, YK, TG ve Denetim Kurulu üyesi: kişisel kod listesinde elle girilen numaralar, yoksa adının
+//   resmi ortak listesinde geçtiği numaralar (birden çok villası olan hepsini görür).
+async function hesapNolari(u: any): Promise<{ nolar: number[]; neden?: string }> {
+  if (u.rol === "uye" && u.ortak_no) {
+    const h = await muavinHakki(u);
+    return h.hak ? { nolar: [u.ortak_no] } : { nolar: [], neden: h.neden };
+  }
+  if (!(tgGibi(u) || u.rol === "baskan" || u.rol === "yonetim")) return { nolar: [] };
+  const { data: k } = await db.from("tg_uyeleri").select("hesap_nolari").eq("ad", u.ad).maybeSingle();
+  if (Array.isArray(k?.hesap_nolari) && k.hesap_nolari.length) return { nolar: [...k.hesap_nolari].sort((a: number, b: number) => a - b) };
+  const { data } = await db.from("ortak_rehberi").select("no").eq("ad_ozet", await rehberOzeti(adNorm(u.ad)));
+  return { nolar: (data ?? []).map((x: any) => x.no).sort((a: number, b: number) => a - b) };
+}
 // Bilgisayardan yükleme kodu: 30 dakika geçerli; hatalı denemeler kodla girişteki gibi sınırlanır
 async function muavinKodu(g: any, ip: string) {
   const kod = temiz(g.kod, 40).toLowerCase().replace(/\s+/g, "");
@@ -1093,6 +1108,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       return { kayitlar: await fotoUrlleri(kayitlar), rol, unvan: (u as any).unvan ?? null, bekleyen, ykUyeler, varsayilan_sure, cevapKisiler, parsel, bekleyenYakinlar,
         yenilikler: await yenilikBul(u, rol).catch(() => []),
         okunmamis: await okunmamisSay(u).catch(() => null),
+        hesap_ozeti: rol !== "uye" || !(u as any).ortak_no ? (await hesapNolari(u).catch(() => ({ nolar: [] }))).nolar.length > 0 : undefined,
         // Yenilikler penceresi ilk kez kurulurken: bu kişinin daha önce açıp gördüğü kayıtlar yeniden gösterilmesin
         gordum: g.ilk ? ((await db.from("goruntulemeler").select("kayit_id, ilk_at").or(`cihaz.eq.${u.cihaz},and(ad.eq."${String(u.ad).replace(/["\\]/g, "")}",rol.eq.${rol})`)).data ?? []) : undefined };
     }
@@ -1677,11 +1693,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     }
 
     case "muavin_benim": {
-      // Ortak: yalnızca kendi muavininin özeti
-      const h = await muavinHakki(u);
-      if (!h.hak) return { hak: false, neden: h.neden };
-      const { data: m } = await db.from("muavinler").select("ortak_no, ad, bilgi, toplam, yuklendi_at").eq("ortak_no", (u as any).ortak_no).maybeSingle();
-      return { hak: true, muavin: m ? { ...muavinOzet(m), yuklendi_at: m.yuklendi_at } : null };
+      // Kişinin yalnızca kendi hesap özetleri
+      const h = await hesapNolari(u);
+      if (!h.nolar.length) return { hak: false, neden: h.neden ?? "Adınız kooperatifin ortak listesinde bulunamadığı için hesap özetinizi gösteremiyoruz. Lütfen muhasebeyle görüşün." };
+      const { data } = await db.from("muavinler").select("ortak_no, ad, bilgi, toplam, yuklendi_at").in("ortak_no", h.nolar).order("ortak_no");
+      return { hak: true, muavinler: (data ?? []).map((m: any) => ({ ...muavinOzet(m), yuklendi_at: m.yuklendi_at })) };
     }
 
     case "muavin_pdf": {
@@ -1691,9 +1707,9 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         no = Number(g.ortak_no);
         if (!Number.isInteger(no) || no < 1) throw new Hata("Ortak numarası geçersiz.");
       } else {
-        const h = await muavinHakki(u);
-        if (!h.hak) throw new Hata(h.neden ?? "Bu muavini göremezsiniz.", 403);
-        no = (u as any).ortak_no;
+        const h = await hesapNolari(u);
+        if (!h.nolar.length) throw new Hata(h.neden ?? "Bu hesap özetini göremezsiniz.", 403);
+        no = h.nolar.includes(Number(g.ortak_no)) ? Number(g.ortak_no) : h.nolar[0];
       }
       const { data: m } = await db.from("muavinler").select("*").eq("ortak_no", no).maybeSingle();
       if (!m) throw new Hata("Bu ortak için yüklenmiş muavin yok.", 404);

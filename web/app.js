@@ -212,6 +212,7 @@
 
   let bekleyenSayisi = 0;
   let okunmamis = { duyuru: 0, restoran: 0 }; // ana sayfadaki Duyurular / Restoran rakamı
+  let hesapOzetiVar = !!sakla.al("sk_hesap_ozeti"); // yönetici, YK, TG, Denetim Kurulu: adı ortak listesinde varsa
   let varsSure = null; // yeni işlerin yapılma süresi (yönetici ve yönetim kurulu görür)
   async function yenile() {
     // Ekran kapalıyken (arka planda) gelen bildirimde tazeleme yapılmaz: dönünce zaten tazelenir
@@ -238,6 +239,7 @@
       }
       sunucuYenilik = r.yenilikler || [];
       if (r.okunmamis) { okunmamis = r.okunmamis; if (!$("#ekran-ana").hidden) duyuruRozeti(); }
+      if (typeof r.hesap_ozeti === "boolean" && r.hesap_ozeti !== hesapOzetiVar) { hesapOzetiVar = r.hesap_ozeti; sakla.koy("sk_hesap_ozeti", hesapOzetiVar); if (!$("#ekran-ana").hidden) anaAc(); }
       listeCiz();
       yenilikKontrol();
     } catch (e) {
@@ -3077,7 +3079,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
     $("#ana-kutular [data-ac=masraf]").hidden = !tgGibi();
-    $("#ana-kutular [data-ac=muavin]").hidden = !muavinOrtagi();
+    $("#ana-kutular [data-ac=muavin]").hidden = !(muavinOrtagi() || hesapOzetiVar);
     $("#ana-kutular [data-ac=rapor]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Restoran yetkilisi yalnızca Restoran bölümünü görür
@@ -3172,10 +3174,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <a class="iletisim-satir" href="tel:+905413253021"><span class="iletisim-ikon ara">📞</span><span><small>Muhasebe</small><b>0541 325 30 21</b><em>Aramak için dokunun</em></span></a></div>`;
         return;
       }
-      if (!r.muavin) { k.innerHTML = `<p class="bos">Henüz muavin yüklenmedi. Muhasebe yüklediğinde size bildirim gelir.</p>`; return; }
-      const m = r.muavin, t = m.toplam || {};
-      k.innerHTML = `
-        <div class="kart muavin-kart">
+      if (!r.muavinler.length) { k.innerHTML = `<p class="bos">Henüz hesap özeti yüklenmedi. Muhasebe yüklediğinde size bildirim gelir.</p>`; return; }
+      k.innerHTML = r.muavinler.map((m) => { const t = m.toplam || {}; return `
+        <div class="kart muavin-kart" data-muavin-kart="${m.ortak_no}">
           <small>${kac(m.ortak_no)} No'lu Ortak</small><b class="muavin-ad">${kac(m.ad)}</b>
           <div class="muavin-bakiye ${Number(t.bakiye) > 0 ? "borc" : "alacak"}"><small>Güncel bakiye</small><b>${bakiyeYaz(t.bakiye)}</b></div>
           <dl class="muavin-ozet">
@@ -3188,11 +3189,14 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <small class="ipucu">Hesap tarihi: <b>${kac(m.hesap_tarihi)}</b></small>
           <button type="button" class="ana-dugme" data-muavin-pdf>📄 Hesap dökümümü PDF olarak aç</button>
           <div data-muavin-link></div>
-        </div>
+        </div>`; }).join("") + `
         <p class="ipucu">🔒 Hesap özetinizi ortaklardan yalnızca siz görürsünüz. Kooperatif yönetimi ve muhasebe de görebilir.</p>`;
     } catch (e) { k.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
-  $("#muavin").addEventListener("click", (e) => { if (e.target.closest("[data-muavin-pdf]")) muavinPdfHazirla($("#muavin"), null); });
+  $("#muavin").addEventListener("click", (e) => {
+    const k = e.target.closest("[data-muavin-kart]");
+    if (k && e.target.closest("[data-muavin-pdf]")) muavinPdfHazirla(k, Number(k.dataset.muavinKart));
+  });
 
   let muavinVeri = null, muavinAra = "";
   async function muavinlerAc() {
