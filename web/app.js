@@ -65,6 +65,7 @@
     if (o?.rol === "baskan") return "Yönetim Kurulu Başkanı Sayın";
     if (o?.rol === "yonetim") return "Yönetim Kurulu Üyesi Sayın";
     if (o?.rol === "uye" && /^TG/i.test(un)) return /başkan/i.test(un) ? "Temsilciler Grubu Başkanı Sayın" : "Temsilciler Grubu Üyesi Sayın";
+    if (o?.rol === "uye" && /^Denetim/i.test(un)) return "Denetim Kurulu Üyesi Sayın";
     if (o?.rol === "uye" && /Yakını/.test(un)) return "Hoş geldiniz,";
     if (o?.rol === "uye") return "Ortağımız Sayın";
     return "Sayın";
@@ -76,6 +77,8 @@
   // Bu kaydı ben onaylayabilir miyim (sunucu söyler: ortağın kaydını parsel temsilcisi, diğerlerini yönetim)
   const benOnaylarim = (k) => onayBekliyor(k) && !!k.onaylayabilir;
   const ortakMi = () => !!parsel?.ortak;
+  // TG üyeleri ve Denetim Kurulu üyeleri: ekranları birebir aynı
+  const tgGibi = () => oturum?.rol === "uye" && /^(TG|Denetim)/.test(oturum?.unvan || "");
   // Yönetim Kurulu bölümüne girenler; muhasebe orada yalnızca YK Saha Takip'i görür
   const programGorur = () => ["baskan", "yonetim", "mudur", "sef", "muhasebe"].includes(oturum?.rol);
   const gorevGorur = () => ["baskan", "yonetim", "mudur", "sef"].includes(oturum?.rol);
@@ -172,7 +175,7 @@
   // gezinmek (liste → kayıt → liste) tek açılış sayılır, ana sayfaya dönünce sıfırlanır.
   const EKRAN_BOLUM = { liste: "saha", detay: "saha", yeni: "saha", yonetim: "uyeler", yonetimisleri: "yonetim", yksaha: "yksaha", program: "program",
     gorevler: "gorevler", aidat: "aidat", iletisim: "iletisim", parsel: "parsel", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar",
-    sokaklar: "sokaklar", servis: "servis", duyuru: "duyuru", rapor: "rapor" };
+    sokaklar: "sokaklar", servis: "servis", duyuru: "duyuru", rapor: "rapor", masraf: "masraf" };
   let sonSayilan = null;
   function kullanimSay(ad) {
     if (ad === "ana") { sonSayilan = null; return; }
@@ -1215,6 +1218,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         if (!document.hidden && !["duyuru", "restoran"].includes(e.data.sayfa)) bildirimleriTemizle();
         if (e.data.sayfa === "uyeler") yonetimAc();
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
+        else if (e.data.sayfa === "masraf") { if (!$("#ekran-masraf").hidden) masrafListeAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
         else if (e.data.sayfa === "faaliyet") { if (yonetici()) faaliyetAc(); }
         else if (["duyuru", "restoran", "muhasebe"].includes(e.data.sayfa)) { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); else yenile(); }
@@ -1265,6 +1269,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     if (location.hash === "#rapor" && yonetici()) return raporAc();
     if (location.hash === "#uyeler" && yonetici()) return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
+    if (location.hash === "#masraf") return masrafListeAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
@@ -2548,9 +2553,18 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // ---------- Paylaşım bölümleri: Duyurular ve Restoran (görsel, metin, PDF) ----------
   // Duyuruyu yalnızca yönetici, restoran paylaşımını restoran yetkilisi ve yönetici yapar ve siler;
   // herkes görür, her paylaşım uygulamayı kullanan herkese sesli bildirimle duyurulur.
-  const PAYLASIM_TURLERI = { gorsel: ["📷", "Görsel", "image/*"], metin: ["📝", "Metin", ""], pdf: ["📄", "PDF", "application/pdf"], link: ["🔗", "Link", ""] };
-  // Link (YouTube, Instagram, web…) Duyurular ve Restoran'da; metin olarak saklanır, gösterirken karta dönüşür
-  const turlerOf = (b) => Object.entries(PAYLASIM_TURLERI).filter(([k]) => k !== "link" || b !== "muhasebe");
+  // Paylaşımda tür seçilmez: dosya eklenirse türü dosyadan anlaşılır (görsel, PDF, Excel), eklenmezse metindir. Video kabul edilmez.
+  const DOSYA_KABUL = "image/*,application/pdf,.pdf,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv";
+  const excelMi = (f) => /\.(xlsx|xls|csv)$/i.test(f?.name || "");
+  const videoMu = (f) => /^video\//.test(f?.type || "") || /\.(mp4|mov|m4v|avi|3gp|webm|mkv|hevc)$/i.test(f?.name || "");
+  function dosyaTuru(f) {
+    if (!f) return "metin";
+    if (videoMu(f)) return "video";
+    if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name)) return "gorsel";
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) return "pdf";
+    if (excelMi(f)) return "excel";
+    return null;
+  }
   const URL_RE = /https?:\/\/[^\s<>"']+/g;
   const urlTemiz = (u) => u.replace(/[).,;:!?]+$/, "");
   const youtubeId = (u) => (u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/) || [])[1];
@@ -2577,7 +2591,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     duyuru: { ornekMetin: "Örn. Cumartesi günü saat 10.00'da sitede ilaçlama yapılacaktır.", ornekAciklama: "Örn. Genel Kurul daveti", bos: "Henüz duyuru yok." },
     muhasebe: { ornekMetin: "Örn. Kasım ayı gelir-gider tablosu hazırlandı.", ornekAciklama: "Örn. Kasım ayı mizanı", bos: "Henüz paylaşım yok." },
   };
-  const paylasimTur = { restoran: "gorsel", duyuru: "metin", muhasebe: "pdf" };
   const MUHASEBE_GOREN = ["baskan", "yonetim", "muhasebe"];
   const MASRAF_BASLIK = "Aylık Masraflar Listesi";
   let masrafModu = false;
@@ -2609,16 +2622,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   function paylasimHtml(b, p, yonetir) {
     let ic = "";
     if (p.tur === "gorsel") ic = p.url ? `<button type="button" class="aidat-buyut" data-resim="${kac(p.url)}" aria-label="Tam ekran aç"><img src="${kac(p.url)}" alt=""></button>` : `<div class="foto-bos">Görsel açılamadı</div>`;
-    else if (p.tur === "pdf") ic = p.url ? `<a class="paylasim-pdf" href="${kac(p.url)}" target="_blank" rel="noopener">📄 PDF'yi aç</a>` : "";
+    else if (["pdf", "excel"].includes(p.tur)) ic = p.url ? `<a class="paylasim-pdf" href="${kac(p.url)}" target="_blank" rel="noopener">📎 Dosyayı aç</a>` : "";
     return `<article class="paylasim${b === "duyuru" ? " duyuru" : ""}${b === "muhasebe" && String(p.metin || "").startsWith(MASRAF_BASLIK + " ·") ? " masraf" : ""}">
-      <div class="paylasim-ust"><span>${PAYLASIM_TURLERI[p.tur]?.[0] || ""} ${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
+      <div class="paylasim-ust"><span>${kac(p.ekleyen)} · ${tarihSaat(p.created_at)}</span>
         ${yonetir ? `<button type="button" class="kucuk-dugme tehlike" data-paylasim-sil="${p.id}">🗑 Sil</button>` : ""}</div>
       ${ic}
       ${p.metin ? (() => { const ilk = String(p.metin).match(URL_RE)?.[0]; return `${ilk ? linkKarti(urlTemiz(ilk)) : ""}<p class="paylasim-metin">${linkliMetin(p.metin)}</p>`; })() : ""}
     </article>`;
   }
   function paylasimCiz(b, v) {
-    const tur = paylasimTur[b], t = PAYLASIM_TURLERI[tur], ayar = PAYLASIM_BOLUMU[b];
+    const ayar = PAYLASIM_BOLUMU[b];
     let siparis = "";
     if (b === "restoran") {
       const uluslar = v.tel ? telefonUluslararasi(v.tel) : "";
@@ -2636,43 +2649,46 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const form = v.yonetir ? `
       <form class="kart restoran-yonet ${masraf ? "masraf-form" : ""}" data-paylasim-form>
         <b class="restoran-form-baslik">${masraf ? `📋 ${kac(v.alt || "")} · ${MASRAF_BASLIK} · ${kac(v.masraf?.liste_ayi || "")}` : `➕ ${b === "duyuru" ? "Yeni duyuru" : b === "muhasebe" ? `Yeni paylaşım · ${kac(v.alt || "")}` : "Yeni paylaşım"}`}</b>
-        ${masraf ? `<small class="ipucu">Listeyi PDF olarak seçin (Excel'i PDF olarak kaydedebilirsiniz). Başlık kendiliğinden yazılır.</small>` : ""}
-        <div class="restoran-tur${b === "muhasebe" ? " dortlu" : ""}">${turlerOf(b).map(([k, [ikon, ad]]) => `<button type="button" data-paylasim-tur="${k}" class="${k === tur && !masraf ? "secili" : ""}">${ikon}<br>${ad}</button>`).join("")}${b === "muhasebe" ? `<button type="button" data-masraf-ac class="masraf-tur ${masraf ? "secili" : ""}">📋<br>Aylık Masraflar Listesi</button>` : ""}</div>
-        ${tur === "link" ? `<label>Bağlantı (YouTube, Instagram, web sitesi…)
-          <input name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://…" data-paylasim-link></label>
-          <div data-paylasim-onizleme class="paylasim-onizleme" hidden></div>`
-        : tur !== "metin" ? `<label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${t[2]}" hidden><span>${t[0]} ${t[1]} seçin</span></label>
-          <p data-paylasim-secilen class="ipucu" hidden></p>
-          <div data-paylasim-onizleme class="paylasim-onizleme" hidden></div>` : ""}
-        <label>${tur === "metin" ? (b === "duyuru" ? "Duyuru metni" : "Paylaşılacak metin") : tur === "link" ? "Açıklama (isteğe bağlı)" : "Açıklama (isteğe bağlı)"}
-          <textarea name="metin" rows="${tur === "metin" ? 5 : 2}" maxlength="3000" placeholder="${tur === "metin" ? ayar.ornekMetin : ayar.ornekAciklama}"></textarea>
+        ${masraf ? `<small class="ipucu">Listenin dosyasını ekleyin. Başlık kendiliğinden yazılır.</small>` : ""}
+        <label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${DOSYA_KABUL}" hidden><span>📎 Dosya ekle${masraf ? "" : " (isteğe bağlı)"}</span></label>
+        <p data-paylasim-secilen class="ipucu" hidden></p>
+        <div data-paylasim-onizleme class="paylasim-onizleme" hidden></div>
+        <label>${masraf ? "Açıklama (isteğe bağlı)" : b === "duyuru" ? "Duyuru metni" : "Metin"}
+          <textarea name="metin" rows="${masraf ? 2 : 4}" maxlength="3000" placeholder="${masraf ? ayar.ornekAciklama : ayar.ornekMetin}"></textarea>
         </label>
+        <div data-link-onizleme class="paylasim-onizleme" hidden></div>
         <button class="ana-dugme" type="submit">📣 ${b === "duyuru" ? "Duyur ve herkese bildir" : b === "muhasebe" ? "Paylaş ve yönetime bildir" : "Paylaş ve herkese bildir"}</button>
         ${b === "muhasebe" ? `<small class="ipucu">Muhasebe bölümünü yalnızca yönetici, yönetim kurulu üyeleri ve muhasebe görür; ortaklar görmez.</small>` : ""}
         ${b === "restoran" ? `<details class="restoran-tel-ayar"><summary>📞 Sipariş telefonunu değiştir</summary>
           <input name="tel" type="tel" maxlength="20" value="${kac(v.tel)}" placeholder="0532 123 45 67">
           <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
         </details>` : ""}
-      </form>` : "";
-    const liste = v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.silebilir ?? v.yonetir)).join("") : `<p class="bos">${ayar.bos}</p>`;
+      </form>` : b === "muhasebe" ? `<p class="ipucu muhasebe-not">📎 Bu bölüme paylaşımları <b>muhasebe</b> yapar. Sporkent 87, Restoran ya da Aylık Masraflar Listesi'ne dokunarak paylaşımları görürsünüz${v.silebilir ? "; uygun görmediğinizi silebilirsiniz" : ""}.</p>` : "";
+    const masrafMi = (p) => String(p.metin || "").startsWith(MASRAF_BASLIK + " ·");
+    const gorunen = b === "muhasebe" ? v.paylasimlar.filter((p) => masrafMi(p) === masraf) : v.paylasimlar;
+    const liste = gorunen.length ? gorunen.map((p) => paylasimHtml(b, p, v.silebilir ?? v.yonetir)).join("") : `<p class="bos">${masraf ? "Henüz masraf listesi paylaşılmadı." : ayar.bos}</p>`;
     // Muhasebe: üstte Sporkent 87 / Restoran alt tuşları, altında seçilenin masraf listesi durumu
     if (b === "muhasebe" && v.masraf) {
       const m = v.masraf;
-      siparis = `<div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === muhasebeAlt ? "secili" : ""}" data-muhasebe-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
-      <div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
-        <b>📋 ${kac(v.alt || "")} · ${MASRAF_BASLIK} · ${kac(m.liste_ayi)}</b>
+      siparis = `<div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === muhasebeAlt && !masraf ? "secili" : ""}" data-muhasebe-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
+      <button type="button" class="masraf-tus ${m.paylasildi_at ? "tamam" : "bekliyor"} ${masraf ? "secili" : ""}" data-masraf-ac>
+        <span>📋</span><b>${MASRAF_BASLIK}</b><small>${kac(v.alt || "")} · ${kac(m.liste_ayi)} · ${m.paylasildi_at ? "✅ Paylaşıldı" : "⏳ Henüz paylaşılmadı"}</small></button>
+      ${masraf ? `<div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
         <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ay henüz paylaşılmadı. Her ayın ilk iş gününde paylaşılır (1'i cumartesi, pazar ya da resmî tatilse sonraki ilk iş günü). Bu ay: <b>${m.gun ? new Date(m.gun + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }) : "ayın 1'i"}</b>. O gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider.`}</span>
-      </div>`;
+      </div>` : ""}`;
     }
     // Restoran ve Muhasebe: paylaşımlar (en yenisi üstte) önce, yeni paylaşım penceresi en altta
     $("#" + b).innerHTML = b === "duyuru" ? form + siparis + liste : siparis + liste + form;
   }
   // Görsel küçültülüp JPEG olarak, PDF olduğu gibi yüklenir (en fazla 50 MB)
   async function paylasimDosyaYukle(b, f) {
-    const tur = paylasimTur[b];
+    const tur = dosyaTuru(f);
     let blob = f, uzanti, tip;
     if (tur === "gorsel") { blob = await kucult(f, 2400); uzanti = "jpg"; tip = "image/jpeg"; }
-    else { uzanti = "pdf"; tip = "application/pdf"; }
+    else if (tur === "excel") {
+      uzanti = f.name.split(".").pop().toLowerCase();
+      tip = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xls: "application/vnd.ms-excel", csv: "text/csv" }[uzanti];
+    } else { uzanti = "pdf"; tip = "application/pdf"; }
     if (blob.size > 50 * 1048576) throw new Error("Dosya çok büyük (en fazla 50 MB).");
     const { yol, adres } = await api("yukleme_adresi", { tur: b, uzanti });
     const r = await fetch(adres, { method: "PUT", headers: { "Content-Type": tip, "x-upsert": "false" }, body: blob });
@@ -2683,9 +2699,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const kutu = $("#" + b);
     kutu.addEventListener("click", async (e) => {
       const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
-      const tb = e.target.closest("[data-paylasim-tur]");
-      if (tb) { paylasimTur[b] = tb.dataset.paylasimTur; if (b === "muhasebe") masrafModu = false; return paylasimAc(b); }
-      if (e.target.closest("[data-masraf-ac]")) { masrafModu = true; paylasimTur[b] = "pdf"; return paylasimAc(b); }
+      if (e.target.closest("[data-masraf-ac]")) { masrafModu = !masrafModu; return paylasimAc(b); }
       const ma = e.target.closest("[data-muhasebe-alt]");
       if (ma) { muhasebeAlt = ma.dataset.muhasebeAlt; masrafModu = false; return paylasimAc(b); }
       if (e.target.closest("[data-restoran-tel-kaydet]")) {
@@ -2705,37 +2719,43 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       if (!e.target.matches("[data-paylasim-dosya]")) return;
       const f = e.target.files?.[0], y = kutu.querySelector("[data-paylasim-secilen]"), o = kutu.querySelector("[data-paylasim-onizleme]");
       if (onizlemeAdres) { URL.revokeObjectURL(onizlemeAdres); onizlemeAdres = null; }
+      y.classList.remove("hata");
       if (!f) { y.hidden = true; if (o) o.hidden = true; return; }
+      const tur = dosyaTuru(f);
+      if (tur === "video" || !tur) {
+        const uyari = tur === "video" ? "Buraya video ekleyemezsiniz." : "Bu dosya eklenemez.";
+        e.target.value = ""; y.textContent = "⚠️ " + uyari; y.classList.add("hata"); y.hidden = false; if (o) o.hidden = true;
+        alert(uyari); return;
+      }
       y.textContent = `Seçilen: ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`; y.hidden = false;
       if (o) {
-        if (f.type.startsWith("image/")) { onizlemeAdres = URL.createObjectURL(f); o.innerHTML = `<small>Paylaşılacak görsel:</small><img src="${onizlemeAdres}" alt="Seçilen görsel">`; }
-        else o.innerHTML = `<div class="paylasim-pdf">📄 ${kac(f.name)}</div>`;
+        if (tur === "gorsel") { onizlemeAdres = URL.createObjectURL(f); o.innerHTML = `<small>Paylaşılacak görsel:</small><img src="${onizlemeAdres}" alt="Seçilen görsel">`; }
+        else o.innerHTML = `<div class="paylasim-pdf">📎 ${kac(f.name)}</div>`;
         o.hidden = false;
       }
     });
     // Link yazılırken nasıl görüneceği hemen gösterilir
     kutu.addEventListener("input", (e) => {
-      if (!e.target.matches("[data-paylasim-link]")) return;
-      const o = kutu.querySelector("[data-paylasim-onizleme]"), u = e.target.value.trim();
-      const kart = /^https?:\/\/\S+\.\S+/.test(u) ? linkKarti(u) : "";
+      if (!e.target.matches("[data-paylasim-form] textarea[name=metin]")) return;
+      const o = kutu.querySelector("[data-link-onizleme]"), u = e.target.value.match(URL_RE)?.[0];
+      const kart = u && /^https?:\/\/\S+\.\S+/.test(urlTemiz(u)) ? linkKarti(urlTemiz(u)) : "";
       o.innerHTML = kart ? `<small>Paylaşılacak bağlantı:</small>${kart}` : ""; o.hidden = !kart;
     });
     kutu.addEventListener("submit", async (e) => {
       if (!e.target.matches("[data-paylasim-form]")) return;
       e.preventDefault();
-      const f = e.target, d = f.querySelector("button[type=submit]"), eski = d.textContent, tur = paylasimTur[b];
-      const dosya = f.querySelector("[data-paylasim-dosya]")?.files?.[0];
-      const link = tur === "link" ? f.link.value.trim() : "";
-      if (tur === "link" && !/^https?:\/\/\S+\.\S+/.test(link)) return mesaj("Bağlantıyı https:// ile başlayarak yazın ya da yapıştırın.");
-      if (!["metin", "link"].includes(tur) && !dosya) return mesaj(`Önce ${PAYLASIM_TURLERI[tur][1].toLocaleLowerCase("tr")} seçin.`);
+      const f = e.target, d = f.querySelector("button[type=submit]"), eski = d.textContent;
+      const dosya = f.querySelector("[data-paylasim-dosya]")?.files?.[0], tur = dosyaTuru(dosya), metin = f.metin.value;
+      if (tur === "video") return alert("Buraya video ekleyemezsiniz.");
+      if (!tur) return alert("Bu dosya eklenemez.");
+      const masraf = b === "muhasebe" && masrafModu;
+      if (masraf && !dosya) return mesaj("Önce listenin dosyasını ekleyin.");
+      if (!dosya && !metin.trim()) return mesaj(b === "duyuru" ? "Duyuru metnini yazın ya da dosya ekleyin." : "Metin yazın ya da dosya ekleyin.");
       d.disabled = true; d.textContent = "Yükleniyor…";
       try {
-        const yol = ["metin", "link"].includes(tur) ? null : await paylasimDosyaYukle(b, dosya);
+        const yol = dosya ? await paylasimDosyaYukle(b, dosya) : null;
         d.textContent = "Gönderiliyor…";
-        // Link metin olarak gider: açıklama + adres (gösterirken karta dönüşür)
-        const metin = tur === "link" ? [f.metin.value.trim(), link].filter(Boolean).join("\n") : f.metin.value;
-        const r = await api(b + "_paylas", { tur: tur === "link" ? "metin" : tur, metin, yol, masraf: b === "muhasebe" && masrafModu, ...altParam(b) });
-        if (b === "muhasebe") masrafModu = false;
+        const r = await api(b + "_paylas", { tur, metin, yol, masraf, ...altParam(b) });
         mesaj(b === "duyuru"
           ? (typeof r?.basarili === "number" ? `Duyuru yayımlandı. ${r.basarili} telefona bildirim gönderildi (sizinki dahil).` : "Duyuru yayımlandı. Herkese bildirim gönderildi.")
           : (typeof r?.basarili === "number" ? `Paylaşıldı. ${r.basarili} telefona bildirim gönderildi${b === "muhasebe" ? "" : " (sizinki dahil)"}.` : b === "muhasebe" ? "Paylaşıldı. Yönetime bildirim gönderildi." : "Paylaşıldı. Herkese bildirim gönderildi."));
@@ -2760,7 +2780,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
     aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
     yakinlar: "👨‍👩‍👧 Katılım Onayları", muhasebe: "🧾 Muhasebe", faaliyet: "📑 Aylık Faaliyet Raporu", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
-    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler" };
+    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler", masraf: "📋 Aylık Masraflar Listesi" };
   const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
   let raporGun = 30, raporVeri = null, raporAra = "";
   const sonGorulmeKisa = (t) => {
@@ -3018,7 +3038,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash !== "#iletisim") history.replaceState(null, "", "#iletisim");
     goster("iletisim");
   }
-  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, muhasebe: muhasebeAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc() };
+  const MODUL_AC = { kayitonay: () => { filtre = "onay"; sahaAc(); }, duyuru: duyuruAc, rapor: () => raporAc(), restoran: restoranAc, muhasebe: muhasebeAc, plaka: plakaAc, yakinlar: yakinlarAc, parsel: parselAc, saha: sahaAc, yonetim: yonetimIsleriAc, aidat: aidatAc, iletisim: iletisimAc, sokaklar: sokaklarAc, servis: servisAc, uyeler: () => yonetimAc(), masraf: () => masrafListeAc() };
   $("#alt-menu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-modul]"); if (!b) return;
     MODUL_AC[b.dataset.modul]();
@@ -3033,7 +3053,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     $("#ana-kutular [data-ac=yonetim]").hidden = !programGorur();
     // Plaka girişi talebi: yalnızca ortaklar (ve ortak yakınları)
     // Ortaklar (ve yakınları), TG ve YK üyeleri, yönetici
-    $("#ana-kutular [data-ac=plaka]").hidden = !(ortakMi() || ["baskan", "yonetim"].includes(oturum?.rol) || (oturum?.rol === "uye" && /^TG/.test(oturum?.unvan || "")));
+    $("#ana-kutular [data-ac=plaka]").hidden = !(ortakMi() || ["baskan", "yonetim"].includes(oturum?.rol) || tgGibi());
     // Restoran herkese açık (paylaşımları herkese bildirilir)
     $("#ana-kutular [data-ac=restoran]").hidden = false;
     // Parsel temsilcisine: ortak yakını onayları
@@ -3054,6 +3074,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       : parsel?.temsilciler?.length ? parsel.temsilciler.map((t) => t.ad).join(", ") : "";
     // Üyeler ve Ayarlar yalnızca yöneticide; onay bekleyen üye varsa sayısı yazar
     $("#ana-kutular [data-ac=uyeler]").hidden = !yonetici();
+    $("#ana-kutular [data-ac=masraf]").hidden = !tgGibi();
     $("#ana-kutular [data-ac=rapor]").hidden = !yonetici();
     $("#ana-kutular [data-ac=uyeler] small").textContent = yonetici() && bekleyenSayisi ? `${bekleyenSayisi} onay bekliyor` : "";
     // Restoran yetkilisi yalnızca Restoran bölümünü görür
@@ -3091,7 +3112,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     kutulariSigdir();
   }
   // Ana sayfadan açılan bölüm geçmişe eklenir: telefonun geri tuşu ana sayfaya döner
-  const MODUL_ADRES = { kayitonay: "saha", duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler" };
+  const MODUL_ADRES = { kayitonay: "saha", duyuru: "duyuru", rapor: "rapor", restoran: "restoran", plaka: "plaka", yakinlar: "yakinlar", parsel: "parsel", saha: "saha", yonetim: "yonetim-isleri", aidat: "aidat", iletisim: "iletisim", sokaklar: "sokak-numaralari", servis: "servis", uyeler: "uyeler", masraf: "masraf" };
   $("#ana-kutular").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ac]"); if (!b) return;
     history.pushState({ ana: 1 }, "", "#" + MODUL_ADRES[b.dataset.ac]);
@@ -3119,6 +3140,31 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     sigdir(); requestAnimationFrame(() => setTimeout(sigdir, 60));
     numHarita = h;
   }
+
+  // ---------- Aylık Masraflar Listesi: TG ve Denetim Kurulu üyeleri muhasebenin paylaştığı listeleri görür ----------
+  let masrafVeri = null, masrafAlt = "sporkent";
+  async function masrafListeAc() {
+    if (!tgGibi()) return;
+    if (location.hash !== "#masraf") history.replaceState(history.state, "", "#masraf");
+    goster("masraf");
+    if (!masrafVeri) $("#masraf").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { masrafVeri = await api("masraf_liste"); masrafCiz(); }
+    catch (e) { $("#masraf").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  function masrafCiz() {
+    const a = masrafVeri.altlar.find((x) => x.anahtar === masrafAlt) || masrafVeri.altlar[0], m = a.masraf;
+    $("#masraf").innerHTML = `
+      <div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === a.anahtar ? "secili" : ""}" data-masraf-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
+      <div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
+        <b>📋 ${kac(a.ad)} · ${kac(m.liste_ayi)}</b>
+        <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ayın listesi henüz paylaşılmadı. Muhasebe her ayın ilk iş gününde paylaşır; paylaşılınca size bildirim gelir.`}</span>
+      </div>
+      ${a.paylasimlar.length ? a.paylasimlar.map((p) => paylasimHtml("muhasebe", p, false)).join("") : `<p class="bos">Henüz masraf listesi paylaşılmadı.</p>`}`;
+  }
+  $("#masraf").addEventListener("click", (e) => {
+    const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
+    const b = e.target.closest("[data-masraf-alt]"); if (b) { masrafAlt = b.dataset.masrafAlt; masrafCiz(); }
+  });
 
   // ---------- Aidat: yıl içindeki parasal yükümlülükler (resim) ----------
   async function aidatAc() {
@@ -3581,6 +3627,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     if (location.hash === "#sokak-numaralari" && $("#ekran-sokaklar").hidden) return sokaklarAc();
     if (location.hash === "#uyeler") return yonetimAc();
     if (location.hash === "#aidat") return aidatAc();
+    if (location.hash === "#masraf") return masrafListeAc();
     if (location.hash === "#iletisim") return iletisimAc();
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();

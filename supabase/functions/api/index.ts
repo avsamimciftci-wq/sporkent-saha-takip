@@ -162,7 +162,9 @@ const MAKS_UYE = 800; // başkan dahil onaylı üye sınırı (400 ortak, bir k�
 // Kaydı onay beklemeden iş listesine düşenler. TG üyeleri (rolü "uye", unvanı TG…) de onaysız girer;
 // yalnızca düz ortakların kaydı yönetici ya da YK onayı bekler.
 const ONAYSIZ_GIREN: Rol[] = ["baskan", "yonetim", "mudur", "sef", "muhasebe"];
-const onaysizGirer = (u: any) => ONAYSIZ_GIREN.includes(u.rol) || (u.rol === "uye" && !u.ortak_no && /^TG/.test(u.unvan ?? ""));
+// TG üyeleri ve Denetim Kurulu üyeleri: kişisel kodla girer, ekranları birebir aynıdır
+const tgGibi = (u: any) => u?.rol === "uye" && /^(TG|Denetim)/.test(u?.unvan ?? "");
+const onaysizGirer = (u: any) => ONAYSIZ_GIREN.includes(u.rol) || (!u.ortak_no && tgGibi(u));
 const KAYIT_ONAYLAYAN: Rol[] = ["baskan", "yonetim"];
 // Aidat resmini yönetici ve muhasebe ekler; iş programına bu dört görev girer
 // Aidat resmini yalnızca yönetici ekler ve siler; herkes görür
@@ -175,7 +177,7 @@ const ROL_ADI: Record<Rol, string> = {
 const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel", "duyuru_liste", "kullanim"];
 // Kullanım raporunda sayılan bölümler (uygulamadaki ekran adları)
 const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restoran", "yonetim", "aidat", "plaka", "iletisim", "sokaklar", "servis",
-  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet", "muhasebe"];
+  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet", "muhasebe", "masraf"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -404,7 +406,7 @@ async function yenilikBul(u: any, rol: Rol) {
 
 // Plaka-Kimlik Bildirimi: bildirenin ortaklık numarası ve cep telefonu.
 // Ortakta kayıttan, yöneticide ayarlardan; TG ve YK üyelerinin kaydında yoktur: ilk bildirimde yazdıkları hatırlanır.
-const PLAKA_BILDIREN = (u: any, rol: Rol) => rol === "baskan" || rol === "yonetim" || (rol === "uye" && (!!u.ortak_no || /^TG/.test(u.unvan ?? "")));
+const PLAKA_BILDIREN = (u: any, rol: Rol) => rol === "baskan" || rol === "yonetim" || (rol === "uye" && (!!u.ortak_no || tgGibi(u)));
 async function plakaKimlik(u: any, rol: Rol): Promise<{ no: number | null; tel: string | null }> {
   let no: number | null = u.ortak_no ?? null, tel: string | null = u.telefon ?? null;
   if (rol === "baskan" && (!no || !tel)) {
@@ -978,7 +980,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       else if (g.tur === "kontrol") { if (!GOREV_ISARETLEYEN.includes(rol)) throw new Hata("Günlük Kontrol fotoğrafını yalnızca müdür ve şef ekler.", 403); }
       else if (g.tur !== undefined && g.tur !== null && g.tur !== "") throw new Hata("Geçersiz yükleme türü.");
       const coklu = g.tur === "restoran" || g.tur === "duyuru" || g.tur === "muhasebe";
-      const uzanti = coklu && ["jpg", "pdf"].includes(g.uzanti) ? g.uzanti : "jpg";
+      // Duyuru, Restoran ve Muhasebe: görsel (jpg), PDF ve Excel (xlsx, xls, csv); video yüklenmez
+      const uzanti = coklu && ["jpg", "pdf", "xlsx", "xls", "csv"].includes(g.uzanti) ? g.uzanti : "jpg";
       const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" || g.tur === "kontrol" ? g.tur + "/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
@@ -1416,7 +1419,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "duyuru_paylas": {
       yonetici();
-      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
+      const tur = ["gorsel", "metin", "pdf", "excel"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Duyuru türünü seçin.");
       const metin = temiz(g.metin, 3000);
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
@@ -1426,7 +1429,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (error) throw error;
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)" }[tur as "gorsel"];
+      const ek = { gorsel: " (görsel)", metin: "", pdf: " (PDF)", excel: " (Excel)" }[tur as "gorsel"];
       // Gönderen yönetici de alır: duyurunun gittiğini kendi telefonunda görür
       const giden = await duyur("hepsi", `📢 Duyuru${ek}`, (metin || "Duyurular bölümünde yeni bir duyuru var.").slice(0, 180), { sayfa: "duyuru", resim });
       return { id: p.id, ...giden };
@@ -1524,10 +1527,28 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       };
     }
 
+    case "masraf_liste": {
+      // Yalnızca muhasebenin paylaştığı Aylık Masraflar Listeleri: TG ve Denetim Kurulu üyeleri ile yönetim görür
+      if (!MUHASEBE_GOREN.includes(rol) && !tgGibi(u)) throw new Hata("Aylık Masraflar Listesini TG ve Denetim Kurulu üyeleri ile yönetim görür.", 403);
+      const altlar = [];
+      for (const k of ["sporkent", "restoran"]) {
+        const alt = MUHASEBE_ALT[k];
+        const { data, error } = await db.from("restoran_paylasim").select("id, tur, metin, yol, created_at").eq("bolum", alt.bolum)
+          .like("metin", `${MASRAF_BASLIK} ·%`).order("created_at", { ascending: false }).limit(36);
+        if (error) throw error;
+        const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
+        const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+        const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
+        altlar.push({ anahtar: k, ad: alt.ad, masraf: await masrafDurumu(alt.bolum),
+          paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at, ekleyen: "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })) });
+      }
+      return { altlar };
+    }
+
     case "muhasebe_paylas": {
       if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Muhasebe bölümünde yalnızca muhasebe paylaşım yapar.", 403);
       const alt = muhasebeAlt(g.alt);
-      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
+      const tur = ["gorsel", "metin", "pdf", "excel"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
       const masraf = !!g.masraf;
       const ek = temiz(g.metin, 2900);
@@ -1538,10 +1559,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (tur !== "metin" && !yol?.startsWith("muhasebe/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
       const { data: p, error } = await db.from("restoran_paylasim").insert({ bolum: alt.bolum, tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
       if (error) throw error;
-      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
+      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF", excel: "📊 Yeni Excel" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
       const giden = await duyur(MUHASEBE_GOREN, masraf ? `📋 ${alt.ad}: Aylık Masraflar Listesi paylaşıldı` : `🧾 Muhasebe · ${alt.ad}: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
+      if (masraf) {
+        const { data: tg } = await db.from("uyeler").select("cihaz, rol, unvan").eq("rol", "uye").eq("durum", "onayli").or("unvan.ilike.TG%,unvan.ilike.Denetim%");
+        await Promise.all((tg ?? []).filter(tgGibi).map((x: any) => bildir({ cihaz: x.cihaz }, `📋 ${alt.ad}: Aylık Masraflar Listesi paylaşıldı`, metin.slice(0, 180), { sayfa: "masraf" }).catch(() => {})));
+      }
       return { id: p.id, ...giden };
     }
 
@@ -1611,7 +1636,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
 
     case "restoran_paylas": {
       restoranYonetir();
-      const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
+      const tur = ["gorsel", "metin", "pdf", "excel"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
       const metin = temiz(g.metin, 3000);
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
@@ -1620,7 +1645,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const { data: p, error } = await db.from("restoran_paylasim").insert({ tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
       if (error) throw error;
       // Uygulamayı kullanan herkese (ortak yakınları dahil) sesli bildirim; görselde resim de görünür
-      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
+      const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni duyuru", pdf: "📄 Yeni PDF", excel: "📊 Yeni Excel" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
       // Paylaşan kişi de alır: paylaşımın gittiğini kendi telefonunda görür
