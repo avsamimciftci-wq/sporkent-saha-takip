@@ -2593,7 +2593,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   };
   const MUHASEBE_GOREN = ["baskan", "yonetim", "muhasebe"];
   const MASRAF_BASLIK = "Aylık Masraflar Listesi";
-  let masrafModu = false;
   // Muhasebe alt tuşları: Sporkent 87 ve Restoran (her birinin ayrı paylaşımları ve masraf listesi)
   let muhasebeAlt = "sporkent";
   const MUHASEBE_ALTLAR = [["sporkent", "🏢", "Sporkent 87"], ["restoran", "🍽️", "Restoran"]];
@@ -2645,10 +2644,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
         </div>
       </div>` : `<p class="bos">Sipariş telefonu henüz girilmedi.</p>`;
     }
-    const masraf = b === "muhasebe" && masrafModu;
+    const masraf = b === "muhasebe" && muhasebeAlt === "masraf";
     const form = v.yonetir ? `
       <form class="kart restoran-yonet ${masraf ? "masraf-form" : ""}" data-paylasim-form>
-        <b class="restoran-form-baslik">${masraf ? `📋 ${kac(v.alt || "")} · ${MASRAF_BASLIK} · ${kac(v.masraf?.liste_ayi || "")}` : `➕ ${b === "duyuru" ? "Yeni duyuru" : b === "muhasebe" ? `Yeni paylaşım · ${kac(v.alt || "")}` : "Yeni paylaşım"}`}</b>
+        <b class="restoran-form-baslik">${masraf ? `📋 ${MASRAF_BASLIK} · ${kac(v.masraf?.liste_ayi || "")}` : `➕ ${b === "duyuru" ? "Yeni duyuru" : b === "muhasebe" ? `Yeni paylaşım · ${kac(v.alt || "")}` : "Yeni paylaşım"}`}</b>
         ${masraf ? `<small class="ipucu">Listenin dosyasını ekleyin. Başlık kendiliğinden yazılır.</small>` : ""}
         <label class="foto-dugme"><input data-paylasim-dosya type="file" accept="${DOSYA_KABUL}" hidden><span>📎 Dosya ekle${masraf ? "" : " (isteğe bağlı)"}</span></label>
         <p data-paylasim-secilen class="ipucu" hidden></p>
@@ -2664,15 +2663,13 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <button type="button" class="ikincil" data-restoran-tel-kaydet style="width:100%;margin-top:8px">Telefonu kaydet</button>
         </details>` : ""}
       </form>` : b === "muhasebe" ? `<p class="ipucu muhasebe-not">📎 Bu bölüme paylaşımları <b>muhasebe</b> yapar. Sporkent 87, Restoran ya da Aylık Masraflar Listesi'ne dokunarak paylaşımları görürsünüz${v.silebilir ? "; uygun görmediğinizi silebilirsiniz" : ""}.</p>` : "";
-    const masrafMi = (p) => String(p.metin || "").startsWith(MASRAF_BASLIK + " ·");
-    const gorunen = b === "muhasebe" ? v.paylasimlar.filter((p) => masrafMi(p) === masraf) : v.paylasimlar;
-    const liste = gorunen.length ? gorunen.map((p) => paylasimHtml(b, p, v.silebilir ?? v.yonetir)).join("") : `<p class="bos">${masraf ? "Henüz masraf listesi paylaşılmadı." : ayar.bos}</p>`;
+    const liste = v.paylasimlar.length ? v.paylasimlar.map((p) => paylasimHtml(b, p, v.silebilir ?? v.yonetir)).join("") : `<p class="bos">${masraf ? "Henüz masraf listesi paylaşılmadı." : ayar.bos}</p>`;
     // Muhasebe: üstte Sporkent 87 / Restoran alt tuşları, altında seçilenin masraf listesi durumu
     if (b === "muhasebe" && v.masraf) {
       const m = v.masraf;
-      siparis = `<div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === muhasebeAlt && !masraf ? "secili" : ""}" data-muhasebe-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
+      siparis = `<div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === muhasebeAlt ? "secili" : ""}" data-muhasebe-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
       <button type="button" class="masraf-tus ${m.paylasildi_at ? "tamam" : "bekliyor"} ${masraf ? "secili" : ""}" data-masraf-ac>
-        <span>📋</span><b>${MASRAF_BASLIK}</b><small>${kac(v.alt || "")} · ${kac(m.liste_ayi)} · ${m.paylasildi_at ? "✅ Paylaşıldı" : "⏳ Henüz paylaşılmadı"}</small></button>
+        <span>📋</span><b>${MASRAF_BASLIK}</b><small>${kac(m.liste_ayi)} · ${m.paylasildi_at ? "✅ Paylaşıldı" : "⏳ Henüz paylaşılmadı"}</small></button>
       ${masraf ? `<div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
         <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ay henüz paylaşılmadı. Her ayın ilk iş gününde paylaşılır (1'i cumartesi, pazar ya da resmî tatilse sonraki ilk iş günü). Bu ay: <b>${m.gun ? new Date(m.gun + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }) : "ayın 1'i"}</b>. O gün paylaşılmazsa akşam 20.00'de muhasebeye, yöneticiye ve YK üyelerine bildirim gider.`}</span>
       </div>` : ""}`;
@@ -2699,9 +2696,9 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const kutu = $("#" + b);
     kutu.addEventListener("click", async (e) => {
       const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
-      if (e.target.closest("[data-masraf-ac]")) { masrafModu = !masrafModu; return paylasimAc(b); }
+      if (e.target.closest("[data-masraf-ac]")) { muhasebeAlt = "masraf"; return paylasimAc(b); }
       const ma = e.target.closest("[data-muhasebe-alt]");
-      if (ma) { muhasebeAlt = ma.dataset.muhasebeAlt; masrafModu = false; return paylasimAc(b); }
+      if (ma) { muhasebeAlt = ma.dataset.muhasebeAlt; return paylasimAc(b); }
       if (e.target.closest("[data-restoran-tel-kaydet]")) {
         try { const x = await api("restoran_tel", { tel: kutu.querySelector("[data-paylasim-form]").tel.value }); mesaj(`Sipariş telefonu kaydedildi: ${x.tel}`); await paylasimAc(b); }
         catch (err) { mesaj(err.message); }
@@ -2748,7 +2745,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       const dosya = f.querySelector("[data-paylasim-dosya]")?.files?.[0], tur = dosyaTuru(dosya), metin = f.metin.value;
       if (tur === "video") return alert("Buraya video ekleyemezsiniz.");
       if (!tur) return alert("Bu dosya eklenemez.");
-      const masraf = b === "muhasebe" && masrafModu;
+      const masraf = b === "muhasebe" && muhasebeAlt === "masraf";
       if (masraf && !dosya) return mesaj("Önce listenin dosyasını ekleyin.");
       if (!dosya && !metin.trim()) return mesaj(b === "duyuru" ? "Duyuru metnini yazın ya da dosya ekleyin." : "Metin yazın ya da dosya ekleyin.");
       d.disabled = true; d.textContent = "Yükleniyor…";
@@ -3142,7 +3139,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
 
   // ---------- Aylık Masraflar Listesi: TG ve Denetim Kurulu üyeleri muhasebenin paylaştığı listeleri görür ----------
-  let masrafVeri = null, masrafAlt = "sporkent";
+  let masrafVeri = null;
   async function masrafListeAc() {
     if (!tgGibi()) return;
     if (location.hash !== "#masraf") history.replaceState(history.state, "", "#masraf");
@@ -3152,18 +3149,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     catch (e) { $("#masraf").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
   function masrafCiz() {
-    const a = masrafVeri.altlar.find((x) => x.anahtar === masrafAlt) || masrafVeri.altlar[0], m = a.masraf;
+    const a = masrafVeri, m = a.masraf;
     $("#masraf").innerHTML = `
-      <div class="muhasebe-altlar">${MUHASEBE_ALTLAR.map(([k, i, ad]) => `<button type="button" class="muhasebe-alt alt-${k} ${k === a.anahtar ? "secili" : ""}" data-masraf-alt="${k}"><span>${i}</span>${ad}</button>`).join("")}</div>
       <div class="masraf-durum ${m.paylasildi_at ? "tamam" : "bekliyor"}">
-        <b>📋 ${kac(a.ad)} · ${kac(m.liste_ayi)}</b>
+        <b>📋 ${kac(m.liste_ayi)}</b>
         <span>${m.paylasildi_at ? `✅ Paylaşıldı: ${tarihSaat(m.paylasildi_at)}` : `⏳ Bu ayın listesi henüz paylaşılmadı. Muhasebe her ayın ilk iş gününde paylaşır; paylaşılınca size bildirim gelir.`}</span>
       </div>
       ${a.paylasimlar.length ? a.paylasimlar.map((p) => paylasimHtml("muhasebe", p, false)).join("") : `<p class="bos">Henüz masraf listesi paylaşılmadı.</p>`}`;
   }
   $("#masraf").addEventListener("click", (e) => {
     const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
-    const b = e.target.closest("[data-masraf-alt]"); if (b) { masrafAlt = b.dataset.masrafAlt; masrafCiz(); }
   });
 
   // ---------- Aidat: yıl içindeki parasal yükümlülükler (resim) ----------
