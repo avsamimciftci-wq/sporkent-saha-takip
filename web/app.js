@@ -455,22 +455,33 @@
     yeni.forEach((i) => yapildiGonderilen.add(i));
     api("yapildi_goruldu", { ids: yeni }).catch(() => yeni.forEach((i) => yapildiGonderilen.delete(i)));
   }
+  // Yönetici: bütün görme bilgileri tek yerde: müdür, şef, (muhasebe), yönetim kurulu ve yapılan işi gören herkes
   async function yapildiGorenGoster(k) {
     const kutu = $("#yapildi-goren"), dugme = $("#yapildi-goren-ac");
     if (!kutu.hidden) { kutu.hidden = true; dugme.textContent = "👁 Bu işi kimler gördü?"; return; }
-    kutu.hidden = false; kutu.innerHTML = `<p class="ipucu">Yükleniyor…</p>`; dugme.textContent = "✖ Listeyi kapat";
+    kutu.hidden = false; dugme.textContent = "✖ Listeyi kapat";
+    const satir = (ad, unvan, at) => `<li><b>${kac(ad || "—")}</b>${unvan ? ` <small>${kac(unvan)}</small>` : ""}<span>${at ? `👁 ${tarihSaat(at)}` : `<em class="gorulmedi">Henüz görmedi</em>`}</span></li>`;
+    const roller = gorenRoller(k).flatMap(([r, ad]) => { const g = gorenler(k, r); return g.length ? g.map((x) => satir(ad, x.ad && x.ad !== ad ? x.ad : "", x.ilk_at)) : [satir(ad, "", null)]; });
+    const ykG = gorenler(k, "yonetim"), ykAd = [...new Set([...ykUyeler, ...ykG.map((x) => x.ad)])];
+    const yk = ykAd.map((ad) => satir(ad, "YK Üyesi", ykG.find((y) => y.ad === ad)?.ilk_at));
+    const gorev = `<h3 class="goren-baslik gorev">🧑‍💼 Müdür, şef ve yönetim kurulu</h3>
+      <p class="ipucu goren-not">İşi ilk açtıkları an</p>
+      <ul class="goren-liste">${[...roller, ...yk].join("")}</ul>`;
+    if (k.durum !== "tamam") { kutu.innerHTML = gorev + `<p class="ipucu">İş yapılınca, yapılan işi (notuyla) kimlerin gördüğü de burada çıkar. Yalnızca siz görürsünüz.</p>`; return; }
+    kutu.innerHTML = gorev + `<p class="ipucu">Yapılan iş yükleniyor…</p>`;
     try {
       const r = await api("yapildi_gorenler", { id: k.id });
-      if ($("#yapildi-goren") !== kutu) return;
+      if ($("#yapildi-goren") !== kutu || kutu.hidden) return;
       const kisi = (x) => `<b>${kac(x.ad || "—")}</b>${x.unvan ? ` <small>${kac(x.unvan)}</small>` : ""}`;
-      kutu.innerHTML = `
-        <h3 class="goren-baslik gordu">✅ Gördü (${r.gorenler.length})</h3>
+      kutu.innerHTML = gorev + `
+        <h3 class="goren-baslik gordu">✅ Yapılan işi gördü (${r.gorenler.length})</h3>
         ${r.gorenler.length ? `<ul class="goren-liste">${r.gorenler.map((x) => `<li>${kisi(x)}<span>👁 ${tarihSaat(x.ilk_at)}</span></li>`).join("")}</ul>` : `<p class="ipucu">Henüz kimse görmedi.</p>`}
-        <details class="goren-gormeyen"><summary><h3 class="goren-baslik gormedi">⏳ Henüz görmedi (${r.gormeyenler.length})</h3></summary>
+        <details class="goren-gormeyen"><summary><h3 class="goren-baslik gormedi">⏳ Yapılan işi henüz görmedi (${r.gormeyenler.length})</h3></summary>
         <ul class="goren-liste">${r.gormeyenler.map((x) => `<li>${kisi(x)}</li>`).join("")}</ul></details>
         <p class="ipucu">İşi açan ya da açılıştaki yenilik penceresinde notu gören kişi “gördü” sayılır. Yalnızca siz görürsünüz.</p>`;
-    } catch (e) { kutu.innerHTML = `<p class="hata">${kac(e.message || "Liste alınamadı.")}</p>`; }
+    } catch (e) { kutu.innerHTML = gorev + `<p class="hata">${kac(e.message || "Liste alınamadı.")}</p>`; }
   }
+
 
   // Yönetici / yönetim kurulu için onay bekleyenler iş listesinde değil, ayrı düğmede
   const listede = (k) => !benOnaylarim(k);
@@ -541,7 +552,7 @@
           ${k.yanit && k.durum !== "tamam" ? `<span class="satir-cevap">💬 ${kac(k.yanit)}</span>` : ""}
           ${k.temsilci_cevaplari?.length && (k.benim || k.temsilcisiyim) ? `<span class="satir-cevap">💬 Temsilci ${kac(k.temsilci_cevaplari.at(-1).ad)}: ${kac(k.temsilci_cevaplari.at(-1).metin)}</span>` : ""}
           ${k.gizli && k.cevaplar?.length ? `<span class="satir-cevap yk-cevap-kirmizi"><span class="cevap-verildi">✅ CEVAP VERİLDİ${k.cevaplar.length > 1 ? ` (${k.cevaplar.length})` : ""}${cevapOkunmadi(k) ? " · YENİ" : ""}</span>💬 ${kac(k.cevaplar.at(-1).ad)}: ${kac(k.cevaplar.at(-1).metin)}${cevapGorulmeOzet(k)}</span>` : ""}
-          ${gorulmeGorur() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
+          ${gorulmeGorur() && !yonetici() && k.durum !== "tamam" ? `<span class="satir-gorulme">👁 ${gorulmeSatiri(k)}</span>` : ""}
         </span>
       </button>`;
 
@@ -625,14 +636,14 @@
         <dt>Bildiren</dt><dd>${kac(k.bildiren)}</dd>
         <dt>Bildirim</dt><dd>${tarihSaat(k.created_at)}</dd>
         ${k.yanit ? `<dt>Cevap</dt><dd>💬 ${kac(k.yanit)}<br><small>${kac(k.yanit_veren || "")} · ${tarihSaat(k.yanit_at)}</small></dd>` : ""}
-        ${gorulmeGorur() ? gorulmeAlanlari(k) : ""}
+        ${gorulmeGorur() && !yonetici() ? gorulmeAlanlari(k) : ""}
         ${k.son_tarih && !(k.gizli && sureGormez()) ? `<dt>Son gün</dt><dd>${new Date(k.son_tarih + "T00:00:00").toLocaleDateString("tr-TR")} ${sureYazisi(k)}</dd>` : ""}
         ${k.durum === "tamam" ? `
         <dt>Yapan</dt><dd>${kac(k.kapatan || "—")}</dd>
         <dt>Yapıldı</dt><dd>${tarihSaat(k.kapanis_at)}</dd>
         ${k.sonuc ? `<dt class="yapildi-not">Not</dt><dd class="yapildi-not">${kac(k.sonuc)}</dd>` : ""}` : ""}
       </dl>
-      ${yonetici() && k.durum === "tamam" ? `
+      ${yonetici() ? `
       <button type="button" class="goren-dugme" id="yapildi-goren-ac">👁 Bu işi kimler gördü?</button>
       <div id="yapildi-goren" class="yapildi-goren" hidden></div>` : ""}
       ${k.gizli ? `
@@ -1373,13 +1384,14 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         <div class="tg-link-kutu">
           <b>🏠 Bütün ortaklar için tek davet mesajı</b>
           <div class="tg-link">${kac(UYGULAMA_ADRESI.replace(/^https:\/\//, ""))}</div>
-          <small>Bu mesajı sitenin WhatsApp gruplarına bir kez gönderin. Kod yok: ortak adını, ortak numarasını ve cep telefonunu yazar. Telefonu kooperatif kayıtlarıyla eşleşen ortak <b>hemen girer</b>; eşleşmeyen aşağıdaki “Onay bekleyenler”e düşer.</small>
+          <small>Bu mesajı sitenin WhatsApp gruplarına bir kez gönderin. Kod yok: ortak adını, ortak numarasını ve cep telefonunu yazar. Telefonu kooperatif kayıtlarıyla eşleşen ortak <b>hemen girer</b>. Eşleşmeyeni parselinin temsilcisi onaylar; temsilcisi olmayan parsellerin başvurusu “Onay Bekleyenler”e düşer. Mesajda tanıtım ve kurulum videolarının linkleri de vardır.</small>
           <details class="davet-onizle"><summary>Gidecek mesajı göster</summary><pre>${kac(genelDavetMetni)}</pre></details>
           <div class="davet-tel">
             <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(genelDavetMetni)}" target="_blank" rel="noopener">WhatsApp</a>
             <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(genelDavetMetni)}">SMS</a>
             <button type="button" class="davet-dugme kopya genel-davet-kopyala">📋 Kopyala</button></div>
         </div>
+        ${videoKutusu(false)}
         <h2>Tek bir ortağa davet (isteğe bağlı)</h2>
         <div>
         <p>Ortaklık numarasını (örn. 12), telefon numarasını ya da ortağın adını / soyadını yazın. İsimde kelimenin tamamını yazın (örn. “Yılmaz”). Davet kodu ve mesajı o ortağa göre hazırlanır; WhatsApp ya da SMS açılınca kişiyi rehberinizden seçin.</p>
@@ -1441,6 +1453,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
           <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(tgLinkMetni)}">SMS</a>
           <button type="button" class="davet-dugme kopya tg-link-kopyala">📋 Kopyala</button></div>
       </div>
+      ${videoKutusu(true)}
       <details class="ortak-liste" open>
         <summary>📋 Kişisel kodları göster</summary>
         <table><thead><tr><th>Ad</th><th>Kod</th><th>Durum</th></tr></thead><tbody>
@@ -1482,21 +1495,52 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
   // ---------- Ortağa davet (yönetici) ----------
   const UYGULAMA_ADRESI = "https://tinyurl.com/sporkent-ortak";
   // Bütün ortaklara tek mesaj: kod yok, kooperatifte kayıtlı telefonla hemen girilir
+  // Kurulum ve tanıtım videoları: link açılınca telefona uygun video oynar (iPhone / Android)
+  const SITE_ADRESI = "https://avsamimciftci-wq.github.io/sporkent-saha-takip/";
+  const videoLink = (v, tg) => `${SITE_ADRESI}video.html?v=${v}${tg ? "&tg=1" : ""}`;
   const genelDavetMetni = `Sayın Ortağımız,
 
-SPORKENT ASİSTAN uygulaması kullanıma açıldı. Kooperatifin duyurularını anında alabilir, sitemizdeki sorunları telefonunuzdan fotoğrafla bildirebilir; yapılan işleri, aidat bilgilerinizi, parsel temsilcinizi ve restoran menüsünü görebilir, araç plakanızı bildirebilirsiniz.
+SPORKENT ASİSTAN programı kullanıma açıldı. Kooperatifin duyurularını anında alabilir, sitedeki sorunları telefonunuzdan fotoğrafla bildirebilir, yapılan işleri ve notlarını görebilirsiniz. Aidat bilgilerinizi, parsel temsilcinizi, servis saatlerini ve güzergâhını, sokak numaralarını ve iletişim bilgilerini de tek yerden izleyebilirsiniz.
+
+🎬 Programın tanıtım videosu (3,5 dk):
+${videoLink("tanitim")}
+
+📲 Programın kurulum videosu (1 dk):
+${videoLink("kurulum")}
 
 Katılmak için:
 1. Bu bağlantıya dokunun: ${UYGULAMA_ADRESI}
 2. Açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
-3. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın ve "Kooperatif Ortağıyım"ı seçin.
-4. Adınızı soyadınızı, ortaklık numaranızı ve kooperatifte kayıtlı cep telefonunuzu yazıp "Kayıt ol"a basın.
+3. Telefonunuzun ana ekranındaki Sporkent Asistan simgesinden programı açın.
+4. "Bildirimleri Aç" düğmesine dokunun, çıkan soruya "İzin Ver" deyin. Bildirimler açılmadan program kullanılamaz; duyurular ve yapılan işler size bildirimle gelir.
+5. "Kooperatif Ortağıyım"ı seçin. Adınızı soyadınızı, ortaklık numaranızı ve kooperatifte kayıtlı cep telefonunuzu yazıp "Kayıt ol"a basın.
 
-Telefonunuz kooperatifteki kaydınızla eşleşirse uygulama hemen açılır. Şifre ya da kod gerekmez.
+Telefonunuz kooperatifteki kaydınızla eşleşirse program hemen açılır; şifre ya da kod gerekmez. Eşleşmezse kaydınızı parselinizin temsilcisi (temsilci yoksa Yönetim Kurulu) onaylar; onaylanınca program kendiliğinden açılır.
 
-Ortağımızın eşi, çocukları, damadı, gelini ve misafirleri de "Ortağın Yakınıyım"ı seçip ortağın numarasıyla katılabilir.
+Ortağımızın eşi, çocukları, damadı, gelini ve misafirleri de "Ortağın Yakınıyım"ı seçip ortağın numarasıyla katılabilir; bu kayıtları parsel temsilcisi onaylar. Ortağın kendisi "Ortağın Yakınıyım"ı değil, "Kooperatif Ortağıyım"ı seçmelidir.
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
+  // Yalnızca video linkini göndermek için: WhatsApp / SMS / Kopyala
+  const videoMetni = (v, tg) => v === "tanitim"
+    ? `Sporkent Asistan programının tanıtım videosu (3,5 dk):
+${videoLink("tanitim", tg)}`
+    : `Sporkent Asistan programının kurulum videosu (1 dk). Telefonunuza uygun video (Android / iPhone) kendiliğinden açılır:
+${videoLink("kurulum", tg)}`;
+  const videoKutusu = (tg) => `<div class="tg-link-kutu video-kutu">
+      <b>🎬 Video linkleri${tg ? " (TG / YK)" : ""}</b>
+      <small>Gerektiğinde yalnızca bu linki gönderin; kişi linke dokununca video telefonunda açılır. Kurulum videosunda telefonuna uygun olanı (Android / iPhone) kendiliğinden gelir.${tg ? " Videonun altındaki düğme şahsi kodla giriş ekranını açar." : ""}</small>
+      ${[["kurulum", "📲 Kurulum videosu"], ["tanitim", "🎬 Tanıtım videosu"]].map(([v, ad]) => `
+      <div class="video-satir"><b>${ad}</b><div class="tg-link">${kac(videoLink(v, tg).replace(/^https:\/\//, ""))}</div>
+        <div class="davet-tel">
+          <a class="davet-dugme wa" href="https://wa.me/?text=${encodeURIComponent(videoMetni(v, tg))}" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="davet-dugme sms" href="sms:?&body=${encodeURIComponent(videoMetni(v, tg))}">SMS</a>
+          <button type="button" class="davet-dugme kopya" data-video-kopya="${v}" data-tg="${tg ? 1 : ""}">📋 Kopyala</button></div></div>`).join("")}
+    </div>`;
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-video-kopya]"); if (!b) return;
+    try { await navigator.clipboard.writeText(videoMetni(b.dataset.videoKopya, !!b.dataset.tg)); mesaj("Video linki kopyalandı."); }
+    catch { mesaj("Kopyalanamadı; WhatsApp ya da SMS düğmesini kullanın."); }
+  });
   document.addEventListener("click", async (e) => {
     if (!e.target.closest(".genel-davet-kopyala")) return;
     try { await navigator.clipboard.writeText(genelDavetMetni); mesaj("Genel davet mesajı kopyalandı."); }
@@ -1552,15 +1596,22 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const TG_ADRESI = "https://tinyurl.com/sporkent-asistan-tg";
   const tgLinkMetni = `Sayın TG / YK Üyemiz,
 
-SPORKENT ASİSTAN uygulamasına size özel giriş bağlantısı:
+SPORKENT ASİSTAN programına size özel giriş bağlantısı:
 
 ${TG_ADRESI}
 
-1. Bağlantıya dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
-2. Telefonunuzun ana ekranındaki Sporkent simgesinden uygulamayı açın.
-3. "Şahsi kodla giriş" ekranı açılır. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
+🎬 Programın tanıtım videosu (3,5 dk):
+${videoLink("tanitim", true)}
 
-(iPhone'da uygulama açılınca bu ekran yerine "Nasıl giriş yapacaksınız?" ekranı gelirse, en üstteki Sporkent logosuna art arda 5 kez dokunun; şahsi kodla giriş ekranı açılır.)
+📲 Programın kurulum videosu (1 dk):
+${videoLink("kurulum", true)}
+
+1. Yukarıdaki giriş bağlantısına dokunun, açılan sayfada "📲 Ana Ekrana Ekle" düğmesine basın. (iPhone'da bu düğme yerine adımlar çıkar; ekrandaki adımları izleyin.)
+2. Telefonunuzun ana ekranındaki Sporkent Asistan simgesinden programı açın.
+3. "Bildirimleri Aç" düğmesine dokunun, çıkan soruya "İzin Ver" deyin. Bildirimler açılmadan program kullanılamaz.
+4. "Şahsi kodla giriş" ekranı açılır. Adınızı ve size verilen şahsi kodunuzu (harfleriyle birlikte) yazıp "Giriş yap"a basın. Onay beklemeden girersiniz.
+
+(iPhone'da program açılınca bu ekran yerine "Nasıl giriş yapacaksınız?" ekranı gelirse, en üstteki Sporkent logosuna art arda 5 kez dokunun; şahsi kodla giriş ekranı açılır.)
 
 Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
