@@ -4,6 +4,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
 import { GUNLUK, HAFTALIK, KALEM_IDLERI } from "./gorev_programi.ts";
+import { PDFDocument, rgb } from "npm:pdf-lib@1.17.1";
+import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
+import { raporPdf } from "./faaliyet_raporu.js";
+import { ROBOTO_KALIN, ROBOTO_NORMAL } from "./fontlar.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC") ?? "";
@@ -132,7 +136,7 @@ const ROL_ADI: Record<Rol, string> = {
 const RESTORAN_ISLEMLERI = ["durum", "abone_ol", "izin_bildir", "liste", "yukleme_adresi", "restoran_liste", "restoran_paylas", "restoran_sil", "restoran_tel", "duyuru_liste", "kullanim"];
 // Kullanım raporunda sayılan bölümler (uygulamadaki ekran adları)
 const KULLANIM_BOLUMLERI = ["acilis", "ana", "duyuru", "parsel", "saha", "restoran", "yonetim", "aidat", "plaka", "iletisim", "sokaklar", "servis",
-  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler"];
+  "yakinlar", "uyeler", "rapor", "yksaha", "program", "devriye", "gorevler", "faaliyet"];
 
 const temiz = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
 
@@ -1472,7 +1476,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const bas = tarihMi(g.bas) ? String(g.bas) : sonGun(new Date(), -40);
       const bit = tarihMi(g.bit) ? String(g.bit) : sonGun(new Date(), 40);
       // Tekrarlayanlar başlangıç gününden sonra her dönemde görünür; tek seferlikler yalnızca kendi gününde
-      const { data, error } = await db.from("is_programi").select("id, tarih, saat, tekrar, baslik, aciklama, ekleyen, cihaz, created_at")
+      const { data, error } = await db.from("is_programi").select("id, tarih, saat, tekrar, baslik, aciklama, ekleyen, cihaz, created_at, yapildi_at, yapildi_gun, yapan")
         .lte("tarih", bit).or(`tekrar.neq.yok,tarih.gte.${bas}`).order("tarih").limit(1000);
       if (error) throw error;
       return { kayitlar: (data ?? []).map(({ cihaz: c, ...x }: any) => ({ ...x, silebilir: rol === "baskan" || c === u.cihaz })) };
@@ -1482,7 +1486,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!PROGRAM_GIREN.includes(rol)) throw new Hata("İş programına yalnızca yönetici, yönetim kurulu, müdür ve şef girer.", 403);
       const tarih = String(g.tarih ?? "");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih)) throw new Hata("Tarih seçin.");
-      const tekrar: string = ["yok", "gunluk", "haftalik", "aylik"].includes(g.tekrar) ? g.tekrar : "yok";
+      const tekrar: string = ["yok", "gunluk", "haftalik", "aylik", "hafta"].includes(g.tekrar) ? g.tekrar : "yok";
       const saat = /^\d{2}:\d{2}$/.test(String(g.saat ?? "")) ? String(g.saat) : null;
       const baslik = temiz(g.baslik, 1000);
       if (!baslik) throw new Hata("Yapılacak işi yazın.");
@@ -1490,10 +1494,50 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
         tarih, saat, tekrar, baslik, aciklama: temiz(g.aciklama) || null, ekleyen: u.ad, cihaz: u.cihaz, rol,
       });
       if (error) throw error;
-      const ne: Record<string, string> = { yok: "", gunluk: " (her gün)", haftalik: " (her hafta)", aylik: " (her ay)" };
+      const ne: Record<string, string> = { yok: "", gunluk: " (her gün)", haftalik: " (her hafta)", aylik: " (her ay)", hafta: " (bu hafta, pazar hariç her gün)" };
       const [y, a, gn] = tarih.split("-");
       await duyur(PROGRAM_GIREN, "📅 İş programına eklendi", `${gn}.${a}.${y}${saat ? " " + saat : ""}${ne[tekrar]}: ${baslik} · ${u.ad}`.slice(0, 180), { sayfa: "program" });
       return { tamam: true };
+    }
+
+    case "program_yapildi": {
+      // Tek günlük ya da "bu hafta" işi yapıldı: o güne yazılır, haftanın diğer günlerinden kalkar
+      if (!PROGRAM_GIREN.includes(rol)) throw new Hata("Yetkiniz yok.", 403);
+      const geri = !!g.geri;
+      const { data: x } = await db.from("is_programi").select("id, tekrar, baslik, yapildi_at, yapan_cihaz").eq("id", g.id).maybeSingle();
+      if (!x) throw new Hata("Kayıt bulunamadı.");
+      if (!["yok", "hafta"].includes(x.tekrar)) throw new Hata("Her gün / her hafta tekrarlanan işler “Yapıldı” yapılamaz.");
+      if (geri) {
+        if (!x.yapildi_at) return { tamam: true };
+        if (rol !== "baskan" && x.yapan_cihaz !== u.cihaz) throw new Hata("“Yapıldı”yı yalnızca işaretleyen kişi ya da yönetici geri alabilir.", 403);
+        await db.from("is_programi").update({ yapildi_at: null, yapildi_gun: null, yapan: null, yapan_cihaz: null }).eq("id", x.id);
+        return { tamam: true };
+      }
+      if (x.yapildi_at) throw new Hata("Bu iş zaten yapıldı olarak işaretlenmiş.");
+      await db.from("is_programi").update({ yapildi_at: new Date().toISOString(), yapildi_gun: sonGun(new Date(), 0), yapan: u.ad, yapan_cihaz: u.cihaz }).eq("id", x.id);
+      await duyur(PROGRAM_GIREN, "✅ İş programında yapıldı", `${x.baslik} · ${u.ad}`.slice(0, 180), { sayfa: "program", haric: u.cihaz });
+      return { tamam: true };
+    }
+
+    // ---------- Aylık Faaliyet Raporu (yalnızca yönetici) ----------
+    case "faaliyet_raporlari": {
+      yonetici();
+      const { data } = await db.from("faaliyet_raporlari").select("ay, yol, is_sayisi, program_sayisi, olusturma").order("ay", { ascending: false }).limit(60);
+      const liste = await Promise.all((data ?? []).map(async (r: any) => {
+        const { data: url } = await db.storage.from(BUCKET).createSignedUrl(r.yol, 60 * 60, { download: `Sporkent_Faaliyet_Raporu_${r.ay}.pdf` });
+        return { ay: r.ay, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, olusturma: r.olusturma, url: url?.signedUrl ?? null };
+      }));
+      return { raporlar: liste, bu_ay: sonGun(new Date(), 0).slice(0, 7) };
+    }
+
+    case "faaliyet_raporu_hazirla": {
+      yonetici();
+      const buAy = sonGun(new Date(), 0).slice(0, 7);
+      const ay = /^\d{4}-\d{2}$/.test(String(g.ay ?? "")) ? String(g.ay) : buAy;
+      if (ay > buAy) throw new Hata("Gelecek ayın raporu hazırlanamaz.");
+      const r = await aylikRaporHazirla(ay, false);
+      const { data: url } = await db.storage.from(BUCKET).createSignedUrl(r.yol, 60 * 60, { download: `Sporkent_Faaliyet_Raporu_${ay}.pdf` });
+      return { ay: r.ay, ayAdi: r.ayAdi, is_sayisi: r.is_sayisi, program_sayisi: r.program_sayisi, url: url?.signedUrl ?? null };
     }
 
     case "program_sil": {
@@ -1807,6 +1851,39 @@ async function eskiDevriyeSil() {
   const sinir = sonGun(new Date(Date.now() - DEVRIYE_SAKLAMA_GUN * 864e5), 0);
   await db.from("devriye_turlari").delete().lt("gun", sinir); // izleri de birlikte silinir
 }
+// ---------- Aylık Faaliyet Raporu ----------
+const AY_ADLARI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
+  const [yil, a] = ay.split("-").map(Number);
+  const bas = new Date(Date.UTC(yil, a - 1, 1) - 3 * 3600e3).toISOString(); // Türkiye saatiyle ayın başı
+  const bit = new Date(Date.UTC(yil, a, 1) - 3 * 3600e3).toISOString();
+  const { data: isler, error } = await db.from("kayitlar")
+    .select("id, no, yer, bolge, sorun, bildiren, created_at, kapatan, kapanis_at, sonuc, foto_once, foto_sonra, gizli")
+    .eq("durum", "tamam").gte("kapanis_at", bas).lt("kapanis_at", bit).order("kapanis_at");
+  if (error) throw error;
+  const { data: program } = await db.from("is_programi").select("baslik, aciklama, yapan, yapildi_at")
+    .gte("yapildi_at", bas).lt("yapildi_at", bit).order("yapildi_at");
+  const ayAdi = `${AY_ADLARI[a - 1]} ${yil}`;
+  const logo = await fetch("https://avsamimciftci-wq.github.io/sporkent-saha-takip/logo-yatay.png").then((r) => r.ok ? r.arrayBuffer() : null).catch(() => null);
+  const pdf = await raporPdf(
+    { PDFDocument, rgb, fontkit, fontNormal: ROBOTO_NORMAL(), fontKalin: ROBOTO_KALIN(), logo: logo ? new Uint8Array(logo) : null },
+    { ayAdi, hazirlanma: new Date().toISOString(), isler: isler ?? [], program: program ?? [] },
+    async (yol: string) => { const { data } = await db.storage.from(BUCKET).download(yol); return data ? new Uint8Array(await data.arrayBuffer()) : null; },
+  );
+  const yol = `raporlar/faaliyet-${ay}.pdf`;
+  const { error: ye } = await db.storage.from(BUCKET).upload(yol, pdf, { contentType: "application/pdf", upsert: true });
+  if (ye) throw ye;
+  await db.from("faaliyet_raporlari").upsert({ ay, yol, is_sayisi: isler?.length ?? 0, program_sayisi: program?.length ?? 0, olusturma: new Date().toISOString() });
+  if (bildirimle) await bildir(["baskan"], `📑 ${ayAdi} faaliyet raporu hazır`, `${isler?.length ?? 0} yapılan iş, fotoğrafları ve notlarıyla PDF olarak hazırlandı. Açmak için dokunun.`, { sayfa: "faaliyet" });
+  return { ay, ayAdi, yol, is_sayisi: isler?.length ?? 0, program_sayisi: program?.length ?? 0 };
+}
+// Her akşam çağrılır; yarın ayın 1'iyse bu ayın raporu hazırlanır
+async function aylikRaporZamani() {
+  const bugun = sonGun(new Date(), 0), yarin = sonGun(new Date(), 1);
+  if (!yarin.endsWith("-01")) return { atlandi: true, bugun };
+  return await aylikRaporHazirla(bugun.slice(0, 7), true);
+}
+
 async function gunlukGecikme() {
   await eskiUyeleriSil().catch(() => {});
   await eskiDevriyeSil().catch(() => {});
@@ -1829,6 +1906,10 @@ Deno.serve(async (req) => {
     if (g.eylem === "gunluk_gecikme") {
       if (!CRON_ANAHTARI || !esitMi(String(g.cron ?? ""), CRON_ANAHTARI)) throw new Hata("Yetkisiz.", 401);
       return yanit(await gunlukGecikme());
+    }
+    if (g.eylem === "aylik_rapor") {
+      if (!CRON_ANAHTARI || !esitMi(String(g.cron ?? ""), CRON_ANAHTARI)) throw new Hata("Yetkisiz.", 401);
+      return yanit(await aylikRaporZamani());
     }
     if (g.eylem === "gorev_hatirlat") {
       if (!CRON_ANAHTARI || !esitMi(String(g.cron ?? ""), CRON_ANAHTARI)) throw new Hata("Yetkisiz.", 401);

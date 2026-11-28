@@ -1214,6 +1214,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         if (e.data.sayfa === "uyeler") yonetimAc();
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
+        else if (e.data.sayfa === "faaliyet") { if (yonetici()) faaliyetAc(); }
         else if (e.data.sayfa === "duyuru" || e.data.sayfa === "restoran") { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); }
         else yenile();
       });
@@ -1265,6 +1266,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     if (location.hash === "#yonetim-isleri") return yonetimIsleriAc();
     if (location.hash === "#yk-saha") return ykSahaAc();
     if (location.hash === "#program") return programAc();
+    if (location.hash === "#faaliyet" && yonetici()) return faaliyetAc();
     if (location.hash === "#sokak-numaralari") return sokaklarAc();
     if (location.hash === "#devriye") return devriyeAc();
     if (location.hash.startsWith("#gorevler")) return gorevlerAc(location.hash === "#gorevler-haftalik" ? "haftalik" : "gunluk");
@@ -2820,6 +2822,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   function yonetimIsleriAc() {
     if (!programGorur()) return;
     for (const id of ["#program-ac", "#gorevler-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
+    $("#faaliyet-ac").hidden = !yonetici();
     if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
     goster("yonetimisleri");
   }
@@ -3032,7 +3035,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // ---------- Yönetim iş programı (takvim): gün / hafta / ay ----------
   const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
   const GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
-  const TEKRAR = { yok: "", gunluk: "Her gün", haftalik: "Her hafta", aylik: "Her ay" };
+  const TEKRAR = { yok: "", gunluk: "Her gün", haftalik: "Her hafta", aylik: "Her ay", hafta: "Bu hafta her gün (pazar hariç)" };
   const tGun = (t) => new Date(t + "T00:00:00Z");
   const tYaz = (d) => d.toISOString().slice(0, 10);
   const tEkle = (t, n) => tYaz(new Date(tGun(t).getTime() + n * 864e5));
@@ -3043,7 +3046,15 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   let progGorunum = "hafta", progTarih = bugun(), progVeri = [], progFormAcik = false;
 
   // Bir iş o gün yapılacak mı (tekrarlayanlar başladığı günden itibaren)
+  const haftaBasi = (t) => tEkle(t, -haftaGunu(t));
   function oGunMu(x, gun) {
+    // "Bu hafta" işi: haftanın pazartesi–cumartesi her günü; yapılınca yalnızca yapıldığı günde kalır.
+    // Hafta bitti de yapılmadıysa bu haftaya taşınır (yapılana kadar).
+    if (x.tekrar === "hafta") {
+      if (x.yapildi_gun) return gun === x.yapildi_gun;
+      const bas = haftaBasi(x.tarih), son = tEkle(haftaBasi(bugun() > x.tarih ? bugun() : x.tarih), 5);
+      return gun >= bas && gun <= son && haftaGunu(gun) !== 6;
+    }
     if (gun < x.tarih) return false;
     if (x.tekrar === "yok") return gun === x.tarih;
     if (x.tekrar === "gunluk") return true;
@@ -3072,13 +3083,22 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     catch (e) { $("#program").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
 
-  const isKarti = (x) => `<div class="prog-is">
+  const isKarti = (x, gun) => {
+    const yapilabilir = ["yok", "hafta"].includes(x.tekrar);
+    const kaldi = x.tekrar === "hafta" && !x.yapildi_at && gun && haftaBasi(gun) > haftaBasi(x.tarih);
+    return `<div class="prog-is ${x.yapildi_at ? "yapildi" : ""}">
       ${x.saat ? `<span class="saat">${kac(x.saat)}</span>` : ""}
-      <span class="icerik"><b>${kac(x.baslik)}</b>
+      <span class="icerik">${x.yapildi_at ? `<span class="prog-yapildi-etiket">✅ YAPILDI</span>` : kaldi ? `<span class="prog-kaldi-etiket">⚠ Geçen haftadan kaldı</span>` : ""}<b>${kac(x.baslik)}</b>
         ${x.aciklama ? `<small>${kac(x.aciklama)}</small>` : ""}
-        <small>${TEKRAR[x.tekrar] ? `🔁 ${TEKRAR[x.tekrar]} · ` : ""}Giren: ${kac(x.ekleyen || "")}</small></span>
-      ${x.silebilir ? `<button type="button" class="sil" data-prog-sil="${x.id}" data-tekrar="${x.tekrar}">Sil</button>` : ""}
+        <small>${TEKRAR[x.tekrar] && !x.yapildi_at ? `🔁 ${TEKRAR[x.tekrar]} · ` : ""}Giren: ${kac(x.ekleyen || "")}</small>
+        ${x.yapildi_at ? `<small class="prog-yapan">Yapan: ${kac(x.yapan || "—")} · ${tarihSaat(x.yapildi_at)}</small>` : ""}</span>
+      <span class="prog-dugmeler">
+        ${yapilabilir && !x.yapildi_at ? `<button type="button" class="prog-yap" data-prog-yap="${x.id}">✅ Yapıldı</button>` : ""}
+        ${x.yapildi_at ? `<button type="button" class="prog-geri" data-prog-geri="${x.id}">Geri al</button>` : ""}
+        ${x.silebilir ? `<button type="button" class="sil" data-prog-sil="${x.id}" data-tekrar="${x.tekrar}">Sil</button>` : ""}
+      </span>
     </div>`;
+  };
 
   function programCiz() {
     const [bas] = progAralik();
@@ -3099,23 +3119,23 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       etiket = `${ayinGunu(bas)} ${AYLAR[tGun(bas).getUTCMonth()]} – ${ayinGunu(tEkle(bas, 6))} ${AYLAR[tGun(tEkle(bas, 6)).getUTCMonth()]}`;
       icerik = Array.from({ length: 7 }, (_, i) => tEkle(bas, i)).map((g) => {
         const isler = gununIsleri(g);
-        return `<div class="prog-gun"><h3 class="gun-${haftaGunu(g)} ${g === bugunT ? "bugun" : ""}">${GUNLER[haftaGunu(g)]}, ${ayinGunu(g)} ${AYLAR[tGun(g).getUTCMonth()]}${g === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : ""}</h3>
-          ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">İş yok</p>`}</div>`;
+        return `<div class="prog-gun"><h3 class="gun-${haftaGunu(g)} ${g === bugunT ? "bugun" : ""}">${GUNLER[haftaGunu(g)]}, ${ayinGunu(g)} ${AYLAR[tGun(g).getUTCMonth()]}${g === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : haftaGunu(g) === 6 ? `<span class="tatil-etiket">TATİL</span>` : ""}</h3>
+          ${isler.length ? isler.map((x) => isKarti(x, g)).join("") : `<p class="prog-bos">${haftaGunu(g) === 6 ? "Pazar: tatil" : "İş yok"}</p>`}</div>`;
       }).join("");
     } else {
       etiket = `${AYLAR[tGun(progTarih).getUTCMonth()]} ${tGun(progTarih).getUTCFullYear()}`;
       const ay = progTarih.slice(0, 7);
-      icerik = `<div class="prog-ay">${["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((g) => `<span class="gun-adi">${g}</span>`).join("")}
+      icerik = `<div class="prog-ay">${["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((g) => `<span class="gun-adi ${g === "Paz" ? "pazar" : ""}">${g}</span>`).join("")}
         ${Array.from({ length: Math.round((tGun(progAralik()[1]) - tGun(bas)) / 864e5) + 1 }, (_, i) => tEkle(bas, i)).map((g) => {
           const n = gununIsleri(g).length;
-          return `<button type="button" data-prog-gun="${g}" class="${g.slice(0, 7) !== ay ? "disarida" : ""} ${g === bugunT ? "bugun" : ""} ${n ? "dolu" : ""} ${g === progTarih ? "secili" : ""}">${ayinGunu(g)}${n ? `<i>${n}</i>` : ""}</button>`;
+          return `<button type="button" data-prog-gun="${g}" class="${g.slice(0, 7) !== ay ? "disarida" : ""} ${haftaGunu(g) === 6 ? "pazar" : ""} ${g === bugunT ? "bugun" : ""} ${n ? "dolu" : ""} ${g === progTarih ? "secili" : ""}">${ayinGunu(g)}${n ? `<i>${n}</i>` : ""}</button>`;
         }).join("")}</div>
         <p class="ipucu" style="font-size:15px">Bir güne dokunun, o günün işleri aşağıda görünsün.</p>`;
       // Seçili günün işleri takvimin altında
       if (progTarih.slice(0, 7) === ay) {
         const isler = gununIsleri(progTarih);
-        icerik += `<div class="prog-gun"><h3 class="gun-${haftaGunu(progTarih)} ${progTarih === bugunT ? "bugun" : ""}">${uzunTarih(progTarih)}${progTarih === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : ""}</h3>
-          ${isler.length ? isler.map(isKarti).join("") : `<p class="prog-bos">Bu gün için girilmiş iş yok</p>`}</div>`;
+        icerik += `<div class="prog-gun"><h3 class="gun-${haftaGunu(progTarih)} ${progTarih === bugunT ? "bugun" : ""}">${uzunTarih(progTarih)}${progTarih === bugunT ? `<span class="bugun-etiket">BUGÜN</span>` : haftaGunu(progTarih) === 6 ? `<span class="tatil-etiket">TATİL</span>` : ""}</h3>
+          ${isler.length ? isler.map((x) => isKarti(x, progTarih)).join("") : `<p class="prog-bos">Bu gün için girilmiş iş yok</p>`}</div>`;
       }
     }
     $("#program").innerHTML = `
@@ -3133,6 +3153,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
           <textarea name="baslik" class="prog-is-yaz" required rows="6" maxlength="1000" placeholder="Örn. Ağaçlar bugün teslim edilecek"></textarea>
           <small class="ipucu">Konuşarak yazmak için klavyedeki 🎤 mikrofon tuşuna basın.</small>
         </label>
+        ${progGorunum === "hafta" ? `<fieldset class="prog-ne-zaman"><legend>Ne zaman?</legend>
+          <label><input type="radio" name="sure" value="hafta" checked> <b>Bu hafta her gün</b> <small>(pazartesi–cumartesi; “Yapıldı” denince diğer günlerden kalkar)</small></label>
+          <label><input type="radio" name="sure" value="yok"> <b>Yalnızca ${progTarih === bugun() || haftaBasi(progTarih) === haftaBasi(bugun()) ? "bugün" : uzunTarih(progTarih)}</b></label>
+        </fieldset>` : ""}
         <div class="dugmeler">
           <button type="button" class="ikincil" id="prog-vazgec">Vazgeç</button>
           <button class="ana-dugme" type="submit">Kaydet</button>
@@ -3167,6 +3191,18 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       return;
     }
     if (t.closest("#prog-vazgec")) { progFormAcik = false; return programCiz(); }
+    const yap = t.closest("[data-prog-yap]"), geriAl = t.closest("[data-prog-geri]");
+    if (yap || geriAl) {
+      const b = yap || geriAl;
+      if (geriAl && !confirm("“Yapıldı” işareti geri alınsın mı? İş yeniden yapılacaklara döner.")) return;
+      b.disabled = true;
+      try {
+        await api("program_yapildi", { id: Number(b.dataset.progYap || b.dataset.progGeri), geri: !!geriAl });
+        mesaj(geriAl ? "Geri alındı." : "Yapıldı olarak işaretlendi. Yönetim, müdür ve şefe bildirildi.");
+        await programAc();
+      } catch (err) { mesaj(err.message); b.disabled = false; }
+      return;
+    }
     const sil = t.closest("[data-prog-sil]");
     if (sil) {
       const tekrarli = sil.dataset.tekrar !== "yok";
@@ -3183,14 +3219,53 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const d = e.target.querySelector("button[type=submit]");
     d.disabled = true; d.textContent = "Kaydediliyor…";
     try {
-      // Tarih sorulmaz: iş bugüne yazılır (aylık takvimde bir gün seçiliyse o güne)
-      const tarih = progGorunum === "ay" ? progTarih : bugun();
-      await api("program_ekle", { baslik: f.get("baslik"), tarih, tekrar: "yok" });
+      // Tarih sorulmaz: iş bugüne yazılır (aylık takvimde bir gün seçiliyse o güne).
+      // Haftalık görünümde "bu hafta her gün" seçiliyse görülen haftaya yazılır (bu haftaysa bugüne).
+      const buHafta = haftaBasi(progTarih) === haftaBasi(bugun());
+      const sure = progGorunum === "hafta" ? (f.get("sure") || "hafta") : "yok";
+      const tarih = progGorunum === "ay" ? progTarih : sure === "hafta" && !buHafta ? haftaBasi(progTarih) : buHafta ? bugun() : progTarih;
+      await api("program_ekle", { baslik: f.get("baslik"), tarih, tekrar: sure });
       progFormAcik = false; progTarih = tarih;
       mesaj("İş programına eklendi. Yönetim, müdür ve şefe bildirildi.");
       await programAc();
     } catch (err) { mesaj(err.message); d.disabled = false; d.textContent = "Kaydet"; }
   });
+  // ---------- Aylık Faaliyet Raporu (yalnızca yönetici) ----------
+  // Her ayın son günü akşam 20.00'de sunucu hazırlar ve yöneticiye bildirir; istenirse şimdi de hazırlanır.
+  const ayAdi = (ay) => `${AYLAR[Number(ay.slice(5, 7)) - 1]} ${ay.slice(0, 4)}`;
+  async function faaliyetAc() {
+    if (!yonetici()) return;
+    if (location.hash !== "#faaliyet") history.replaceState(history.state, "", "#faaliyet");
+    goster("faaliyet");
+    if (!$("#faaliyet").innerHTML) $("#faaliyet").innerHTML = `<p class="bos">Yükleniyor…</p>`;
+    try { faaliyetCiz(await api("faaliyet_raporlari")); }
+    catch (e) { $("#faaliyet").innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
+  }
+  function faaliyetCiz(v) {
+    const buAyVar = v.raporlar.some((r) => r.ay === v.bu_ay);
+    $("#faaliyet").innerHTML = `
+      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-faaliyet">📑 Aylık Faaliyet Raporu</h1></div>
+      <p class="ipucu">Saha Takip ve YK Saha Takip'te “Yapıldı” olarak kapatılan bütün işler ile İş Programı'nda yapılanlar her ay <b>fotoğrafları ve notlarıyla</b> PDF rapor olur. Rapor <b>her ayın son günü akşam 20.00'de</b> kendiliğinden hazırlanır ve size bildirim gelir. Raporlar haftalık yedeğe de girer.</p>
+      <button type="button" class="ana-dugme" data-faaliyet-hazirla="${v.bu_ay}">🔄 ${ayAdi(v.bu_ay)} raporunu şimdi hazırla</button>
+      <small class="ipucu">Ay bitmeden hazırlarsanız o güne kadar yapılanlar girer; ayın son günü rapor yeniden, eksiksiz hazırlanır.</small>
+      <h2>Hazır raporlar</h2>
+      ${v.raporlar.length ? v.raporlar.map((r) => `<div class="faaliyet-satir">
+          <div><b>${ayAdi(r.ay)}</b><small>${r.is_sayisi} yapılan iş · ${r.program_sayisi} İş Programı işi · Hazırlandı: ${tarihSaat(r.olusturma)}</small></div>
+          ${r.url ? `<a class="faaliyet-ac" href="${kac(r.url)}" target="_blank" rel="noopener">📄 PDF'i aç</a>` : ""}
+          ${r.ay !== v.bu_ay ? `<button type="button" class="ikincil faaliyet-yenile" data-faaliyet-hazirla="${r.ay}">🔄 Yeniden hazırla</button>` : ""}
+        </div>`).join("") : `<p class="bos">Henüz hazır rapor yok.${buAyVar ? "" : " Yukarıdaki düğmeyle bu ayın raporunu şimdi hazırlayabilirsiniz."}</p>`}`;
+  }
+  $("#faaliyet").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-faaliyet-hazirla]"); if (!b) return;
+    const eski = b.textContent; b.disabled = true; b.textContent = "Hazırlanıyor… (fotoğraflarla birlikte biraz sürebilir)";
+    try {
+      const r = await api("faaliyet_raporu_hazirla", { ay: b.dataset.faaliyetHazirla });
+      mesaj(`${r.ayAdi} raporu hazırlandı: ${r.is_sayisi} yapılan iş.`);
+      await faaliyetAc();
+    } catch (err) { mesaj(err.message); b.disabled = false; b.textContent = eski; }
+  });
+  $("#faaliyet-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#faaliyet"); faaliyetAc(); });
+
   $("#program-ac").addEventListener("click", () => {
     progGorunum = "hafta"; progTarih = bugun(); progFormAcik = false;
     history.pushState({ yk: 1 }, "", "#program");
