@@ -208,6 +208,7 @@
   }
 
   let bekleyenSayisi = 0;
+  let okunmamis = { duyuru: 0, restoran: 0 }; // ana sayfadaki Duyurular / Restoran rakamı
   let varsSure = null; // yeni işlerin yapılma süresi (yönetici ve yönetim kurulu görür)
   async function yenile() {
     // Ekran kapalıyken (arka planda) gelen bildirimde tazeleme yapılmaz: dönünce zaten tazelenir
@@ -233,6 +234,7 @@
         bekleyenSayisi = r.bekleyen || 0;
       }
       sunucuYenilik = r.yenilikler || [];
+      if (r.okunmamis) { okunmamis = r.okunmamis; if (!$("#ekran-ana").hidden) duyuruRozeti(); }
       listeCiz();
       yenilikKontrol();
     } catch (e) {
@@ -345,7 +347,7 @@
   function yenilikCiz() {
     const l = gorulmemis(), kutu = $("#yenilik");
     if (!l.length) { kutu.hidden = true; return; }
-    $("#yenilik-baslik").textContent = l.length === 1 ? "1 yenilik var" : `${l.length} yenilik var`;
+    $("#yenilik-baslik").textContent = `${l.length} yeni bildirim var.`;
     $("#yenilik-liste").innerHTML = l.map((y) => {
       const [simge, ad, renk] = YENILIK_TIP[y.tip], foto = y.kayit && (y.tip === "yapildi" ? y.kayit.foto_sonra_url : y.kayit.foto_once_url);
       return `<button type="button" class="yenilik-kart yt-${renk}" data-yenilik="${kac(y.a)}">
@@ -1215,7 +1217,7 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
         else if (e.data.sayfa === "aidat") { if (!$("#ekran-aidat").hidden) aidatAc(); }
         else if (e.data.sayfa === "program") { if (!$("#ekran-program").hidden) programAc(); }
         else if (e.data.sayfa === "faaliyet") { if (yonetici()) faaliyetAc(); }
-        else if (["duyuru", "restoran", "muhasebe"].includes(e.data.sayfa)) { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); }
+        else if (["duyuru", "restoran", "muhasebe"].includes(e.data.sayfa)) { if (!$("#ekran-" + e.data.sayfa).hidden) paylasimAc(e.data.sayfa); else yenile(); }
         else yenile();
       });
     }
@@ -1376,7 +1378,6 @@ Ortağın yakınıysanız “Tamam”a dokunun.`)) return;
     const d = (eylem, hedef, yazi, sinif = "") => `<button class="kucuk-dugme ${sinif}" data-eylem="${eylem}" data-hedef="${kac(hedef)}">${yazi}</button>`;
     const sayilar = { onay: bekleyen.length, grup: gruptakiler.length, cikan: cikan.length, kisisel: tg.length, giris: "", ayar: "" };
     $("#yonetim").innerHTML = `
-      <h1>Üyeler ve ayarlar</h1>
       <div class="uye-sekmeler" role="group" aria-label="Bölümler">
         ${UYE_BOLUMLER.map(([k, e, ad]) => `<button type="button" class="uye-sekme sekme-${k}${k === "onay" && bekleyen.length ? " dikkat" : ""}" data-uye-bolum="${k}" aria-pressed="false"><span>${e}</span><b>${ad}</b><small>${sayilar[k] === "" ? "" : k === "grup" ? `${sayilar[k]} / ${MAKS_UYE}` : sayilar[k]}</small></button>`).join("")}
       </div>
@@ -1708,8 +1709,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const saatYazisi = (t) => new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
   const haftaSonu = (g) => { const d = new Date(g + "T00:00:00"); d.setDate(d.getDate() + 6); return d.toLocaleDateString("tr-TR"); };
 
-  // Sekmeler: menu = Günlük İşler (Devriye + Günlük Kontrol tuşları), gunluk = Devriye, kontrol = Günlük Kontrol, haftalik = Haftalık Kontrol
-  const GOREV_HASH = { menu: "#gorevler-isler", gunluk: "#gorevler", kontrol: "#gorevler-kontrol", haftalik: "#gorevler-haftalik" };
+  // Sekmeler: gunluk = Devriye, kontrol = Günlük Kontrol, haftalik = Haftalık Kontrol (eski "#gorevler-isler" bildirimi Devriye'yi açar)
+  const GOREV_HASH = { gunluk: "#gorevler", kontrol: "#gorevler-kontrol", haftalik: "#gorevler-haftalik" };
   function gorevHashSekme(h) { return Object.keys(GOREV_HASH).find((k) => GOREV_HASH[k] === h) || "gunluk"; }
   async function gorevlerAc(sekme = gorevSekme, gun) {
     if (!gorevGorur()) return;
@@ -1723,7 +1724,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
 
   function gorevCiz() {
-    if (gorevSekme === "menu") return islerMenuCiz();
     if (gorevSekme === "kontrol") return kontrolCiz();
     const v = gorevVeri, p = v.program[gorevSekme];
     const gunluk = gorevSekme === "gunluk";
@@ -1737,9 +1737,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const yapilan = gunluk ? ugranan : isaret.size;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="baslik-cift baslik-satir">${gunluk
-        ? `<button class="geri" data-geri-isler>← Geri</button><h1 class="sayfa-bant bant-gorev">🚶 Devriye</h1>`
-        : `<button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-haftalik">🗓️ Haftalık Kontrol</h1>`}</div>
+      <button class="geri geri-tam" data-geri-yk>← Geri</button>
       ${gunluk ? "" : `<p class="gorev-donem">Hafta: ${gunYazisi(donem)} – ${haftaSonu(donem)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
       <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>`}
       ${!guncel ? `<p class="bilgi">Geçmiş ${gunluk ? "gün" : "hafta"}: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">${gunluk ? "Bugüne" : "Bu haftaya"} dön</button></p>` : ""}
@@ -1765,21 +1763,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     devriyeHaritaKur(gunluk ? dv : null);
   }
 
-  // ---------- Günlük İşler: Devriye ve Günlük Kontrol tuşları ----------
-  function islerMenuCiz() {
-    const v = gorevVeri, dv = v.devriye;
-    const kYapilan = v.isaretler.filter((x) => x.tur === "kontrol").length, kToplam = v.gecmis.kontrolToplam;
-    const dvYazi = izSuruyor() ? "● Devriye sürüyor" : dv?.turlar?.length ? `Bugün ${dv.turlar.length} devriye` : "Bugün devriye yok";
-    $("#gorevler").innerHTML = `
-      <div class="baslik-cift baslik-satir"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-gorev">📋 Günlük İşler</h1></div>
-      <div class="yonetim-kutular isler-kutular">
-        <button type="button" class="yonetim-kutu kutu-gorev" data-isler-ac="gunluk"><span>🚶</span>Devriye<small>${kac(dvYazi)}</small></button>
-        <button type="button" class="yonetim-kutu kutu-kontrol${kYapilan === kToplam ? " tamam" : ""}" data-isler-ac="kontrol"><span>✅</span>Günlük Kontrol<small>${kYapilan} / ${kToplam} yapıldı</small></button>
-      </div>`;
-    devriyeHaritaKur(null);
-  }
-
-  // ---------- Günlük İşler › Günlük Kontrol: müdür / şef işaretler, isterse fotoğraf ekler ----------
+  // ---------- Günlük Kontrol: müdür / şef işaretler, isterse fotoğraf ekler ----------
   function kontrolCiz() {
     const v = gorevVeri, p = v.program.kontrol;
     const isaret = new Map(v.isaretler.filter((x) => x.tur === "kontrol").map((x) => [x.kalem, x]));
@@ -1788,7 +1772,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     const fotoDugme = (id, yazi) => `<label class="kontrol-foto-dugme"><input type="file" accept="image/*" data-kontrol-foto="${id}" hidden><span>${yazi}</span></label>`;
     let no = 0;
     $("#gorevler").innerHTML = `
-      <div class="baslik-cift baslik-satir"><button class="geri" data-geri-isler>← Geri</button><h1 class="sayfa-bant bant-kontrol">✅ Günlük Kontrol</h1></div>
+      <button class="geri geri-tam" data-geri-yk>← Geri</button>
       <p class="gorev-donem">${gunYazisi(v.gun)} · <b>${yapilan} / ${toplam} yapıldı</b></p>
       <div class="gorev-cubuk"><span style="width:${toplam ? Math.round((yapilan / toplam) * 100) : 0}%"></span></div>
       ${!guncel ? `<p class="bilgi">Geçmiş gün: yalnızca görüntüleme. <button type="button" class="kucuk-dugme" data-gun="">Bugüne dön</button></p>` : ""}
@@ -1818,9 +1802,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
     catch (err) { mesaj(err.message); if (gorevSekme === "kontrol") gorevCiz(); }
   }
   $("#gorevler").addEventListener("click", async (e) => {
-    const ac = e.target.closest("[data-isler-ac]");
-    if (ac) { history.pushState({ isler: 1 }, "", GOREV_HASH[ac.dataset.islerAc]); return gorevlerAc(ac.dataset.islerAc); }
-    if (e.target.closest("[data-geri-isler]")) { if (history.state?.isler) history.back(); else gorevlerAc("menu"); return; }
     const r = e.target.closest("[data-resim]"); if (r) return resimGoster(r.dataset.resim);
     const y = e.target.closest("[data-kontrol-yap]");
     if (y) { y.disabled = true; y.textContent = "Kaydediliyor…"; return kontrolIsaretle(y.dataset.kontrolYap, true); }
@@ -2248,7 +2229,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
 
   // Yönetim Kurulu ekranından açılan sayfalar geçmişe eklenir: telefonun geri tuşu da Yönetim Kurulu'na döner
-  $("#gorevler-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler-isler"); gorevlerAc("menu"); });
+  $("#gorevler-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler"); gorevlerAc("gunluk"); });
+  $("#kontrol-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler-kontrol"); gorevlerAc("kontrol"); });
   $("#haftalik-ac").addEventListener("click", () => { history.pushState({ yk: 1 }, "", "#gorevler-haftalik"); gorevlerAc("haftalik"); });
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-geri-yksaha]")) return ykSahaAc();
@@ -2614,7 +2596,8 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   // Duyuru ve Restoran'da ekranda görülen paylaşımlar "gördü" sayılır (Kullanım Raporu'nda yalnızca yönetici görür)
   const paylasimGorulenler = new Set();
   function paylasimGorulduGonder(b, v) {
-    if (!["duyuru", "restoran"].includes(b) || yonetici()) return;
+    if (!["duyuru", "restoran"].includes(b)) return;
+    okunmamis[b] = 0;
     const yeni = v.paylasimlar.map((p) => p.id).filter((i) => !paylasimGorulenler.has(i));
     if (!yeni.length) return;
     yeni.forEach((i) => paylasimGorulenler.add(i));
@@ -2762,21 +2745,16 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   }
 
   // Ana sayfadaki Duyurular düğmesinde okunmamış duyuru sayısı (dakikada en çok bir kez sorulur)
-  let duyuruSon = { zaman: 0, tarihler: [] };
-  async function duyuruRozeti() {
-    const k = $("#ana-kutular [data-ac=duyuru] small"); if (!k) return;
-    const yaz = () => {
-      const gorulen = sakla.al("sk_duyuru_gorulen") || "";
-      const yeni = duyuruSon.tarihler.filter((t) => t > gorulen).length;
-      k.textContent = yeni ? `🔴 ${yeni} yeni duyuru` : "";
-    };
-    yaz();
-    if (Date.now() - duyuruSon.zaman < 60000) return;
-    duyuruSon.zaman = Date.now();
-    try { duyuruSon.tarihler = (await api("duyuru_liste")).paylasimlar.map((p) => p.created_at); yaz(); } catch {}
+  // Duyurular ve Restoran tuşunda henüz açıp görülmemiş paylaşım sayısı (sunucu bu telefona göre sayar)
+  function duyuruRozeti() {
+    for (const b of ["duyuru", "restoran"]) {
+      const k = $(`#ana-kutular [data-ac=${b}] small`); if (!k) continue;
+      const n = okunmamis[b] || 0;
+      k.textContent = n ? (n > 99 ? "99+" : String(n)) : "";
+    }
   }
   // Duyurular açılınca hepsi okunmuş sayılır
-  const duyuruGorulduIsaretle = (v) => { yenilikIsaretle((y) => y.tip === "duyuru"); if (v.paylasimlar[0]) sakla.koy("sk_duyuru_gorulen", v.paylasimlar[0].created_at); duyuruSon.tarihler = v.paylasimlar.map((p) => p.created_at); };
+  const duyuruGorulduIsaretle = (v) => { yenilikIsaretle((y) => y.tip === "duyuru"); if (v.paylasimlar[0]) sakla.koy("sk_duyuru_gorulen", v.paylasimlar[0].created_at); };
 
   // ---------- Kullanım raporu (yalnızca yönetici) ----------
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
@@ -3018,7 +2996,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   });
   function yonetimIsleriAc() {
     if (!programGorur()) return;
-    for (const id of ["#program-ac", "#gorevler-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
+    for (const id of ["#program-ac", "#gorevler-ac", "#kontrol-ac", "#haftalik-ac"]) $(id).hidden = !gorevGorur();
     $("#faaliyet-ac").hidden = !yonetici();
     $("#muhasebe-ac").hidden = !MUHASEBE_GOREN.includes(oturum?.rol);
     if (location.hash !== "#yonetim-isleri") history.replaceState(null, "", "#yonetim-isleri");
@@ -3154,7 +3132,6 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
 
   function aidatCiz(v) {
     $("#aidat").innerHTML = `
-      <h1 class="modul-baslik">💳 Aidat</h1>
       <p class="modul-alt">Yıl içinde ödenmesi gereken ödemeler. Resme dokunursanız tam ekran açılır, iki parmakla büyütebilirsiniz.</p>
       ${v.resimler.length ? v.resimler.map((x) => `
       <figure class="aidat-resim">
@@ -3337,7 +3314,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
       }
     }
     $("#program").innerHTML = `
-      <div class="baslik-cift"><button class="geri" data-geri-yk>← Geri</button><h1 class="sayfa-bant bant-program">📅 İş Programı</h1></div>
+      <button class="geri geri-tam" data-geri-yk>← Geri</button>
       <div class="prog-sekme">
         ${[["hafta", "Haftalık"], ["ay", "Aylık"], ["yil", "Yıllık"]].map(([k, ad]) => `<button type="button" data-prog-gorunum="${k}" class="${progGorunum === k ? "secili" : ""}">${ad}</button>`).join("")}
       </div>

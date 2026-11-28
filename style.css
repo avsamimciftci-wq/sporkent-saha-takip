@@ -642,7 +642,7 @@ body.menulu .mesaj { bottom: calc(160px + env(safe-area-inset-bottom)); }
 .numarator-ust span { font-size: 13px; opacity: .9; }
 .numarator { height: calc(100vh - 205px); height: calc(100dvh - 205px); background: #dfe6e3; position: relative; z-index: 0; }
 /* Haftalık Kontrol kutusu ve başlığı */
-.kutu-haftalik { grid-column: 1 / -1; min-height: 110px; background: linear-gradient(145deg, #4d5aa4, #303785); }
+.kutu-haftalik { min-height: 110px; background: linear-gradient(145deg, #4d5aa4, #303785); }
 .bant-haftalik { background: #3d4893; }
 /* Dar telefonlarda (iPhone) alt menü yazıları kelime ortasından bölünmesin */
 @media (max-width: 430px) {
@@ -1366,3 +1366,7 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
   :root:not([data-theme="light"]) .kontrol-ust em { color: #81c784; }
   :root:not([data-theme="light"]) .kontrol-foto-dugme { background: #13263d; border-color: #2f5f8f; color: #bbdefb; }
 }
+
+/* Açılan sayfada başlık yok (Ana Sayfaya Dön yeterli); Yönetim Kurulu alt sayfalarında yalnızca geri tuşu */
+.geri.geri-tam { display: block; width: 100%; margin: 0 0 12px; font-size: 18px; padding: 8px 12px; }
+.numarator-ust span:only-child { margin: 0 auto; font-size: 14px; }
