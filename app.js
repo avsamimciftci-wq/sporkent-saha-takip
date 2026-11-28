@@ -2782,7 +2782,7 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
   const BOLUM_ADI = { duyuru: "📢 Duyurular", parsel: "👤 Parsel Temsilcisi", saha: "🛠️ Saha Takip", restoran: "🍽️ Restoran", yonetim: "🗂️ Yönetim Kurulu",
     aidat: "💳 Aidat", plaka: "🚗 Plaka-Kimlik Bildirimi", iletisim: "☎️ İletişim", sokaklar: "🗺️ Sokak Numaraları", servis: "🚐 Servis",
     yakinlar: "👨‍👩‍👧 Katılım Onayları", muhasebe: "🧾 Muhasebe", faaliyet: "📑 Aylık Faaliyet Raporu", uyeler: "👥 Üyeler ve Ayarlar", rapor: "📊 Kullanım Raporu", yksaha: "🛠️ YK Saha Takip",
-    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler", masraf: "📋 Aylık Masraflar Listesi", muavin: "📒 Muavinim", muavinler: "📒 Ortak Muavinleri" };
+    program: "📅 İş Programı", devriye: "🚶 Devriye", gorevler: "📋 Günlük İşler", masraf: "📋 Aylık Masraflar Listesi", muavin: "📒 Hesap Özeti", muavinler: "📒 Ortak Muavinleri" };
   const RAPOR_DONEM = { 1: "Bugün", 7: "Son 7 gün", 30: "Son 30 gün", 90: "Son 3 ay", 365: "Son 1 yıl" };
   let raporGun = 30, raporVeri = null, raporAra = "";
   const sonGorulmeKisa = (t) => {
@@ -3186,10 +3186,10 @@ Sporkent İşletme Kooperatifi Yönetim Kurulu`;
             <dt>Toplam ödeme</dt><dd>${tlYaz(t.odeme)}</dd>
           </dl>
           <small class="ipucu">Hesap tarihi: <b>${kac(m.hesap_tarihi)}</b></small>
-          <button type="button" class="ana-dugme" data-muavin-pdf>📄 Muavinimi PDF olarak aç</button>
+          <button type="button" class="ana-dugme" data-muavin-pdf>📄 Hesap dökümümü PDF olarak aç</button>
           <div data-muavin-link></div>
         </div>
-        <p class="ipucu">🔒 Muavininizi ortaklardan yalnızca siz görürsünüz. Kooperatif yönetimi ve muhasebe de görebilir.</p>`;
+        <p class="ipucu">🔒 Hesap özetinizi ortaklardan yalnızca siz görürsünüz. Kooperatif yönetimi ve muhasebe de görebilir.</p>`;
     } catch (e) { k.innerHTML = `<p class="hata">${kac(e.message)}</p>`; }
   }
   $("#muavin").addEventListener("click", (e) => { if (e.target.closest("[data-muavin-pdf]")) muavinPdfHazirla($("#muavin"), null); });
