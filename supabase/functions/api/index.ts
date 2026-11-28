@@ -72,7 +72,9 @@ const MUHASEBE_ALT: Record<string, { bolum: string; ad: string }> = {
   sporkent: { bolum: "muhasebe", ad: "Sporkent 87" },
   restoran: { bolum: "muhasebe_restoran", ad: "Restoran" },
 };
-const muhasebeAlt = (a: unknown) => MUHASEBE_ALT[String(a)] ?? MUHASEBE_ALT.sporkent;
+// Aylık Masraflar Listesi: Sporkent 87 ve Restoran'dan bağımsız, kendi bölümü
+const MASRAF_ALT = { bolum: "muhasebe_masraf", ad: MASRAF_BASLIK };
+const muhasebeAlt = (a: unknown) => String(a) === "masraf" ? MASRAF_ALT : MUHASEBE_ALT[String(a)] ?? MUHASEBE_ALT.sporkent;
 async function masrafDurumu(bolum = "muhasebe") {
   const bugun = sonGun(new Date(), 0), [y, a] = bugun.split("-").map(Number);
   const bas = new Date(Date.UTC(y, a - 1, 1) - 3 * 3600e3).toISOString();
@@ -377,7 +379,7 @@ async function yenilikBul(u: any, rol: Rol) {
   const y: any[] = [];
   const baska = (x: any) => x.cihaz !== u.cihaz && !testCihaz(String(x.cihaz ?? ""));
   for (const x of (pay.data ?? []).filter(baska)) {
-    if (x.bolum === "muhasebe" || x.bolum === "muhasebe_restoran") {
+    if (["muhasebe", "muhasebe_restoran", "muhasebe_masraf"].includes(x.bolum)) {
       if (MUHASEBE_GOREN.includes(rol)) y.push({ a: "m" + x.id, tip: "muhasebe", at: x.created_at,
         metin: kisa(x.metin) || ({ gorsel: "Resim paylaşıldı.", pdf: "PDF belge paylaşıldı." } as any)[x.tur] || "Yeni paylaşım." });
       continue;
@@ -1522,7 +1524,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           ekleyen: x.rol === "baskan" ? "Kooperatif Yönetimi" : "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })),
         yonetir: MUHASEBE_PAYLASAN.includes(rol),
         silebilir: MUHASEBE_SILEN.includes(rol),
-        masraf: await masrafDurumu(alt.bolum),
+        masraf: await masrafDurumu(MASRAF_ALT.bolum),
         alt: alt.ad,
       };
     }
@@ -1530,19 +1532,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     case "masraf_liste": {
       // Yalnızca muhasebenin paylaştığı Aylık Masraflar Listeleri: TG ve Denetim Kurulu üyeleri ile yönetim görür
       if (!MUHASEBE_GOREN.includes(rol) && !tgGibi(u)) throw new Hata("Aylık Masraflar Listesini TG ve Denetim Kurulu üyeleri ile yönetim görür.", 403);
-      const altlar = [];
-      for (const k of ["sporkent", "restoran"]) {
-        const alt = MUHASEBE_ALT[k];
-        const { data, error } = await db.from("restoran_paylasim").select("id, tur, metin, yol, created_at").eq("bolum", alt.bolum)
-          .like("metin", `${MASRAF_BASLIK} ·%`).order("created_at", { ascending: false }).limit(36);
-        if (error) throw error;
-        const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
-        const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
-        const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
-        altlar.push({ anahtar: k, ad: alt.ad, masraf: await masrafDurumu(alt.bolum),
-          paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at, ekleyen: "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })) });
-      }
-      return { altlar };
+      const { data, error } = await db.from("restoran_paylasim").select("id, tur, metin, yol, created_at").eq("bolum", MASRAF_ALT.bolum)
+        .order("created_at", { ascending: false }).limit(36);
+      if (error) throw error;
+      const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
+      const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
+      const harita = new Map((u2 ?? []).map((d: any) => [d.path, d.signedUrl]));
+      return { masraf: await masrafDurumu(MASRAF_ALT.bolum),
+        paylasimlar: (data ?? []).map((x: any) => ({ id: x.id, tur: x.tur, metin: x.metin, created_at: x.created_at, ekleyen: "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })) };
     }
 
     case "muhasebe_paylas": {
@@ -1550,7 +1547,7 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const alt = muhasebeAlt(g.alt);
       const tur = ["gorsel", "metin", "pdf", "excel"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
-      const masraf = !!g.masraf;
+      const masraf = alt === MASRAF_ALT;
       const ek = temiz(g.metin, 2900);
       // Masraf listesinin başlığı sunucuda yazılır: "Aylık Masraflar Listesi · Kasım 2026"
       const metin = masraf ? `${MASRAF_BASLIK} · ${oncekiAyAdi(sonGun(new Date(), 0))}${ek ? "\n" + ek : ""}` : ek;
@@ -1562,17 +1559,17 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF", excel: "📊 Yeni Excel" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      const giden = await duyur(MUHASEBE_GOREN, masraf ? `📋 ${alt.ad}: Aylık Masraflar Listesi paylaşıldı` : `🧾 Muhasebe · ${alt.ad}: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
+      const giden = await duyur(MUHASEBE_GOREN, masraf ? `📋 Aylık Masraflar Listesi paylaşıldı` : `🧾 Muhasebe · ${alt.ad}: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
       if (masraf) {
         const { data: tg } = await db.from("uyeler").select("cihaz, rol, unvan").eq("rol", "uye").eq("durum", "onayli").or("unvan.ilike.TG%,unvan.ilike.Denetim%");
-        await Promise.all((tg ?? []).filter(tgGibi).map((x: any) => bildir({ cihaz: x.cihaz }, `📋 ${alt.ad}: Aylık Masraflar Listesi paylaşıldı`, metin.slice(0, 180), { sayfa: "masraf" }).catch(() => {})));
+        await Promise.all((tg ?? []).filter(tgGibi).map((x: any) => bildir({ cihaz: x.cihaz }, `📋 Aylık Masraflar Listesi paylaşıldı`, metin.slice(0, 180), { sayfa: "masraf" }).catch(() => {})));
       }
       return { id: p.id, ...giden };
     }
 
     case "muhasebe_sil": {
       if (!MUHASEBE_SILEN.includes(rol)) throw new Hata("Yalnızca muhasebe ve yönetici silebilir.", 403);
-      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).in("bolum", ["muhasebe", "muhasebe_restoran"]).maybeSingle();
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).in("bolum", ["muhasebe", "muhasebe_restoran", "muhasebe_masraf"]).maybeSingle();
       if (!x) throw new Hata("Paylaşım bulunamadı.");
       if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
       await db.from("restoran_paylasim").delete().eq("id", x.id);
@@ -2099,12 +2096,12 @@ async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
 // Her akşam çağrılır; yarın ayın 1'iyse bu ayın raporu hazırlanır
 async function masrafUyarisi() {
   const sonuc: Record<string, string> = {};
-  for (const alt of Object.values(MUHASEBE_ALT)) {
-    const m = await masrafDurumu(alt.bolum);
-    if (!m.bugun_gunu || m.paylasildi_at) { sonuc[alt.ad] = m.paylasildi_at ? "paylaşıldı" : "bugün değil"; continue; }
-    await bildir(MUHASEBE_GOREN, `⚠ ${alt.ad}: Aylık Masraflar Listesi paylaşılmadı`,
-      `${alt.ad} için ${m.liste_ayi} ayının masraflar listesi bugün (ayın ilk iş günü) Muhasebe bölümünde henüz paylaşılmadı.`, { sayfa: "muhasebe" });
-    sonuc[alt.ad] = "uyarı gönderildi";
+  const m = await masrafDurumu(MASRAF_ALT.bolum);
+  if (!m.bugun_gunu || m.paylasildi_at) sonuc.durum = m.paylasildi_at ? "paylaşıldı" : "bugün değil";
+  else {
+    await bildir(MUHASEBE_GOREN, `⚠ Aylık Masraflar Listesi paylaşılmadı`,
+      `${m.liste_ayi} ayının masraflar listesi bugün (ayın ilk iş günü) Muhasebe bölümünde henüz paylaşılmadı.`, { sayfa: "muhasebe" });
+    sonuc.durum = "uyarı gönderildi";
   }
   return { masraf: sonuc };
 }
@@ -2117,10 +2114,8 @@ async function aylikRaporZamani() {
 
 async function gunlukGecikme() {
   // Ayın 1'i sabahı: muhasebeye "bugün Aylık Masraflar Listesi'ni paylaşın" hatırlatması
-  for (const alt of Object.values(MUHASEBE_ALT)) {
-    await masrafDurumu(alt.bolum).then((m) => m.bugun_gunu && !m.paylasildi_at
-      ? bildir(["muhasebe"], `📋 Bugün Aylık Masraflar Listesi günü (${alt.ad})`, `${alt.ad} için ${m.liste_ayi} ayının masraflar listesini Muhasebe bölümünde paylaşmayı unutmayın.`, { sayfa: "muhasebe" }) : null).catch(() => {});
-  }
+  await masrafDurumu(MASRAF_ALT.bolum).then((m) => m.bugun_gunu && !m.paylasildi_at
+    ? bildir(["muhasebe"], `📋 Bugün Aylık Masraflar Listesi günü`, `${m.liste_ayi} ayının masraflar listesini Muhasebe bölümünde paylaşmayı unutmayın.`, { sayfa: "muhasebe" }) : null).catch(() => {});
   await eskiUyeleriSil().catch(() => {});
   await eskiDevriyeSil().catch(() => {});
   const bugun = sonGun(new Date(), 0);
