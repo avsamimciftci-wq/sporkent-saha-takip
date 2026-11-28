@@ -1330,3 +1330,39 @@ dt.yapildi-not { color: #1565c0; font-weight: 700; }
 .rapor-paylasim-kisiler .gordu { color: #2e7d32; display: block; margin: 4px 0; }
 .rapor-paylasim-kisiler .gormedi { color: #b42318; }
 .rapor-paylasim-kisiler summary { cursor: pointer; margin: 8px 0 4px; }
+
+/* Muhasebe alt tuşları: Sporkent 87 / Restoran */
+.muhasebe-altlar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.muhasebe-alt { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px; border-radius: 16px; border: 2px solid transparent; font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+.muhasebe-alt span { font-size: 30px; line-height: 1; }
+.muhasebe-alt.alt-sporkent { background: #c9d9b3; color: #34501a; }
+.muhasebe-alt.alt-restoran { background: #b8c0db; color: #273668; }
+.muhasebe-alt.secili { border-color: #2b6f93; box-shadow: 0 0 0 3px #2b6f9355, 0 3px 8px rgba(0,0,0,.12); }
+
+/* ---------- Günlük İşler: Devriye ve Günlük Kontrol ---------- */
+.isler-kutular .yonetim-kutu { min-height: 150px; }
+.yonetim-kutu.kutu-kontrol { background: #b9dcc0; color: #1d5a2c; border: 1.5px solid #1d5a2c33; }
+.yonetim-kutu.kutu-kontrol small { background: #1d5a2c14; color: #1d5a2c; }
+.yonetim-kutu.kutu-kontrol.tamam small { background: #2e7d32; color: #fff; }
+.sayfa-bant.bant-kontrol { background: #b9dcc0; color: #1d5a2c; border: 1.5px solid #1d5a2c33; }
+.kontrol { padding: 12px; margin-bottom: 10px; border: 2px solid var(--cizgi); border-radius: 12px; background: var(--kart); }
+.kontrol.yapildi { border-color: #2e7d32; background: #e8f5e9; }
+.kontrol-ust { display: flex; gap: 12px; align-items: flex-start; }
+.kontrol-ust b { display: block; font-size: 17px; }
+.kontrol-ust em { display: block; font-style: normal; color: #2e7d32; font-weight: 700; margin-top: 4px; }
+.kontrol.yapildi .gorev-no { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+.kontrol-bekliyor { display: block; color: var(--soluk); margin-top: 2px; }
+.kontrol-resim { display: block; width: 100%; margin: 10px 0 0; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: none; cursor: zoom-in; }
+.kontrol-resim img { display: block; width: 100%; max-height: 220px; object-fit: cover; }
+.kontrol-dugmeler { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.kontrol-dugmeler .ana-dugme { min-height: 48px; padding: 10px; }
+.kontrol-foto-dugme { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px; border-radius: 12px; border: 2px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: 700; text-align: center; cursor: pointer; }
+.kontrol-kaldir { background: var(--yesil-acik); color: var(--yazi); min-height: 48px; }
+.kontrol-dugmeler > :only-child { grid-column: 1 / -1; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .yonetim-kutu.kutu-kontrol, :root:not([data-theme="light"]) .sayfa-bant.bant-kontrol { background: #3d7a4a; color: #fff; border-color: transparent; }
+  :root:not([data-theme="light"]) .yonetim-kutu.kutu-kontrol small { background: rgba(255,255,255,.2); color: #fff; }
+  :root:not([data-theme="light"]) .kontrol.yapildi { background: #1b3320; }
+  :root:not([data-theme="light"]) .kontrol-ust em { color: #81c784; }
+  :root:not([data-theme="light"]) .kontrol-foto-dugme { background: #13263d; border-color: #2f5f8f; color: #bbdefb; }
+}

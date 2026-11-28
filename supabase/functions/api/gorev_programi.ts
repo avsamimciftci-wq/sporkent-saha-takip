@@ -3,7 +3,7 @@
 
 export type Kalem = { id: string; baslik: string; aciklama: string };
 export type Bolum = { harf: string; baslik: string; saat?: string; kalemler: Kalem[] };
-export type Program = { tur: "gunluk" | "haftalik"; baslik: string; giris: string; bolumler: Bolum[] };
+export type Program = { tur: "gunluk" | "haftalik" | "kontrol"; baslik: string; giris: string; bolumler: Bolum[] };
 
 export const GUNLUK: Program = {
   tur: "gunluk",
@@ -44,6 +44,25 @@ export const HAFTALIK: Program = {
   ],
 };
 
+// Günlük İşler › Günlük Kontrol: müdür ya da şef her gün işaretler, isterse fotoğraf ekler
+export const KONTROL: Program = {
+  tur: "kontrol",
+  baslik: "Günlük kontrol listesi",
+  giris: "Her gün yapılması gereken temizlik ve kontrol işleri.",
+  bolumler: [
+    {
+      harf: "A", baslik: "", kalemler: [
+        { id: "K-1", baslik: "Mıntıka temizliği", aciklama: "" },
+        { id: "K-2", baslik: "Şezlong ve şemsiye kontrolü", aciklama: "" },
+        { id: "K-3", baslik: "İskele merdivenleri fırçalanması", aciklama: "" },
+        { id: "K-4", baslik: "Duş, soyunma kabinleri, WC temizliği", aciklama: "" },
+        { id: "K-5", baslik: "Havuz temizliği", aciklama: "" },
+        { id: "K-6", baslik: "Dut Ağacı temizliği", aciklama: "" },
+      ],
+    },
+  ],
+};
+
 export const KALEM_IDLERI = new Set(
-  [GUNLUK, HAFTALIK].flatMap((p) => p.bolumler.flatMap((b) => b.kalemler.map((k) => k.id))),
+  [GUNLUK, HAFTALIK, KONTROL].flatMap((p) => p.bolumler.flatMap((b) => b.kalemler.map((k) => k.id))),
 );

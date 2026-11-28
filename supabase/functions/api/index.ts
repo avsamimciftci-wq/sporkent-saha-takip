@@ -3,7 +3,7 @@
 // kendi gizli anahtarıyla çalışır. Tarayıcıya hiçbir tablo açık değildir.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
-import { GUNLUK, HAFTALIK, KALEM_IDLERI } from "./gorev_programi.ts";
+import { GUNLUK, HAFTALIK, KONTROL, KALEM_IDLERI } from "./gorev_programi.ts";
 import { PDFDocument, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import { raporPdf } from "./faaliyet_raporu.js";
@@ -67,10 +67,16 @@ const ilkIsGunu = (ay: string) => {
   while (tatilMi(g)) g = new Date(Date.parse(g + "T00:00:00Z") + 864e5).toISOString().slice(0, 10);
   return g;
 };
-async function masrafDurumu() {
+// Muhasebe alt bölümleri: "Sporkent 87" (eski "muhasebe" kayıtları) ve "Restoran"
+const MUHASEBE_ALT: Record<string, { bolum: string; ad: string }> = {
+  sporkent: { bolum: "muhasebe", ad: "Sporkent 87" },
+  restoran: { bolum: "muhasebe_restoran", ad: "Restoran" },
+};
+const muhasebeAlt = (a: unknown) => MUHASEBE_ALT[String(a)] ?? MUHASEBE_ALT.sporkent;
+async function masrafDurumu(bolum = "muhasebe") {
   const bugun = sonGun(new Date(), 0), [y, a] = bugun.split("-").map(Number);
   const bas = new Date(Date.UTC(y, a - 1, 1) - 3 * 3600e3).toISOString();
-  const { data } = await db.from("restoran_paylasim").select("id, created_at").eq("bolum", "muhasebe").like("metin", `${MASRAF_BASLIK} ·%`)
+  const { data } = await db.from("restoran_paylasim").select("id, created_at").eq("bolum", bolum).like("metin", `${MASRAF_BASLIK} ·%`)
     .gte("created_at", bas).order("created_at", { ascending: false }).limit(1);
   const gun = ilkIsGunu(bugun.slice(0, 7));
   return { ay: bugun.slice(0, 7), liste_ayi: oncekiAyAdi(bugun), paylasildi_at: data?.[0]?.created_at ?? null, bugun, gun, bugun_gunu: bugun === gun };
@@ -268,11 +274,15 @@ const gunEkle = (gun: string, n: number) => new Date(Date.parse(gun + "T00:00:00
 // gecmisli: geçmiş günler / haftalar özeti yalnızca yöneticiye gönderilir
 async function gorevDurumu(gun: string, gecmisli = false) {
   const hafta = haftaBasi(gun);
-  const { data: isaretler, error } = await db.from("gorev_isaretleri").select("tur, donem, kalem, ad, rol, isaret_at")
-    .or(`and(tur.eq.gunluk,donem.eq.${gun}),and(tur.eq.haftalik,donem.eq.${hafta})`);
+  const { data: isaretler, error } = await db.from("gorev_isaretleri").select("tur, donem, kalem, ad, rol, isaret_at, foto")
+    .or(`and(tur.in.(gunluk,kontrol),donem.eq.${gun}),and(tur.eq.haftalik,donem.eq.${hafta})`);
   if (error) throw error;
+  // Günlük Kontrol fotoğrafları: 6 saatlik geçici adres
+  const fotolar = (isaretler ?? []).map((x: any) => x.foto).filter(Boolean);
+  const { data: fu } = fotolar.length ? await db.storage.from(BUCKET).createSignedUrls(fotolar, 60 * 60 * 6) : { data: [] };
+  const fotoAdres = new Map((fu ?? []).map((d: any) => [d.path, d.signedUrl]));
   const bugun = sonGun(new Date(), 0);
-  let gunler: unknown[] = [], haftalar: unknown[] = [];
+  let gunler: unknown[] = [], haftalar: unknown[] = [], kontrolGunler: unknown[] = [];
   if (gecmisli) {
     // Son 14 gün ve son 8 hafta, kaç kalem işaretlendi (programdan çıkarılan kalemler sayılmaz)
     const { data: eski } = await db.from("gorev_isaretleri").select("tur, donem, kalem")
@@ -284,13 +294,15 @@ async function gorevDurumu(gun: string, gecmisli = false) {
     const ugranan = (d: string) => new Set((dk ?? []).filter((x: any) => x.gun === d).map((x: any) => x.ad)).size;
     gunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: ugranan(d) }));
     haftalar = Array.from({ length: 8 }, (_, i) => gunEkle(haftaBasi(bugun), -7 * i)).map((d) => ({ donem: d, yapilan: say("haftalik", d) }));
+    kontrolGunler = Array.from({ length: 14 }, (_, i) => gunEkle(bugun, -i)).map((d) => ({ donem: d, yapilan: say("kontrol", d) }));
   }
   return {
-    program: { gunluk: GUNLUK, haftalik: HAFTALIK },
+    program: { gunluk: GUNLUK, haftalik: HAFTALIK, kontrol: KONTROL },
     gun, hafta, bugun, buHafta: haftaBasi(bugun),
-    isaretler: (isaretler ?? []).filter((x: any) => KALEM_IDLERI.has(x.kalem)),
+    isaretler: (isaretler ?? []).filter((x: any) => KALEM_IDLERI.has(x.kalem))
+      .map(({ foto, ...x }: any) => ({ ...x, foto_url: foto ? fotoAdres.get(foto) ?? null : null })),
     gecmisGorur: gecmisli,
-    gecmis: { gunler, haftalar, gunlukToplam: await devriyeciSayisi(), haftalikToplam: kalemSayisi(HAFTALIK) },
+    gecmis: { gunler, haftalar, kontrolGunler, gunlukToplam: await devriyeciSayisi(), haftalikToplam: kalemSayisi(HAFTALIK), kontrolToplam: kalemSayisi(KONTROL) },
   };
 }
 const devriyeciSayisi = async () => {
@@ -301,8 +313,8 @@ const devriyeciSayisi = async () => {
 async function gorevHatirlat() {
   const bugun = sonGun(new Date(), 0);
   const sonuc: Record<string, unknown> = {};
-  sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📍 Günlük devriye",
-    `Devriyeye çıkarken uygulamada "Devriyeyi Başlat"a, bitince "Devriyeyi Bitir"e basın.`, { sayfa: "gorevler" });
+  sonuc.gunluk = await bildir(GOREV_ISARETLEYEN, "📍 Günlük işler",
+    `Devriyeye çıkarken "Devriyeyi Başlat"a, bitince "Devriyeyi Bitir"e basın. Günlük Kontrol listesindeki ${kalemSayisi(KONTROL)} işi yapıldıkça işaretleyin.`, { sayfa: "gorevler-isler" });
   // Pazartesi: haftalık program da hatırlatılır
   if (haftaBasi(bugun) === bugun) {
     sonuc.haftalik = await bildir(GOREV_ISARETLEYEN, "📋 Haftalık görevler",
@@ -344,7 +356,7 @@ async function yenilikBul(u: any, rol: Rol) {
   const y: any[] = [];
   const baska = (x: any) => x.cihaz !== u.cihaz && !testCihaz(String(x.cihaz ?? ""));
   for (const x of (pay.data ?? []).filter(baska)) {
-    if (x.bolum === "muhasebe") {
+    if (x.bolum === "muhasebe" || x.bolum === "muhasebe_restoran") {
       if (MUHASEBE_GOREN.includes(rol)) y.push({ a: "m" + x.id, tip: "muhasebe", at: x.created_at,
         metin: kisa(x.metin) || ({ gorsel: "Resim paylaşıldı.", pdf: "PDF belge paylaşıldı." } as any)[x.tur] || "Yeni paylaşım." });
       continue;
@@ -943,10 +955,11 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       else if (g.tur === "restoran") restoranYonetir();
       else if (g.tur === "muhasebe") { if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Bu dosyayı yalnızca muhasebe yükleyebilir.", 403); }
       else if (g.tur === "devriye") { if (!["baskan", "mudur", "sef"].includes(rol)) throw new Hata("Bu işlem size açık değil.", 403); }
+      else if (g.tur === "kontrol") { if (!GOREV_ISARETLEYEN.includes(rol)) throw new Hata("Günlük Kontrol fotoğrafını yalnızca müdür ve şef ekler.", 403); }
       else if (g.tur !== undefined && g.tur !== null && g.tur !== "") throw new Hata("Geçersiz yükleme türü.");
       const coklu = g.tur === "restoran" || g.tur === "duyuru" || g.tur === "muhasebe";
       const uzanti = coklu && ["jpg", "pdf"].includes(g.uzanti) ? g.uzanti : "jpg";
-      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" ? "devriye/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
+      const yol = `${g.tur === "aidat" ? "aidat" : g.tur === "temsilci" ? "temsilci" : coklu ? g.tur : g.tur === "devriye" || g.tur === "kontrol" ? g.tur + "/" + sonGun(new Date(), 0) : new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${uzanti}`;
       const { data, error } = await db.storage.from(BUCKET).createSignedUploadUrl(yol);
       if (error) throw error;
       return { yol: data.path, adres: data.signedUrl };
@@ -1150,10 +1163,29 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       if (!GOREV_ISARETLEYEN.includes(rol)) throw new Hata("Görevleri yalnızca müdür ve şef işaretleyebilir.", 403);
       const kalem = temiz(g.kalem, 10);
       if (!KALEM_IDLERI.has(kalem)) throw new Hata("Böyle bir görev kalemi yok.");
-      const tur = kalem.startsWith("G-") ? "gunluk" : "haftalik";
+      const tur = kalem.startsWith("G-") ? "gunluk" : kalem.startsWith("K-") ? "kontrol" : "haftalik";
       const bugun = sonGun(new Date(), 0);
-      const donem = tur === "gunluk" ? bugun : haftaBasi(bugun);
-      if (g.yapildi) {
+      const donem = tur === "haftalik" ? haftaBasi(bugun) : bugun;
+      if (tur === "kontrol") {
+        // Günlük Kontrol: isteğe bağlı fotoğraf. İşaretli kaleme sonradan fotoğraf eklenebilir; işaret kalkınca fotoğraf da silinir.
+        const foto = temiz(g.foto, 200);
+        if (foto && !foto.startsWith("kontrol/")) throw new Hata("Fotoğraf yüklenemedi, tekrar deneyin.");
+        const { data: eski } = await db.from("gorev_isaretleri").select("foto").eq("tur", tur).eq("donem", donem).eq("kalem", kalem).maybeSingle();
+        if (g.yapildi) {
+          if (eski && foto) {
+            const { error } = await db.from("gorev_isaretleri").update({ foto }).eq("tur", tur).eq("donem", donem).eq("kalem", kalem);
+            if (error) throw error;
+            if (eski.foto) await db.storage.from(BUCKET).remove([eski.foto]);
+          } else if (!eski) {
+            const { error } = await db.from("gorev_isaretleri").insert({ tur, donem, kalem, cihaz: u.cihaz, ad: u.ad, rol, foto: foto || null });
+            if (error && error.code !== "23505") throw error;
+          }
+        } else if (eski) {
+          const { error } = await db.from("gorev_isaretleri").delete().eq("tur", tur).eq("donem", donem).eq("kalem", kalem);
+          if (error) throw error;
+          if (eski.foto) await db.storage.from(BUCKET).remove([eski.foto]);
+        }
+      } else if (g.yapildi) {
         const { error } = await db.from("gorev_isaretleri").upsert(
           { tur, donem, kalem, cihaz: u.cihaz, ad: u.ad, rol },
           { onConflict: "tur,donem,kalem", ignoreDuplicates: true },
@@ -1456,7 +1488,8 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
     // ---------- Muhasebe: yönetim görür; muhasebe ve yönetici paylaşır (görsel, metin, PDF) ----------
     case "muhasebe_liste": {
       if (!MUHASEBE_GOREN.includes(rol)) throw new Hata("Muhasebe bölümünü yalnızca yönetici, yönetim kurulu ve muhasebe görür.", 403);
-      const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", "muhasebe").order("created_at", { ascending: false }).limit(100);
+      const alt = muhasebeAlt(g.alt);
+      const { data, error } = await db.from("restoran_paylasim").select("*").eq("bolum", alt.bolum).order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
       const yollar = (data ?? []).map((x: any) => x.yol).filter(Boolean);
       const { data: u2 } = yollar.length ? await db.storage.from(BUCKET).createSignedUrls(yollar, 60 * 60 * 6) : { data: [] };
@@ -1466,12 +1499,14 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
           ekleyen: x.rol === "baskan" ? "Kooperatif Yönetimi" : "Muhasebe", url: x.yol ? harita.get(x.yol) ?? null : null })),
         yonetir: MUHASEBE_PAYLASAN.includes(rol),
         silebilir: MUHASEBE_SILEN.includes(rol),
-        masraf: await masrafDurumu(),
+        masraf: await masrafDurumu(alt.bolum),
+        alt: alt.ad,
       };
     }
 
     case "muhasebe_paylas": {
       if (!MUHASEBE_PAYLASAN.includes(rol)) throw new Hata("Muhasebe bölümünde yalnızca muhasebe paylaşım yapar.", 403);
+      const alt = muhasebeAlt(g.alt);
       const tur = ["gorsel", "metin", "pdf"].includes(g.tur) ? g.tur : "";
       if (!tur) throw new Hata("Paylaşım türünü seçin.");
       const masraf = !!g.masraf;
@@ -1481,18 +1516,18 @@ async function islem(eylem: string, u: { cihaz: string; ad: string; rol: Rol; du
       const yol = tur === "metin" ? null : temiz(g.yol, 200);
       if (tur === "metin" && !metin) throw new Hata("Paylaşılacak metni yazın.");
       if (tur !== "metin" && !yol?.startsWith("muhasebe/")) throw new Hata("Dosya yüklenemedi, tekrar deneyin.");
-      const { data: p, error } = await db.from("restoran_paylasim").insert({ bolum: "muhasebe", tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
+      const { data: p, error } = await db.from("restoran_paylasim").insert({ bolum: alt.bolum, tur, metin: metin || null, yol, ekleyen: u.ad, rol, cihaz: u.cihaz }).select("id").single();
       if (error) throw error;
       const ad = { gorsel: "📷 Yeni görsel", metin: "📝 Yeni not", pdf: "📄 Yeni PDF" }[tur as "gorsel"];
       let resim: string | null = null;
       if (tur === "gorsel" && yol) { const { data: s } = await db.storage.from(BUCKET).createSignedUrl(yol, 60 * 60 * 24); resim = s?.signedUrl ?? null; }
-      const giden = await duyur(MUHASEBE_GOREN, masraf ? "📋 Aylık Masraflar Listesi paylaşıldı" : `🧾 Muhasebe: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
+      const giden = await duyur(MUHASEBE_GOREN, masraf ? `📋 ${alt.ad}: Aylık Masraflar Listesi paylaşıldı` : `🧾 Muhasebe · ${alt.ad}: ${ad}`, (metin || "Muhasebe bölümünde yeni bir paylaşım var.").slice(0, 180), { sayfa: "muhasebe", resim });
       return { id: p.id, ...giden };
     }
 
     case "muhasebe_sil": {
       if (!MUHASEBE_SILEN.includes(rol)) throw new Hata("Yalnızca muhasebe ve yönetici silebilir.", 403);
-      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).eq("bolum", "muhasebe").maybeSingle();
+      const { data: x } = await db.from("restoran_paylasim").select("id, yol").eq("id", g.id).in("bolum", ["muhasebe", "muhasebe_restoran"]).maybeSingle();
       if (!x) throw new Hata("Paylaşım bulunamadı.");
       if (x.yol) await db.storage.from(BUCKET).remove([x.yol]);
       await db.from("restoran_paylasim").delete().eq("id", x.id);
@@ -2019,11 +2054,15 @@ async function aylikRaporHazirla(ay: string, bildirimle: boolean) {
 }
 // Her akşam çağrılır; yarın ayın 1'iyse bu ayın raporu hazırlanır
 async function masrafUyarisi() {
-  const m = await masrafDurumu();
-  if (!m.bugun_gunu || m.paylasildi_at) return { masraf: m.paylasildi_at ? "paylaşıldı" : "bugün değil", masraf_gunu: m.gun };
-  const r = await bildir(MUHASEBE_GOREN, "⚠ Aylık Masraflar Listesi paylaşılmadı",
-    `${m.liste_ayi} ayının masraflar listesi bugün (ayın ilk iş günü) Muhasebe bölümünde henüz paylaşılmadı.`, { sayfa: "muhasebe" });
-  return { masraf: "uyarı gönderildi", ...r };
+  const sonuc: Record<string, string> = {};
+  for (const alt of Object.values(MUHASEBE_ALT)) {
+    const m = await masrafDurumu(alt.bolum);
+    if (!m.bugun_gunu || m.paylasildi_at) { sonuc[alt.ad] = m.paylasildi_at ? "paylaşıldı" : "bugün değil"; continue; }
+    await bildir(MUHASEBE_GOREN, `⚠ ${alt.ad}: Aylık Masraflar Listesi paylaşılmadı`,
+      `${alt.ad} için ${m.liste_ayi} ayının masraflar listesi bugün (ayın ilk iş günü) Muhasebe bölümünde henüz paylaşılmadı.`, { sayfa: "muhasebe" });
+    sonuc[alt.ad] = "uyarı gönderildi";
+  }
+  return { masraf: sonuc };
 }
 async function aylikRaporZamani() {
   const uyari = await masrafUyarisi().catch((e) => ({ masraf_hata: String(e) }));
@@ -2034,8 +2073,10 @@ async function aylikRaporZamani() {
 
 async function gunlukGecikme() {
   // Ayın 1'i sabahı: muhasebeye "bugün Aylık Masraflar Listesi'ni paylaşın" hatırlatması
-  await masrafDurumu().then((m) => m.bugun_gunu && !m.paylasildi_at
-    ? bildir(["muhasebe"], "📋 Bugün Aylık Masraflar Listesi günü", `${m.liste_ayi} ayının masraflar listesini Muhasebe bölümünde paylaşmayı unutmayın.`, { sayfa: "muhasebe" }) : null).catch(() => {});
+  for (const alt of Object.values(MUHASEBE_ALT)) {
+    await masrafDurumu(alt.bolum).then((m) => m.bugun_gunu && !m.paylasildi_at
+      ? bildir(["muhasebe"], `📋 Bugün Aylık Masraflar Listesi günü (${alt.ad})`, `${alt.ad} için ${m.liste_ayi} ayının masraflar listesini Muhasebe bölümünde paylaşmayı unutmayın.`, { sayfa: "muhasebe" }) : null).catch(() => {});
+  }
   await eskiUyeleriSil().catch(() => {});
   await eskiDevriyeSil().catch(() => {});
   const bugun = sonGun(new Date(), 0);
